@@ -38,6 +38,29 @@ public sealed class PublicApiBaselineTests
 public sealed class PublicApiContractSelfTests
 {
     [Fact]
+    public void WindowsDesktopResolver_UsesTheCurrentRuntimeMajor()
+    {
+        string scratch = Path.Combine(PublicApiContract.FindRepoRoot(), "artifacts", "api-self-test-" + Guid.NewGuid().ToString("N"));
+        string frameworkRoot = Path.Combine(scratch, "Microsoft.WindowsDesktop.App");
+        try
+        {
+            foreach (string version in new[] { "8.0.24", "9.0.1", "10.0.10" })
+            {
+                string directory = Path.Combine(frameworkRoot, version);
+                Directory.CreateDirectory(directory);
+                File.WriteAllBytes(Path.Combine(directory, "PresentationCore.dll"), []);
+            }
+
+            string? selected = PublicApiContract.FindWindowsDesktopAssembly([frameworkRoot], "PresentationCore.dll", 8);
+            Assert.Equal(Path.Combine(frameworkRoot, "8.0.24", "PresentationCore.dll"), selected);
+        }
+        finally
+        {
+            if (Directory.Exists(scratch)) Directory.Delete(scratch, recursive: true);
+        }
+    }
+
+    [Fact]
     public void SignatureFormatter_CoversComplexPublicContracts()
     {
         string[] signatures = PublicApiContract.SnapshotTypes([typeof(ApiFixture<>), typeof(ApiFixture<>.ProtectedNested), typeof(IExplicitFixture), typeof(ExplicitFixture)]);
@@ -358,20 +381,26 @@ internal static class PublicApiContract
         string programFilesDotnet = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             "dotnet");
-        string? frameworkPath = new[]
-            {
+        string? frameworkPath = FindWindowsDesktopAssembly(
+            [
                 Path.Combine(sharedRoot?.FullName ?? string.Empty, "Microsoft.WindowsDesktop.App"),
                 Path.Combine(dotnetRoot ?? string.Empty, "shared", "Microsoft.WindowsDesktop.App"),
                 Path.Combine(programFilesDotnet, "shared", "Microsoft.WindowsDesktop.App")
-            }
-            .Where(Directory.Exists)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .SelectMany(Directory.GetDirectories)
-            .OrderByDescending(path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(path => Path.Combine(path, fileName))
-            .FirstOrDefault(File.Exists);
+            ],
+            fileName,
+            Environment.Version.Major);
         return frameworkPath is null ? null : AssemblyLoadContext.Default.LoadFromAssemblyPath(frameworkPath);
     }
+
+    internal static string? FindWindowsDesktopAssembly(IEnumerable<string> frameworkRoots, string fileName, int runtimeMajor) => frameworkRoots
+        .Where(Directory.Exists)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .SelectMany(Directory.GetDirectories)
+        .Select(path => new { Path = path, Version = Version.TryParse(Path.GetFileName(path), out Version? version) ? version : null })
+        .Where(entry => entry.Version?.Major == runtimeMajor)
+        .OrderByDescending(entry => entry.Version)
+        .Select(entry => Path.Combine(entry.Path, fileName))
+        .FirstOrDefault(File.Exists);
 
     private static string[] ReadFriends(string projectPath)
     {

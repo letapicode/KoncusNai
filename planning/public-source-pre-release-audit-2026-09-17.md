@@ -1,10 +1,12 @@
 # Public source pre-release audit — 2026-09-17
 
-Last updated with this release-hardening phase: **2026-09-22**.
+Last updated with the private GitHub staging review: **2026-09-23**.
 
 The dated sections below preserve the September 21 evidence baseline. Their
-outdated blocker lists and gate results are superseded by the current-state
-addendum at the end of this report.
+outdated blocker lists and gate results are superseded by the September 23
+current-state addendum at the end of this report. References below to the old
+repository and commit `2946ad2` describe the private Notype rollback copy, not
+the new `KoncusNai` Git history.
 
 ## Decision
 
@@ -471,3 +473,100 @@ third_party/compat/PROVENANCE.md
 3. Review the exact final file list, final gate report, and GitHub destination
    before any publication. The destination has not been supplied. No v1
    installer, automatic updater, signature, or clean-machine claim is approved.
+
+## September 23 private GitHub staging and public-source gate
+
+This section is the current disposition for the new source workspace at
+`C:\Users\RA\Desktop\Code\KoncusNai`. The earlier Notype Git history remains a
+private rollback copy and was not imported. The new `main` has one root commit,
+`851bf463183775e38db0909d5b00faaeae6a0d4f`, with no parent. `git fsck`
+reported no errors. In the signed-in GitHub repository view,
+[`letapicode/KoncusNai`](https://github.com/letapicode/KoncusNai) displayed
+**Private**, `main`, one commit, zero tags, no releases, the intended project
+description, and the rendered pre-release README. GitHub linked the commit and
+contributor to `@letapicode`; the commit author and committer are
+`Ram Adhikari <koncusnai@gmail.com>`. The local `origin/main` is the same commit.
+Whether private contributions are shown on the owner's public profile is a
+separate GitHub profile setting and was not changed in this review.
+
+### Exact committed source
+
+- The 1,126 paths in the committed tree match the ignored
+  `artifacts/release-audit/public-source-2026-09-23/current-source-manifest.json`
+  path-for-path, with zero missing or extra paths. Every tree entry is a regular
+  `100644` file. This first commit contains no reachable earlier Notype commits.
+- A committed-path scan found zero audio files, model weights, credentials,
+  databases, user-data directories, or generated build-output paths. A
+  high-confidence Git text search found zero private-key markers or token-shaped
+  GitHub, OpenAI, Hugging Face, and AWS credentials. The earlier exact-tree
+  content scan found only the synthetic `C:\Users\Person` path in a test.
+- The official Git-index size gate passed for this commit: 1,126 files,
+  9,209,171 indexed bytes, all nine tracked budgets, zero voice-preview files,
+  and zero WAV bytes. The ignored evidence report records the exact scan and
+  committed-checkout validation:
+  `artifacts/release-audit/public-source-2026-09-23/READINESS_REPORT.md`.
+- In the detached committed checkout, locked restore, a zero-warning Release
+  build, compiled public API validation, documentation, security/supply-chain,
+  packaging smoke, and the full suite passed: 1,435 passed, six opt-in or
+  environment tests skipped, zero failed. The September 23 Python OSV query
+  checked 193 locked package versions with zero advisory matches. These are
+  source and contract checks, not a signed installer or clean-machine test.
+
+### GitHub CI finding
+
+The first private GitHub Actions run for `851bf46`
+([ci #1](https://github.com/letapicode/KoncusNai/actions/runs/35899975013))
+**failed** at the compiled public API gate. Restore, supply-chain compliance,
+documentation, advisory audit, size budgets, and the Release and role builds
+passed before that point; later steps were skipped. The API test process uses
+.NET 8, but its resolver chose the newest Windows Desktop assembly directory
+by text sort. On the runner that selected a .NET 9 assembly and then failed to
+load `System.Runtime, Version=9.0.0.0` into the .NET 8 test process. A local
+fix now selects the latest installed Windows Desktop assembly within the
+process's runtime major version, with a regression case containing 8, 9, and
+10 directories. The focused local API tests pass. After this fix, the local
+Release build completed with zero warnings and errors; the full suite passed
+1,436 tests with six opt-in/environment skips and zero failures. Documentation
+and security/supply-chain gates passed, and a fresh OSV query checked 193
+locked Python versions with zero matches. A new GitHub CI run cannot be called
+green until this fix is pushed to the private repository and the run completes.
+This review did not push it.
+
+### Remaining owner decisions for public visibility
+
+1. **Indic Parler.** The exact pinned
+   [model card](https://huggingface.co/ai4bharat/indic-parler-tts/blob/7b527af5ee8ed1f9a28d80b19703ed9bb8ba10ca/README.md)
+   labels the checkpoint Apache-2.0 and describes named voices. The model is
+   [gated](https://huggingface.co/ai4bharat/indic-parler-tts/tree/7b527af5ee8ed1f9a28d80b19703ed9bb8ba10ca),
+   requiring each downloader to accept its conditions. Its training-data table
+   says `CC V1` for GLOBE, while the linked
+   [GLOBE-annotated dataset](https://huggingface.co/datasets/ai4b-hf/GLOBE-annotated)
+   does not display a clear license. The card does not answer whether named
+   voices or generated audio have conditions beyond the checkpoint license.
+   An [upstream clarification request](https://huggingface.co/ai4bharat/indic-parler-tts/discussions/27)
+   exists, but this review found no authoritative answer. The owner wants the
+   existing model option retained; no option was disabled. Before public
+   visibility, obtain upstream clarification or qualified advice and record
+   an explicit owner decision about this residual risk and intended claims.
+   The user-facing notice tells users to review model terms; it does not
+   establish the publisher's rights or resolve the ambiguity.
+2. **Optional Python runtimes.** The source contains setup scripts and pinned
+   requirements, but no downloaded wheels. Upstream package pages identify
+   [`phonemizer-fork`](https://pypi.org/project/phonemizer-fork/) as GPL-3.0-or-later,
+   [`num2words`](https://pypi.org/project/num2words/) as LGPL, and
+   [`soxr`](https://pypi.org/project/soxr/) as LGPL-2.1-or-later.
+   Decide, with qualified license review, which notices, source-offer or other
+   obligations apply to this source-only user-provisioning flow and to any
+   later installer or prebuilt runtime. Do not claim that direct user downloads
+   automatically settle those obligations.
+3. **Public source switch.** Review the final diff and private GitHub CI result,
+   record the rights decisions above, then obtain explicit owner approval
+   before changing visibility. A public work-in-progress source release can
+   precede version 1; it must remain labeled pre-release and source-available
+   under PolyForm Noncommercial. The current private repository is suitable
+   for ongoing commits and contribution attribution, but the public-source
+   gate is not yet complete.
+
+The version 1 installer remains a separate gate. No signed installer,
+clean-machine installation, upgrade validation, CUDA matrix, or release
+artifact is approved by this source review.

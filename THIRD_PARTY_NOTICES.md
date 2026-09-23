@@ -4,6 +4,13 @@ Koncus Nai combines original code with separately licensed packages, runtimes,
 fonts, models, and generated assets. Koncus Nai's PolyForm Noncommercial 1.0.0
 project license does not replace or narrow third-party rights and obligations.
 
+Listing or supporting a third-party model does not imply affiliation,
+endorsement, or a separate permission agreement with its provider. Koncus Nai
+does not grant rights to those models or their outputs. Each user must follow
+the applicable upstream terms and obtain any additional permission their use
+requires. This notice does not remove obligations that may apply to Koncus
+Nai's own distribution of source code or third-party components.
+
 The machine-readable inventories are:
 
 - `docs/security/nuget-package-provenance.json`
