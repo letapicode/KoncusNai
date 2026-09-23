@@ -88,4 +88,17 @@ public sealed class CurrentSettingsPolicyTests
 
     Xunit.Assert.Equal(ChatTypefaceIds.System, normalized.ChatTypefaceId);
   }
+
+  [Xunit.Theory]
+  [Xunit.InlineData(79, 80)]
+  [Xunit.InlineData(151, 150)]
+  public void Normalize_ClampsWorkbenchZoomOutsideCurrentRange(int requested, int expected)
+  {
+    AppSettings normalized = CurrentSettingsPolicy.Normalize(AppSettings.Default with
+    {
+      WorkbenchZoomPercent = requested,
+    });
+
+    Xunit.Assert.Equal(expected, normalized.WorkbenchZoomPercent);
+  }
 }

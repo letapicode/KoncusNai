@@ -150,14 +150,19 @@ public sealed class WindowsHotkeyServiceTests
   private sealed class FakeUser32HotkeyApi : IUser32HotkeyApi
   {
     private readonly ConcurrentQueue<WindowsMessage> queue = new();
-    private short asyncKeyState;
+    private volatile short asyncKeyState;
+    private volatile bool ignoreQuitMessages;
 
     public bool RegisterHotKeyResult { get; set; } = true;
     public int LastError { get; set; }
     public int RegisterHotKeyCallCount { get; private set; }
     public int UnregisterHotKeyCallCount { get; private set; }
     public int PostThreadMessageCallCount { get; private set; }
-    public bool IgnoreQuitMessages { get; set; }
+    public bool IgnoreQuitMessages
+    {
+      get => ignoreQuitMessages;
+      set => ignoreQuitMessages = value;
+    }
     public bool BlockKeyStateReads { get; set; }
     public ManualResetEventSlim KeyStateReadStarted { get; } = new(false);
     public ManualResetEventSlim AllowKeyStateReads { get; } = new(false);

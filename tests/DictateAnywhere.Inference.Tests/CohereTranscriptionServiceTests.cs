@@ -320,19 +320,47 @@ public sealed class CohereTranscriptionServiceTests
       new FakeWorkerClientFactory(workerClient));
 
     service.WarmUpInBackground(modelId);
+    Task warmUp = Xunit.Assert.IsAssignableFrom<Task>(service.BackgroundWarmUpTask);
+    await warmUp.WaitAsync(TimeSpan.FromSeconds(15));
 
-    await WaitUntilAsync(() =>
-    {
-      lock (diagnostics.InfoEntries)
-      {
-        return diagnostics.InfoEntries.Any(entry =>
-          entry.Message == "Cohere worker warmup completed."
-          && Equals(entry.Properties["stage"], "warmupCompleted"));
-      }
-    });
+    Xunit.Assert.True(
+      diagnostics.ErrorEntries.Count == 0,
+      string.Join(Environment.NewLine, diagnostics.ErrorEntries.Select(entry =>
+        $"{entry.Message}: {entry.Exception}")));
+    Xunit.Assert.Contains(diagnostics.InfoEntries, entry =>
+      entry.Message == "Cohere worker warmup completed."
+      && Equals(entry.Properties["stage"], "warmupCompleted"));
 
     Xunit.Assert.Equal(1, workerClient.StartCallCount);
     Xunit.Assert.Equal(0, workerClient.InvokeCallCount);
+  }
+
+  [Xunit.Fact]
+  public async Task WarmUpInBackground_LogsFailureBeforeWorkerStarts()
+  {
+    using TempDirectoryScope scope = new();
+    RecordingStructuredDiagnostics diagnostics = new();
+    await using FakeWorkerClient workerClient = new(new WorkerResponse("ignored", 0));
+    await using CohereTranscriptionService service = new(
+      CohereTranscriptionOptions.Default with
+      {
+        ModelRootPath = scope.DirectoryPath,
+        ProviderId = TranscriptionProviderIds.CohereLocal,
+      },
+      diagnostics,
+      new FakeWorkerClientFactory(workerClient));
+
+    service.WarmUpInBackground("missing-model");
+    Task warmUp = Xunit.Assert.IsAssignableFrom<Task>(service.BackgroundWarmUpTask);
+    await warmUp.WaitAsync(TimeSpan.FromSeconds(15));
+
+    Xunit.Assert.Contains(diagnostics.ErrorEntries, entry =>
+      entry.Message == "Cohere worker warmup failed."
+      && entry.Exception is InferenceException { Reason: InferenceFailureReason.ModelMissing });
+    Xunit.Assert.Contains(diagnostics.ErrorEntries, entry =>
+      entry.Message == "Cohere background warmup failed."
+      && entry.Exception is InferenceException { Reason: InferenceFailureReason.ModelMissing });
+    Xunit.Assert.Equal(0, workerClient.StartCallCount);
   }
 
   [Xunit.Fact]
@@ -456,22 +484,6 @@ public sealed class CohereTranscriptionServiceTests
       ?? throw new InvalidOperationException($"Request property '{propertyName}' was not found.");
     return (T)(property.GetValue(request)
       ?? throw new InvalidOperationException($"Request property '{propertyName}' was null."));
-  }
-
-  private static async Task WaitUntilAsync(Func<bool> condition)
-  {
-    DateTimeOffset deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
-    while (DateTimeOffset.UtcNow < deadline)
-    {
-      if (condition())
-      {
-        return;
-      }
-
-      await Task.Delay(25);
-    }
-
-    throw new TimeoutException("Condition was not met before the test timeout.");
   }
 
   private sealed class FakeWorkerClientFactory : IPersistentWorkerClientFactory

@@ -56,10 +56,21 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
 
   public string ProviderId => options.ProviderId;
 
+  internal Task? BackgroundWarmUpTask
+  {
+    get
+    {
+      lock (backgroundWarmUpSync)
+      {
+        return backgroundWarmUpTask;
+      }
+    }
+  }
+
   [SuppressMessage(
     "Design",
     "CA1031:Do not catch general exception types",
-    Justification = "Background warmup failures are logged by WarmUpAsync and must not crash runtime startup.")]
+    Justification = "Background warmup failures are logged and must not crash runtime startup.")]
   public void WarmUpInBackground(string modelId)
   {
     if (string.IsNullOrWhiteSpace(modelId))
@@ -91,8 +102,15 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
           catch (OperationCanceledException)
           {
           }
-          catch (Exception)
+          catch (Exception ex)
           {
+            LogError(
+              "Cohere background warmup failed.",
+              ex,
+              CreateProperties(
+                ("providerId", options.ProviderId),
+                ("modelId", modelId),
+                ("stage", "backgroundWarmupFailed")));
           }
         });
     }
@@ -110,17 +128,17 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
   {
     string correlationId = Guid.NewGuid().ToString("N");
     Stopwatch totalStopwatch = Stopwatch.StartNew();
-    string modelPath = ResolveInstalledModelPath(modelId);
-    LogInfo(
-      "Cohere worker warmup started.",
-      CreateProperties(
-        ("correlationId", correlationId),
-        ("providerId", options.ProviderId),
-        ("modelId", modelId),
-        ("stage", "warmupStarted")));
-
     try
     {
+      string modelPath = ResolveInstalledModelPath(modelId);
+      LogInfo(
+        "Cohere worker warmup started.",
+        CreateProperties(
+          ("correlationId", correlationId),
+          ("providerId", options.ProviderId),
+          ("modelId", modelId),
+          ("stage", "warmupStarted")));
+
       PreparedWorker preparedWorker = await GetOrCreateStartedClientAsync(
           modelPath,
           cancellationToken,

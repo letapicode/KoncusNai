@@ -108,7 +108,7 @@ public sealed class SmokeTests
   }
 
   [Xunit.Fact]
-  public async Task RunAsync_ThrowsOperationCanceled_WhenCancellationTriggered()
+  public async Task RunAsync_ThrowsOperationCanceled_WhenCanceledBeforeCompletion()
   {
     BenchmarkServiceOptions options = BenchmarkServiceOptions.Default with
     {

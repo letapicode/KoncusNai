@@ -258,7 +258,7 @@ public sealed class WorkbenchChatSendControllerTests
       "New chat",
       "Local model",
       AppSettings.Default);
-    await service.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    await service.Started.Task.WaitAsync(TimeSpan.FromSeconds(15));
     chat.NewChat();
     service.Completion.SetResult(new ChatCompletionResult("old response", "fake", "fake", TimeSpan.Zero));
 

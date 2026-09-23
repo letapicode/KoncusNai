@@ -34,16 +34,16 @@ function New-TestArguments {
     "DictateAnywhere.sln",
     "--configuration", "Release",
     "--no-restore",
-    "--nologo"
+    "--nologo",
+    "--maxcpucount:1"
   )
   if ($NoBuild) {
     $arguments += "--no-build"
   }
   if ($ForDiscovery) {
-    # Solution-level discovery output is parsed below. Keep MSBuild serial so
-    # project output cannot interleave and make real tests disappear from the
-    # count transiently.
-    $arguments += @("--list-tests", "--maxcpucount:1")
+    # Keep discovery and execution serial so test projects do not compete for
+    # worker threads while timing-sensitive deterministic tests are running.
+    $arguments += "--list-tests"
   }
   if (-not [string]::IsNullOrWhiteSpace($filter)) {
     $arguments += @("--filter", $filter)
