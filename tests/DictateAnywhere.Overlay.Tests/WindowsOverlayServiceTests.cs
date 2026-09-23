@@ -138,7 +138,7 @@ public sealed class WindowsOverlayServiceTests
       });
 
     await service.ShowStateAsync(DictationSessionState.Completed);
-    await Task.Delay(60);
+    await presenter.FirstHide.WaitAsync(TimeSpan.FromSeconds(5));
 
     Xunit.Assert.Single(presenter.ShownPresentations);
     Xunit.Assert.True(presenter.HideCallCount >= 1);
@@ -163,7 +163,7 @@ public sealed class WindowsOverlayServiceTests
       DictationSessionState.Completed,
       DictationStatusMessages.NoAudibleSpeechDetected,
       display: display);
-    await Task.Delay(60);
+    await presenter.FirstHide.WaitAsync(TimeSpan.FromSeconds(5));
 
     OverlayPresentation presentation = Xunit.Assert.Single(presenter.ShownPresentations);
     Xunit.Assert.Equal(DictationStatusMessages.NoAudibleSpeechDetected, presentation.Message);
@@ -182,7 +182,7 @@ public sealed class WindowsOverlayServiceTests
       });
 
     await service.ShowStateAsync(DictationSessionState.Error, "Insertion failed.");
-    await Task.Delay(60);
+    await presenter.FirstHide.WaitAsync(TimeSpan.FromSeconds(5));
 
     Xunit.Assert.Single(presenter.ShownPresentations);
     Xunit.Assert.True(presenter.HideCallCount >= 1);
@@ -399,8 +399,11 @@ public sealed class WindowsOverlayServiceTests
 
   private sealed class FakeOverlayPresenter : IOverlayPresenter
   {
+    private readonly TaskCompletionSource<bool> firstHide = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public List<OverlayPresentation> ShownPresentations { get; } = new();
     public int HideCallCount { get; private set; }
+    public Task FirstHide => firstHide.Task;
 
     public Task ShowAsync(OverlayPresentation presentation, CancellationToken cancellationToken = default)
     {
@@ -411,6 +414,7 @@ public sealed class WindowsOverlayServiceTests
     public Task HideAsync(CancellationToken cancellationToken = default)
     {
       HideCallCount++;
+      firstHide.TrySetResult(true);
       return Task.CompletedTask;
     }
   }
