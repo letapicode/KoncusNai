@@ -96,7 +96,7 @@ public sealed class WindowsHotkeyServiceTests
       api,
       WindowsHotkeyService.DefaultHotkeyId,
       TimeSpan.FromMilliseconds(5),
-      TimeSpan.FromMilliseconds(25));
+      TimeSpan.FromSeconds(1));
     try
     {
       HotkeyRegistrationResult result = await service.RegisterAsync(

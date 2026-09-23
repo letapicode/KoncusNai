@@ -117,10 +117,11 @@ public sealed class SmokeTests
     };
     CpuCalibrationBenchmarkService service = new(options);
     using CancellationTokenSource cancellationSource = new();
-    cancellationSource.CancelAfter(TimeSpan.FromMilliseconds(30));
+    Task<BenchmarkResult> run = service.RunAsync(cancellationToken: cancellationSource.Token);
+    cancellationSource.Cancel();
 
     await Xunit.Assert.ThrowsAnyAsync<OperationCanceledException>(
-      () => service.RunAsync(cancellationToken: cancellationSource.Token));
+      () => run);
   }
 
   private sealed class TemporaryDirectoryScope : IDisposable

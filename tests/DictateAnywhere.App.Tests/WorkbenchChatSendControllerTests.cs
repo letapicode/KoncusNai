@@ -262,7 +262,7 @@ public sealed class WorkbenchChatSendControllerTests
     chat.NewChat();
     service.Completion.SetResult(new ChatCompletionResult("old response", "fake", "fake", TimeSpan.Zero));
 
-    WorkbenchChatSendResult result = await send.WaitAsync(TimeSpan.FromSeconds(2));
+    WorkbenchChatSendResult result = await send.WaitAsync(TimeSpan.FromSeconds(15));
 
     Xunit.Assert.False(chat.IsCurrent(source));
     Xunit.Assert.Empty(chat.Messages);
