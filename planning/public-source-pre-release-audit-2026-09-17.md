@@ -1,6 +1,6 @@
 # Public source pre-release audit — 2026-09-17
 
-Last updated with the passing private GitHub CI baseline: **2026-09-23**.
+Last updated with the latest passing private GitHub CI baseline: **2026-09-23**.
 
 The dated sections below preserve the September 21 evidence baseline. Their
 outdated blocker lists and gate results are superseded by the September 23
@@ -479,8 +479,8 @@ third_party/compat/PROVENANCE.md
 This section is the current disposition for the new source workspace at
 `C:\Users\RA\Desktop\Code\KoncusNai`. The earlier Notype Git history remains a
 private rollback copy and was not imported. At the reviewed baseline, `main`
-and local `origin/main` both point to `ac2e6df4ad2ea745a8975637007da572111db3d1`.
-There are six reachable commits from the fresh root
+and local `origin/main` both point to `7d3dfd02e3fe3cd71809a0f4f19ab678fac91171`.
+There are seven reachable commits from the fresh root
 `851bf463183775e38db0909d5b00faaeae6a0d4f`, which has no parent; the old
 Notype commit `2946ad2` is not reachable. The signed-in GitHub staging review
 previously verified that [`letapicode/KoncusNai`](https://github.com/letapicode/KoncusNai)
@@ -492,17 +492,17 @@ contributions appear on the owner's public profile is a separate GitHub setting.
 
 - The fresh root's 1,126 paths matched the ignored
   `artifacts/release-audit/public-source-2026-09-23/current-source-manifest.json`
-  path-for-path. The current `ac2e6df` tree has 1,127 regular `100644` files;
+  path-for-path. The current `7d3dfd0` tree has 1,127 regular `100644` files;
   later source and test changes make the root manifest a historical first-commit
   record, not a current-tree manifest.
-- A scan of the current committed paths and all six reachable commits found
+- A scan of the current committed paths and all seven reachable commits found
   zero audio, model-weight, credential-file, database, user-data, or generated
   build-output paths. A high-signal current-tree Git text search found zero
   private-key markers or token-shaped GitHub, OpenAI, Hugging Face, and AWS
   credentials. This is a source-boundary check, not proof against every possible
   secret string.
 - The official Git-index size gate in the successful CI run passed for 1,127
-  files and 9,230,548 indexed bytes, all tracked budgets, zero voice-preview
+  files and 9,233,974 indexed bytes, all tracked budgets, zero voice-preview
   files, and zero WAV bytes. The ignored initial evidence report records the
   fresh-root scan and committed-checkout validation:
   `artifacts/release-audit/public-source-2026-09-23/READINESS_REPORT.md`.
@@ -518,8 +518,10 @@ The first private GitHub Actions run for `851bf46`
 failed at the compiled public API gate because its .NET 8 test process selected
 a .NET 9 Windows Desktop assembly. That resolver was corrected and tested.
 Subsequent reliability work addressed intermittent warmup and overlay timeout
-tests. The [private `ac2e6df` build-test run](https://github.com/letapicode/KoncusNai/actions/runs/35923006735)
-checked out that exact commit and **passed** in 13 minutes 52 seconds:
+tests. Both the [private `ac2e6df` build-test run](https://github.com/letapicode/KoncusNai/actions/runs/35923006735)
+and the later [private `7d3dfd0` build-test run](https://github.com/letapicode/KoncusNai/actions/runs/35932874142)
+passed. The latter checked out exactly `7d3dfd02e3fe3cd71809a0f4f19ab678fac91171`
+and completed in 15 minutes 17 seconds:
 
 - Locked restore, documentation, supply-chain/security, a 193-package Python
   OSV query with zero matches, the Git-index size gate, zero-warning Release and
@@ -540,10 +542,20 @@ skipped tests require installed models, GPU, or a real runtime, and two require
 explicit video/export opt-in. The compatibility gate did not use
 `-EnforceReleaseEvidence`; manual app and upgrade evidence remains outstanding.
 There is no validated signed installer, actual installation, clean-machine
-upgrade, or measured first-three-dictation latency result. A new documentation
-commit will need its own private CI run before any visibility change.
+upgrade, or measured first-three-dictation latency result. The user reports
+that the first two dictations after launch can feel slower than the third;
+background readiness warmup and model/worker loading are plausible, but no
+stage measurements yet establish the cause. The [README](../README.md#first-use-dictation-speed-and-timing)
+and [user guide](../docs/guides/user-guide.md#daily-dictation) now explain
+the possible early delay without promising a fixed warmup count. A new
+documentation commit will need its own private CI run before visibility changes.
 
 ### Remaining owner decisions for public visibility
+
+The concise [owner decision record](../docs/release/public-source-owner-decision-record.md)
+contains specific upstream and qualified-review questions and a draft message
+for the recorded Hugging Face discussion. No AI4Bharat email address was
+verified from the local evidence in this preflight.
 
 1. **Indic Parler.** The exact pinned
    [model card](https://huggingface.co/ai4bharat/indic-parler-tts/blob/7b527af5ee8ed1f9a28d80b19703ed9bb8ba10ca/README.md)

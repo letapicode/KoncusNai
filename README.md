@@ -1,6 +1,6 @@
 # Koncus Nai
 
-> **Pre-release source project:** the private source baseline at `ac2e6df` passed GitHub CI on September 23, 2026. Public visibility still requires the owner's rights and publication decisions. This is not a supported `v1` release; do not redistribute an installer built from this checkout as an official Koncus Nai release.
+> **Pre-release source project:** the private source baseline at `7d3dfd0` passed GitHub CI on September 23, 2026. Public visibility still requires the owner's rights and publication decisions. This is not a supported `v1` release; do not redistribute an installer built from this checkout as an official Koncus Nai release.
 
 Koncus Nai was previously named Nilo and Notype (and originally Dictate Anywhere). The burnt-orange KN monogram
 is the current application mark. Existing data paths, executable names and installer
@@ -18,7 +18,7 @@ Koncus Nai is a Windows 11 local-first application for global dictation, local c
 
 ## Start here
 
-The current private source baseline passed its automated CI gates; the public-source decision remains open. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md), [the release checklist](docs/release/release-checklist.md), and [TODO.md](TODO.md) for tested changes, remaining decisions, and installation limitations. Local audit installers are not approved public releases.
+The current private source baseline passed its automated CI gates; the public-source decision remains open. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md), [the owner decision record](docs/release/public-source-owner-decision-record.md), [the release checklist](docs/release/release-checklist.md), and [TODO.md](TODO.md) for tested changes, remaining decisions, and installation limitations. Local audit installers are not approved public releases.
 
 Koncus Nai is **source-available** under [PolyForm Noncommercial 1.0.0](LICENSE); it is not OSI-approved open source. The license permits noncommercial use, modification, and redistribution. Commercial use requires separate written permission from Ram Adhikari through [koncusnai@gmail.com](mailto:koncusnai@gmail.com). Third-party code, models, and assets remain under their own licenses.
 
@@ -77,7 +77,9 @@ Generated voice previews are not included in this repository or release payload.
 
 CrisperWhisper is optional and is **not licensed for ordinary production or commercial use**. Its upstream terms restrict the weights and every output, including transcripts, timestamps, and derived annotations, to non-commercial research. Koncus Nai requires explicit acknowledgement before those weights can be selected or used for Reading Studio alignment. See [MODEL_LICENSES.md](MODEL_LICENSES.md) for exact pinned revisions, approximate download sizes, and official license links.
 
-### First-use dictation timing
+### First-use dictation speed and timing
+
+**Expect possible first-use delay.** The first few dictations after opening Koncus Nai may take longer than later ones, even for a short phrase. Koncus Nai starts background readiness work for the selected model; loading a worker or model and warming system caches may contribute. The exact reason and number of slower attempts have not been measured for every setup; a faster third attempt is possible, not guaranteed. The tray menu shows the selected model's readiness state. Do not judge steady-state speed from the first attempt alone: try several similar dictations with the same model after it reports **Ready**. If delays continue, the timing fields below help identify the slow stage.
 
 The green CI run did not measure an installed model or explain why a user's first two dictations may feel slower than the third. For a comparable manual check, open the app normally, keep the same provider, model, language, target app, and recording mode, then dictate the same non-sensitive short phrase three times at a similar speaking pace. Note whether model readiness was still warming before the first attempt. Compare `Recording started.` and `Dictation stop-to-visible timing completed.` entries by `operationId` in the local logs under `%LOCALAPPDATA%\DictateAnywhere\logs`. The numeric `recordingOverlayMs`, `captureStartMs`, `transcribingOverlayMs`, `captureFinalizationMs`, `transcriptionWallMs`, `modelReportedMs`, `transformationMs`, `insertionMs`, and `stopToVisibleMs` fields separate the visible stages. Cohere and CrisperWhisper also log `workerColdStart`, worker startup, and inference or invocation timings; match those by time and model because their worker correlation IDs differ from the dictation operation ID. Do not commit raw logs, recordings, transcripts, models, or credentials.
 

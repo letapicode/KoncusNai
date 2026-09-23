@@ -2,7 +2,7 @@
 
 Current plan: [Chat polish and production readiness](planning/production-readiness-plan-2026-09-15.md).
 
-Current assessment: the private source baseline `ac2e6df` passed GitHub CI on September 23, 2026. Public work-in-progress visibility still requires the owner's rights and publication decisions; a supported version 1 installer is not ready. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md).
+Current assessment: the private source baseline `7d3dfd0` passed GitHub CI on September 23, 2026. Public work-in-progress visibility still requires the owner's rights and publication decisions; a supported version 1 installer is not ready. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md) and [owner decision record](docs/release/public-source-owner-decision-record.md).
 
 This is the user-facing checklist for the September 15 request. The [engineering hardening backlog](planning/codebase-hardening-backlog.md) remains the record for previous hardening work. Unchecked items below are planned, not implemented or verified.
 
@@ -19,17 +19,17 @@ This is the user-facing checklist for the September 15 request. The [engineering
 
 ## Blockers before making the repository public
 
-Release status: checked items include the successful private `ac2e6df` CI baseline, not approval to change visibility. Revalidate the final candidate after any new commit.
+Release status: checked items include the successful private `7d3dfd0` CI baseline, not approval to change visibility. Revalidate the final candidate after any new commit.
 
 - [x] Add the official PolyForm Noncommercial 1.0.0 root license, Ram Adhikari's 2026 required notice, source-available wording, disclaimer, and commercial-contact route. Contributor-rights policy still needs an owner decision before accepting outside code.
 - [x] Publish `koncusnai@gmail.com` in `SECURITY.md` with a seven-calendar-day initial-response target. Immediately after the repository becomes public, enable GitHub private vulnerability reporting and add the real Security Advisory route.
-- [x] Review the current 1,127-file committed tree and six reachable commits through `ac2e6df` for generated audio, models, caches, user data, build output and high-signal credential patterns. The source-boundary scan found zero forbidden paths and zero high-signal secret matches; repeat on the final candidate. The original 1,126-file manifest describes the fresh root commit, not the current tree.
+- [x] Review the current 1,127-file committed tree and seven reachable commits through `7d3dfd0` for generated audio, models, caches, user data, build output and high-signal credential patterns. The source-boundary scan found zero forbidden paths and zero high-signal secret matches; repeat on the final candidate. The original 1,126-file manifest describes the fresh root commit, not the current tree.
 - [x] Start fresh Git history in KoncusNai: root commit `851bf46` has no parent, and the old Notype commit `2946ad2` is not reachable from `main`. Keep the old repository private as a rollback copy and never import its audio-bearing history.
 - [x] Replace the affected Indic graph with compatibility-patched, source-manifested Parler-TTS 0.2.2, AudioTools 0.7.4, and Descript Audio Codec 1.0.0 on Transformers 5.17.0, protobuf 7.36.2, and PyTorch 2.13.0. The September 23 CI query checked the exact 193-package inventory with zero OSV matches; rerun at release time.
-- [ ] Record an explicit owner decision on Indic Parler named-voice, training-data, gated-access and output questions, and obtain qualified review of the optional GPL/LGPL runtime boundary recorded in `MODEL_LICENSES.md` and `THIRD_PARTY_NOTICES.md`. Keep every model option available. User notices do not settle publisher obligations; model weights and third-party Python wheels remain outside the public source tree.
+- [ ] Complete the [owner decision record](docs/release/public-source-owner-decision-record.md) on Indic Parler named-voice, training-data, gated-access and output questions, and obtain qualified review of the optional GPL/LGPL runtime boundary recorded in `MODEL_LICENSES.md` and `THIRD_PARTY_NOTICES.md`. Keep every model option available. User notices do not settle publisher obligations; model weights and third-party Python wheels remain outside the public source tree.
 - [x] Remove the undocumented Cohere health-check WAV from source and payload. Startup checks the loaded model through IPC; an isolated installed-model warm-up passed. This does not establish transcription accuracy; the benchmark accepts only operator-supplied, authorized audio.
-- [x] Pass the private `ac2e6df` GitHub CI source gates: locked build, documentation, supply chain, security, size, focused and full tests, coverage, fault seeds, Milestone 2 reliability, compatibility contracts and static packaging checks. The full suite passed 1,443 tests with six opt-in or environment skips. No real-model latency or installed-installer claim follows from these results.
-- [ ] After this documentation commit, obtain a green private CI run and review its exact committed tree before a visibility change.
+- [x] Pass the private `7d3dfd0` GitHub CI source gates: locked build, documentation, supply chain, security, size, focused and full tests, coverage, fault seeds, Milestone 2 reliability, compatibility contracts and static packaging checks. The full suite passed 1,443 tests with six opt-in or environment skips. No real-model latency or installed-installer claim follows from these results.
+- [ ] After the final documentation commit, obtain a green private CI run and review its exact committed tree before a visibility change.
 
 ## Blockers before a supported v1 installer
 

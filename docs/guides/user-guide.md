@@ -9,13 +9,15 @@ This guide covers installation, first use, daily dictation, Reading Studio narra
 - A supported local transcription model prepared through Settings.
 
 ## Install
-The current installer requires administrator approval on Windows 11 x64. Dictation only and Full assistant are first-run choices within the same installation, not separate packages. Settings can still open the workbench in Dictation only mode.
+No supported public installer has been validated or published. The installer steps below describe the intended flow for a future release; they are not current public download instructions.
+
+The installer candidate requires administrator approval on Windows 11 x64. Dictation only and Full assistant are first-run choices within the same installation, not separate packages. Settings can still open the workbench in Dictation only mode.
 
 Model weights are downloaded separately when prepared. Current pinned dictation downloads are approximately 4.13 GB for Cohere, 1.62 GB for CrisperWhisper Turbo, or 3.09 GB for CrisperWhisper Large, plus runtimes and temporary storage. Prepared local models can run offline. Voice previews are generated and cached locally; user-generated narration and recordings stay local and should never be uploaded as release assets.
 
-See the [release audit](../../planning/first-public-release-audit-2026-09-16.md) for the current release blockers. Source archives from GitHub require a build; use a tested installer from GitHub Releases when one is published.
+See the [current public-source audit](../../planning/public-source-pre-release-audit-2026-09-17.md) for the release decisions and installation limits. Source archives from GitHub require a build; use a tested installer from GitHub Releases when one is published.
 
-Install Koncus Nai with the setup package:
+When a validated installer is published, use its setup package:
 - `KoncusNai-Setup-Small-<version>-x64.exe`
   - Includes the application and local runtime dependencies.
   - A model may be downloaded the first time its provider is prepared.
@@ -35,6 +37,8 @@ The normal workflow uses toggle dictation:
 1. Press hotkey once to start.
 2. Press hotkey again to stop and insert.
 3. Follow the bottom-center recording, transcribing, and completion indicator.
+
+The first few dictations after opening the app may take longer than later ones, even for a short phrase. Koncus Nai checks readiness in the background, and a model or worker may need time to load. Open the tray menu to see the selected model's **Warming**, **Ready**, or **Failed** state. Do not judge steady-state speed from the first attempt alone: use the same model and similar speech length for several attempts after it reports **Ready**. A faster third attempt is possible but is not guaranteed; persistent delays should be investigated with the privacy-safe stage timings described in the [README](../../README.md#first-use-dictation-speed-and-timing).
 
 Koncus Nai remembers the application where recording began and attempts to restore it before insertion. If an ordinary focus change prevents insertion, the transcript is copied to the clipboard and is also saved to local history. Secure or blocked destinations remain protected and are reported as errors.
 
