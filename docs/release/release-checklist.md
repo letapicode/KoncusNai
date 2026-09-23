@@ -6,25 +6,32 @@ Before changing repository visibility, even without publishing an installer:
 
 - [x] Add the owner-selected standard root `LICENSE`; complete `docs/licensing-decision.md`.
 - [x] Put a monitored private security contact and response window in `SECURITY.md`; immediately after public visibility is enabled, turn on GitHub private vulnerability reporting and add the real advisory route.
-- [x] Confirm no model weights, Hugging Face credentials, OAuth files, user history/audio, logs, caches, build output, or machine-specific data exist in the reviewed first-commit tree or its reachable Git history. Repeat this check for any later public candidate.
+- [x] Confirm no model weights, Hugging Face credentials, OAuth files, user history/audio, logs, caches, build output, or machine-specific data exist in the 1,127-file `ac2e6df` tree or its six reachable commits. Repeat this check for the final public candidate.
 - [x] Review `MODEL_LICENSES.md`, `THIRD_PARTY_NOTICES.md`, archived license texts, and dependency inventories against the pinned revisions; record unresolved model and runtime rights below. Repeat when pins change.
 - [x] Keep CrisperWhisper optional and research-only; verify acknowledgement gates both dictation and Reading Studio alignment.
-- [x] Resolve all failing dependency-advisory gates or record narrowly scoped, owner-approved reachability exceptions with expiry dates. The September 22 exact 193-package scan reports zero OSV matches; rerun it against the final candidate.
-- [x] Build and test the fresh 1,126-file first-commit checkout; repeat after the final public-source changes.
-- [ ] Obtain a passing GitHub CI run on the final private `main` candidate.
+- [x] Resolve all failing dependency-advisory gates or record narrowly scoped, owner-approved reachability exceptions with expiry dates. The September 23 CI scan checked 193 locked packages with zero OSV matches; rerun it against the final candidate.
+- [x] Build and test the fresh 1,126-file root checkout and the later 1,127-file `ac2e6df` baseline. The current tree and history contain no reachable Notype commits.
+- [x] Obtain a passing private GitHub CI run on `ac2e6df` for source and static packaging checks.
+- [ ] Obtain a passing private GitHub CI run on the final public-source candidate after subsequent commits.
 - [ ] Record the owner's public-source decision on the Indic Parler named-voice, training-data, gated-access, and generated-output questions, and obtain qualified review of the optional GPL/LGPL runtime provisioning boundary.
 - [ ] Review the final private GitHub diff and exact history, then obtain explicit approval before changing visibility.
 
 The September 23 committed-checkout evidence is in the ignored
-`artifacts/release-audit/public-source-2026-09-23/READINESS_REPORT.md` and the
+`artifacts/release-audit/public-source-2026-09-23/READINESS_REPORT.md`; the
 current disposition is in `planning/public-source-pre-release-audit-2026-09-17.md`.
-The first private GitHub CI run failed in the compiled public API test because
-its .NET 8 process selected a .NET 9 Windows Desktop assembly. A local fix and
-regression test are prepared; the local Release build, full suite (1,436 passed,
-six skipped), documentation, supply-chain, and advisory gates passed. CI has
-not yet passed with that fix. The source
-repository is PolyForm Noncommercial source-available work in progress, not a
-supported version 1 installer.
+The [private `ac2e6df` build-test run](https://github.com/letapicode/KoncusNai/actions/runs/35923006735)
+passed locked restore, documentation, supply-chain/security and Git-index size
+checks (1,127 files; 9,230,548 bytes), zero-warning Release builds, public API
+contracts, 1,149 deterministic focused tests, coverage floors, four fault seeds,
+the full suite (1,443 passed; six opt-in/environment skips), three Milestone 2
+coordinator soak iterations, compatibility contracts, and static packaging and
+upgrade checks. The performance gate did not run a real-model cold/warm
+benchmark because no authorized audio path was supplied. The compatibility
+gate did not enforce manual release evidence. No signed installer, actual
+install/upgrade, or clean-machine validation has passed. The repository is
+PolyForm Noncommercial source-available work in progress, not a supported
+version 1 installer. User-facing model notices do not resolve the owner's
+remaining model and optional-runtime rights decisions.
 
 Passing this gate permits a clearly labeled source pre-release only. It does not approve a `v1` installer.
 

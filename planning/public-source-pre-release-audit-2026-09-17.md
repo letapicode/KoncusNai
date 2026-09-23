@@ -1,6 +1,6 @@
 # Public source pre-release audit — 2026-09-17
 
-Last updated with the private GitHub staging review: **2026-09-23**.
+Last updated with the passing private GitHub CI baseline: **2026-09-23**.
 
 The dated sections below preserve the September 21 evidence baseline. Their
 outdated blocker lists and gate results are superseded by the September 23
@@ -8,9 +8,9 @@ current-state addendum at the end of this report. References below to the old
 repository and commit `2946ad2` describe the private Notype rollback copy, not
 the new `KoncusNai` Git history.
 
-## Decision
+## September 17 decision (historical)
 
-**Not ready for public visibility yet.** The owner has now selected PolyForm
+**Not ready for public visibility at this stage.** The owner had selected PolyForm
 Noncommercial 1.0.0, supplied the notice/contact details, and authorized removal
 of all generated preview recordings. The known Indic OSV findings were fixed
 with a source-pinned compatibility stack; the September 22 scan found zero
@@ -478,59 +478,70 @@ third_party/compat/PROVENANCE.md
 
 This section is the current disposition for the new source workspace at
 `C:\Users\RA\Desktop\Code\KoncusNai`. The earlier Notype Git history remains a
-private rollback copy and was not imported. The new `main` has one root commit,
-`851bf463183775e38db0909d5b00faaeae6a0d4f`, with no parent. `git fsck`
-reported no errors. In the signed-in GitHub repository view,
-[`letapicode/KoncusNai`](https://github.com/letapicode/KoncusNai) displayed
-**Private**, `main`, one commit, zero tags, no releases, the intended project
-description, and the rendered pre-release README. GitHub linked the commit and
-contributor to `@letapicode`; the commit author and committer are
-`Ram Adhikari <koncusnai@gmail.com>`. The local `origin/main` is the same commit.
-Whether private contributions are shown on the owner's public profile is a
-separate GitHub profile setting and was not changed in this review.
+private rollback copy and was not imported. At the reviewed baseline, `main`
+and local `origin/main` both point to `ac2e6df4ad2ea745a8975637007da572111db3d1`.
+There are six reachable commits from the fresh root
+`851bf463183775e38db0909d5b00faaeae6a0d4f`, which has no parent; the old
+Notype commit `2946ad2` is not reachable. The signed-in GitHub staging review
+previously verified that [`letapicode/KoncusNai`](https://github.com/letapicode/KoncusNai)
+was private and linked the original commit and contributor to `@letapicode`.
+This update did not recheck repository settings in a browser. Whether private
+contributions appear on the owner's public profile is a separate GitHub setting.
 
 ### Exact committed source
 
-- The 1,126 paths in the committed tree match the ignored
+- The fresh root's 1,126 paths matched the ignored
   `artifacts/release-audit/public-source-2026-09-23/current-source-manifest.json`
-  path-for-path, with zero missing or extra paths. Every tree entry is a regular
-  `100644` file. This first commit contains no reachable earlier Notype commits.
-- A committed-path scan found zero audio files, model weights, credentials,
-  databases, user-data directories, or generated build-output paths. A
-  high-confidence Git text search found zero private-key markers or token-shaped
-  GitHub, OpenAI, Hugging Face, and AWS credentials. The earlier exact-tree
-  content scan found only the synthetic `C:\Users\Person` path in a test.
-- The official Git-index size gate passed for this commit: 1,126 files,
-  9,209,171 indexed bytes, all nine tracked budgets, zero voice-preview files,
-  and zero WAV bytes. The ignored evidence report records the exact scan and
-  committed-checkout validation:
+  path-for-path. The current `ac2e6df` tree has 1,127 regular `100644` files;
+  later source and test changes make the root manifest a historical first-commit
+  record, not a current-tree manifest.
+- A scan of the current committed paths and all six reachable commits found
+  zero audio, model-weight, credential-file, database, user-data, or generated
+  build-output paths. A high-signal current-tree Git text search found zero
+  private-key markers or token-shaped GitHub, OpenAI, Hugging Face, and AWS
+  credentials. This is a source-boundary check, not proof against every possible
+  secret string.
+- The official Git-index size gate in the successful CI run passed for 1,127
+  files and 9,230,548 indexed bytes, all tracked budgets, zero voice-preview
+  files, and zero WAV bytes. The ignored initial evidence report records the
+  fresh-root scan and committed-checkout validation:
   `artifacts/release-audit/public-source-2026-09-23/READINESS_REPORT.md`.
-- In the detached committed checkout, locked restore, a zero-warning Release
+- In the earlier detached root checkout, locked restore, a zero-warning Release
   build, compiled public API validation, documentation, security/supply-chain,
-  packaging smoke, and the full suite passed: 1,435 passed, six opt-in or
-  environment tests skipped, zero failed. The September 23 Python OSV query
-  checked 193 locked package versions with zero advisory matches. These are
-  source and contract checks, not a signed installer or clean-machine test.
+  packaging smoke, and the then-current full suite passed: 1,435 passed and six
+  skipped. The later GitHub CI result below is the current baseline.
 
-### GitHub CI finding
+### GitHub CI history and current result
 
 The first private GitHub Actions run for `851bf46`
 ([ci #1](https://github.com/letapicode/KoncusNai/actions/runs/35899975013))
-**failed** at the compiled public API gate. Restore, supply-chain compliance,
-documentation, advisory audit, size budgets, and the Release and role builds
-passed before that point; later steps were skipped. The API test process uses
-.NET 8, but its resolver chose the newest Windows Desktop assembly directory
-by text sort. On the runner that selected a .NET 9 assembly and then failed to
-load `System.Runtime, Version=9.0.0.0` into the .NET 8 test process. A local
-fix now selects the latest installed Windows Desktop assembly within the
-process's runtime major version, with a regression case containing 8, 9, and
-10 directories. The focused local API tests pass. After this fix, the local
-Release build completed with zero warnings and errors; the full suite passed
-1,436 tests with six opt-in/environment skips and zero failures. Documentation
-and security/supply-chain gates passed, and a fresh OSV query checked 193
-locked Python versions with zero matches. A new GitHub CI run cannot be called
-green until this fix is pushed to the private repository and the run completes.
-This review did not push it.
+failed at the compiled public API gate because its .NET 8 test process selected
+a .NET 9 Windows Desktop assembly. That resolver was corrected and tested.
+Subsequent reliability work addressed intermittent warmup and overlay timeout
+tests. The [private `ac2e6df` build-test run](https://github.com/letapicode/KoncusNai/actions/runs/35923006735)
+checked out that exact commit and **passed** in 13 minutes 52 seconds:
+
+- Locked restore, documentation, supply-chain/security, a 193-package Python
+  OSV query with zero matches, the Git-index size gate, zero-warning Release and
+  role builds, and compiled public API contracts passed.
+- The deterministic focused suite passed 1,149 tests. Coverage passed its line
+  and branch floors (64.46% and 55.52%), and all four controlled fault seeds
+  were killed. The full suite passed 1,443 tests with six opt-in/environment
+  skips and zero failures.
+- Milestone 2 baseline tests and all three coordinator soak iterations passed.
+  The performance regression script passed its static checks, but no authorized
+  `-AudioPath` was supplied, so its real-model cold/warm measurement was
+  `NOT_RUN`. Fault injection, compatibility contracts, Milestone 3 static
+  acceptance, packaging smoke, and installer-upgrade compatibility static
+  checks passed.
+
+These results establish a passing source and static packaging baseline. Four
+skipped tests require installed models, GPU, or a real runtime, and two require
+explicit video/export opt-in. The compatibility gate did not use
+`-EnforceReleaseEvidence`; manual app and upgrade evidence remains outstanding.
+There is no validated signed installer, actual installation, clean-machine
+upgrade, or measured first-three-dictation latency result. A new documentation
+commit will need its own private CI run before any visibility change.
 
 ### Remaining owner decisions for public visibility
 
@@ -563,9 +574,10 @@ This review did not push it.
    record the rights decisions above, then obtain explicit owner approval
    before changing visibility. A public work-in-progress source release can
    precede version 1; it must remain labeled pre-release and source-available
-   under PolyForm Noncommercial. The current private repository is suitable
-   for ongoing commits and contribution attribution, but the public-source
-   gate is not yet complete.
+   under PolyForm Noncommercial. The current private repository's source and
+   static CI baseline is technically ready for work-in-progress visibility;
+   the owner decisions, final-candidate CI rerun, and explicit visibility
+   approval remain open.
 
 The version 1 installer remains a separate gate. No signed installer,
 clean-machine installation, upgrade validation, CUDA matrix, or release
