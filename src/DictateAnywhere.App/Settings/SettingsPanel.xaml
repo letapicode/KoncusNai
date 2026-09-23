@@ -1,0 +1,239 @@
+<UserControl FontFamily="Segoe UI" FontSize="{DynamicResource Font.Size.Control}" x:Class="DictateAnywhere.App.Settings.SettingsPanel"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:hotkeys="clr-namespace:DictateAnywhere.App.Hotkeys"
+ xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+ Background="{DynamicResource Brush.Surface.Canvas}"
+ Foreground="{DynamicResource Brush.Text.Primary}"
+ Loaded="OnLoaded">
+ <UserControl.Resources>
+  <Style x:Key="SettingsBackButtonStyle" TargetType="Button" BasedOn="{StaticResource AppActionButtonStyle}">
+    <Setter Property="MinHeight" Value="34" />
+   <Setter Property="Padding" Value="10,0" />
+   <Setter Property="Background" Value="Transparent" />
+   <Setter Property="BorderBrush" Value="Transparent" />
+   <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+  </Style>
+  <Style x:Key="SettingsPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource AppHeaderTextBlockStyle}">
+    <Setter Property="FontSize" Value="{DynamicResource Font.Size.Display}" />
+   <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style x:Key="SettingsSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource AppSectionTitleTextBlockStyle}">
+   <Setter Property="Margin" Value="2,26,0,9" />
+    <Setter Property="FontSize" Value="{DynamicResource Font.Size.Caption}" />
+   <Setter Property="FontWeight" Value="SemiBold" />
+   <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+  </Style>
+  <Style x:Key="SettingsCardTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource AppSectionTitleTextBlockStyle}">
+    <Setter Property="FontSize" Value="{DynamicResource Font.Size.Section}" />
+   <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style x:Key="SettingsRowLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource AppFieldLabelTextBlockStyle}">
+   <Setter Property="Width" Value="Auto" />
+   <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+ </UserControl.Resources>
+
+ <Grid>
+  <Grid.RowDefinitions>
+   <RowDefinition Height="64" />
+   <RowDefinition Height="*" />
+   <RowDefinition Height="Auto" />
+  </Grid.RowDefinitions>
+
+  <Border Grid.Row="0" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="0,0,0,1">
+   <Grid Margin="24,0,52,0">
+    <Button x:Name="BackButton"
+            HorizontalAlignment="Left"
+            Style="{StaticResource SettingsBackButtonStyle}"
+            ToolTip="Back to app"
+            AutomationProperties.Name="Back to app"
+            Click="OnBackClicked"
+            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+     <StackPanel Orientation="Horizontal">
+      <TextBlock Style="{StaticResource AppIconGlyphTextBlockStyle}" Margin="0,0,9,0" Text="&#xE72B;" />
+      <TextBlock Text="Back" />
+     </StackPanel>
+    </Button>
+   </Grid>
+  </Border>
+
+  <ScrollViewer x:Name="SettingsScrollViewer"
+                Grid.Row="1"
+                ClipToBounds="True"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled">
+   <AdornerDecorator ClipToBounds="True">
+   <Grid MaxWidth="960" Margin="36,30,36,42" HorizontalAlignment="Stretch">
+    <StackPanel>
+     <TextBlock Style="{StaticResource SettingsPageTitleStyle}" Text="Settings" />
+     <TextBlock x:Name="SettingsSaveHint" Margin="0,8,0,0" Text="Changes save automatically." Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.Body}" />
+
+     <TextBlock Style="{StaticResource SettingsSectionTitleStyle}" Text="EXPERIENCE" />
+     <Border Style="{StaticResource AppCardBorderStyle}">
+      <StackPanel>
+       <TextBlock Style="{StaticResource SettingsCardTitleStyle}" Text="Assistant features" />
+       <CheckBox x:Name="AssistantFeaturesEnabledCheckBox"
+                 Margin="0,12,0,0"
+                 Checked="OnAssistantFeaturesEnabledChanged"
+                 Unchecked="OnAssistantFeaturesEnabledChanged"
+                 Content="Enable chat and Reading Studio"
+                 AutomationProperties.Name="Enable chat and Reading Studio" />
+       <TextBlock Margin="24,4,0,0" TextWrapping="Wrap"
+                  Style="{StaticResource AppCaptionTextBlockStyle}"
+                  Text="When off, Koncus Nai starts in the tray for dictation. Assistant models and speech tools remain on demand." />
+      </StackPanel>
+     </Border>
+
+     <TextBlock Style="{StaticResource SettingsSectionTitleStyle}" Text="DICTATION" />
+      <UniformGrid Columns="{DynamicResource Layout.Responsive.Columns}">
+      <Border Margin="0,0,8,0" Style="{StaticResource AppCardBorderStyle}">
+       <StackPanel>
+        <TextBlock Style="{StaticResource SettingsCardTitleStyle}" Text="Shortcut" />
+        <hotkeys:HotkeyCaptureControl x:Name="HotkeyCaptureControl" Margin="0,12,0,0" />
+       </StackPanel>
+      </Border>
+      <Border Margin="8,0,0,0" Style="{StaticResource AppCardBorderStyle}">
+       <StackPanel>
+        <TextBlock Style="{StaticResource SettingsCardTitleStyle}" Text="Microphone" />
+         <ComboBox x:Name="AudioDeviceComboBox"
+                   Margin="0,12,0,0"
+                   AutomationProperties.Name="Microphone"
+                   DisplayMemberPath="Label"
+                  DropDownOpened="OnAudioDeviceDropDownOpened"
+                  SelectionChanged="OnAudioDeviceSelectionChanged" />
+       </StackPanel>
+      </Border>
+     </UniformGrid>
+
+     <TextBlock Style="{StaticResource SettingsSectionTitleStyle}" Text="SPEECH" />
+     <Border Style="{StaticResource AppCardBorderStyle}">
+      <StackPanel>
+       <TextBlock Style="{StaticResource SettingsCardTitleStyle}" Text="Transcription" />
+       <TextBlock x:Name="ModelStatusTextBlock" Margin="0,5,0,16" Style="{StaticResource AppCaptionTextBlockStyle}" AutomationProperties.LiveSetting="Polite" />
+       <Grid>
+        <Grid.RowDefinitions>
+         <RowDefinition Height="Auto" />
+         <RowDefinition Height="Auto" />
+         <RowDefinition Height="Auto" />
+         <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+         <ColumnDefinition Width="{DynamicResource Layout.Settings.LabelWidth}" />
+         <ColumnDefinition Width="*" />
+         <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Style="{StaticResource SettingsRowLabelStyle}" Text="Provider" />
+        <ComboBox x:Name="TranscriptionProviderComboBox" Grid.Column="1" AutomationProperties.Name="Transcription provider" DisplayMemberPath="Label" SelectionChanged="OnTranscriptionProviderSelectionChanged" />
+        <TextBlock Grid.Row="1" Margin="0,12,0,0" Style="{StaticResource SettingsRowLabelStyle}" Text="Model" />
+        <ComboBox x:Name="ModelComboBox" Grid.Row="1" Grid.Column="1" Margin="0,12,0,0" AutomationProperties.Name="Transcription model" DisplayMemberPath="DisplayName" SelectionChanged="OnTranscriptionModelSelectionChanged" />
+        <Button Grid.Row="1" Grid.Column="2" Margin="10,12,0,0" Style="{StaticResource AppToolbarIconButtonStyle}" ToolTip="Refresh models" AutomationProperties.Name="Refresh models" Click="OnRefreshModelsClicked">
+         <TextBlock Style="{StaticResource AppIconGlyphTextBlockStyle}" Text="&#xE72C;" />
+        </Button>
+        <TextBlock Grid.Row="2" Margin="0,12,0,0" Style="{StaticResource SettingsRowLabelStyle}" Text="Language" />
+        <ComboBox x:Name="TranscriptionLanguageComboBox" Grid.Row="2" Grid.Column="1" Margin="0,12,0,0" AutomationProperties.Name="Transcription language" MaxDropDownHeight="320" DisplayMemberPath="Label" SelectionChanged="OnTranscriptionLanguageSelectionChanged" />
+        <TextBlock x:Name="AutomaticPunctuationLabel" Grid.Row="3" Margin="0,12,0,0" Style="{StaticResource SettingsRowLabelStyle}" Text="Formatting" />
+        <StackPanel x:Name="AutomaticPunctuationPanel" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0">
+         <CheckBox x:Name="EnableAutomaticPunctuationCheckBox"
+                   Checked="OnEnableAutomaticPunctuationCheckedChanged"
+                   Unchecked="OnEnableAutomaticPunctuationCheckedChanged"
+                   Content="Automatic punctuation" />
+         <TextBlock Margin="24,3,0,0"
+                    Style="{StaticResource AppCaptionTextBlockStyle}"
+                    Text="Adds capitalization and punctuation. Turn off for lowercase text without punctuation."
+                    TextWrapping="Wrap" />
+        </StackPanel>
+       </Grid>
+        <TextBlock x:Name="ModelCapabilityTextBlock" Margin="{DynamicResource Layout.Settings.ContentIndent12}" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock x:Name="ModelLanguageSummaryTextBlock" Margin="{DynamicResource Layout.Settings.ContentIndent4}" Style="{StaticResource AppCaptionTextBlockStyle}" TextWrapping="Wrap" />
+        <WrapPanel Margin="{DynamicResource Layout.Settings.ContentIndent14}">
+        <Button x:Name="ActivateModelButton" Style="{StaticResource AppActionButtonStyle}" Click="OnActivateModelClicked" Content="Use model" />
+        <Button x:Name="DownloadModelButton" Margin="8,0,0,0" Style="{StaticResource AppActionButtonStyle}" Click="OnDownloadModelClicked" Content="Download" />
+        <Button x:Name="RunBenchmarkButton" Margin="8,0,0,0" Visibility="Collapsed" Style="{StaticResource AppActionButtonStyle}" Click="OnRunBenchmarkClicked" Content="Run Benchmark" />
+        <Button x:Name="DeleteModelButton" Margin="8,0,0,0" Visibility="Collapsed" Style="{StaticResource AppDangerActionButtonStyle}" Click="OnDeleteModelClicked" Content="Delete" />
+       </WrapPanel>
+        <ProgressBar x:Name="ModelProgressBar" Visibility="Collapsed" Margin="{DynamicResource Layout.Settings.ContentIndent14}" Height="8" Minimum="0" Maximum="100" AutomationProperties.Name="Model operation progress" />
+        <TextBlock x:Name="ModelActionStatusTextBlock" Margin="{DynamicResource Layout.Settings.ContentIndent7}" Style="{StaticResource AppCaptionTextBlockStyle}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+        <TextBlock x:Name="ModelBenchmarkSummaryTextBlock" Margin="{DynamicResource Layout.Settings.ContentIndent7}" Visibility="Collapsed" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+      </StackPanel>
+     </Border>
+
+     <Grid Visibility="Collapsed">
+      <hotkeys:HotkeyCaptureControl x:Name="UndoHotkeyCaptureControl" />
+      <hotkeys:HotkeyCaptureControl x:Name="RetryLastDictationHotkeyCaptureControl" />
+     </Grid>
+
+     <TextBlock Style="{StaticResource SettingsSectionTitleStyle}" Text="TEXT &amp; SAFETY" />
+      <UniformGrid Columns="{DynamicResource Layout.Responsive.Columns}">
+      <Border Margin="0,0,8,0" Style="{StaticResource AppCardBorderStyle}">
+       <StackPanel>
+        <TextBlock Style="{StaticResource SettingsCardTitleStyle}" Text="Formatting" />
+        <CheckBox x:Name="EnableDictationCommandsCheckBox"
+                  Margin="0,13,0,0"
+                  Checked="OnEnableDictationCommandsCheckedChanged"
+                  Unchecked="OnEnableDictationCommandsCheckedChanged"
+                  Content="Spoken formatting commands"
+                  ToolTip="Turns phrases such as new line, comma, and bullet into formatting." />
+       </StackPanel>
+      </Border>
+      <Border Margin="8,0,0,0" Style="{StaticResource AppCardBorderStyle}">
+       <StackPanel>
+        <TextBlock Style="{StaticResource SettingsCardTitleStyle}" Text="Insertion safety" />
+        <CheckBox x:Name="EnableSecureFieldDetectionCheckBox"
+                  Margin="0,13,0,0"
+                  Checked="OnEnableSecureFieldDetectionCheckedChanged"
+                  Unchecked="OnEnableSecureFieldDetectionCheckedChanged"
+                  Content="Block password fields" />
+        <CheckBox x:Name="EnableElevatedInsertionCheckBox"
+                  Margin="0,11,0,0"
+                  Checked="OnEnableElevatedInsertionCheckedChanged"
+                  Unchecked="OnEnableElevatedInsertionCheckedChanged"
+                  Content="Insert into administrator apps" />
+       </StackPanel>
+      </Border>
+     </UniformGrid>
+
+     <TextBlock Style="{StaticResource SettingsSectionTitleStyle}" Text="TYPOGRAPHY" />
+     <Border Style="{StaticResource AppCardBorderStyle}">
+      <Grid>
+       <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="{DynamicResource Layout.Settings.ValueWidth}" />
+       </Grid.ColumnDefinitions>
+       <StackPanel VerticalAlignment="Center">
+        <TextBlock Style="{StaticResource SettingsCardTitleStyle}" Text="Chat typeface" />
+        <TextBlock Margin="0,4,20,0" Style="{StaticResource AppCaptionTextBlockStyle}" Text="Used for chat messages." />
+       </StackPanel>
+       <ComboBox x:Name="ChatTypefaceComboBox" Grid.Column="1" AutomationProperties.Name="Chat typeface" DisplayMemberPath="DisplayName" SelectionChanged="OnChatTypefaceSelectionChanged" />
+      </Grid>
+     </Border>
+
+     <TextBlock Style="{StaticResource SettingsSectionTitleStyle}" Text="HISTORY" />
+     <Border Style="{StaticResource AppCardBorderStyle}">
+      <Grid>
+       <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+       </Grid.ColumnDefinitions>
+       <StackPanel VerticalAlignment="Center">
+        <TextBlock Style="{StaticResource SettingsCardTitleStyle}" Text="Dictation history" />
+        <TextBlock Margin="0,4,20,0" Style="{StaticResource AppCaptionTextBlockStyle}" Text="Saved locally with no automatic entry limit." />
+       </StackPanel>
+       <Button Grid.Column="1" Style="{StaticResource AppActionButtonStyle}" Click="OnManageHistoryClicked" Content="Manage Dictation History" />
+      </Grid>
+     </Border>
+    </StackPanel>
+   </Grid>
+   </AdornerDecorator>
+  </ScrollViewer>
+
+  <TextBlock x:Name="PersistStatusTextBlock"
+             Grid.Row="2"
+             Margin="36,8"
+             HorizontalAlignment="Center"
+             TextWrapping="Wrap"
+             Visibility="Collapsed"
+             AutomationProperties.LiveSetting="Polite"
+             Foreground="{DynamicResource Brush.Text.Secondary}" />
+ </Grid>
+</UserControl>

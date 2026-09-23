@@ -1,0 +1,431 @@
+<Window x:Class="DictateAnywhere.App.Workbench.Reading.ReaderWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        FontFamily="Segoe UI" FontSize="{DynamicResource Font.Size.Control}"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        xmlns:reading="clr-namespace:DictateAnywhere.App.Workbench.Reading"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        presentation:WindowWorkAreaConstraintBehavior.IsEnabled="True"
+        Title="Koncus Nai"
+        Width="1380"
+        Height="860"
+        MinWidth="1040"
+        MinHeight="700"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        Background="{DynamicResource Brush.Surface.Canvas}"
+        Foreground="{DynamicResource Brush.Text.Primary}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Loaded="OnLoaded"
+        PreviewKeyDown="OnReaderPreviewKeyDown"
+        Closed="OnClosed">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="7" GlassFrameThickness="0" CornerRadius="16" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+  <Window.Resources>
+    <SolidColorBrush x:Key="ReaderInk" Color="#182237" />
+    <Style x:Key="ReaderMicroLabel" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.Caption}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="ReaderComboBoxItem" TargetType="ComboBoxItem">
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.Control}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBoxItem">
+            <Border x:Name="ItemSurface" Margin="4,2" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" CornerRadius="7">
+              <ContentPresenter VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="ItemSurface" Property="Background" Value="{DynamicResource Brush.Control.Hover}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="ItemSurface" Property="Background" Value="{DynamicResource Brush.Control.Selection}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.42" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ReaderControl" TargetType="ComboBox">
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.Control}" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Input}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="ItemContainerStyle" Value="{StaticResource ReaderComboBoxItem}" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid>
+              <Border x:Name="ControlSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
+                <Grid>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="34" /></Grid.ColumnDefinitions>
+                  <ContentPresenter Margin="{TemplateBinding Padding}"
+                                    VerticalAlignment="Center"
+                                    Content="{TemplateBinding SelectionBoxItem}"
+                                    ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                    TextElement.Foreground="{TemplateBinding Foreground}"
+                                    SnapsToDevicePixels="True" />
+                  <Border Grid.Column="1" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1,0,0,0">
+                    <Path Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z" Fill="{DynamicResource Brush.Text.Secondary}" />
+                  </Border>
+                </Grid>
+              </Border>
+              <ToggleButton Background="Transparent" BorderThickness="0" ClickMode="Press" Focusable="False"
+                            IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="Transparent" /></ControlTemplate></ToggleButton.Template>
+              </ToggleButton>
+              <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" PopupAnimation="Fade">
+                <Border Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" Margin="0,7,0,0" Padding="3"
+                        Background="{DynamicResource Brush.Surface.Elevated}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="10">
+                  <ScrollViewer MaxHeight="430" CanContentScroll="True"><ItemsPresenter /></ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="ControlSurface" Property="BorderBrush" Value="{DynamicResource Brush.Progress.Value}" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ControlSurface" Property="BorderBrush" Value="{DynamicResource Brush.Text.Secondary}" />
+                <Setter TargetName="ControlSurface" Property="Background" Value="{DynamicResource Brush.Control.Hover}" />
+              </Trigger>
+              <Trigger Property="IsDropDownOpen" Value="True"><Setter TargetName="ControlSurface" Property="BorderBrush" Value="{DynamicResource Brush.Control.Primary}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="ControlSurface" Property="Opacity" Value="0.48" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <ControlTemplate x:Key="ReaderDraftInputTemplate" TargetType="{x:Type TextBox}">
+      <ScrollViewer x:Name="PART_ContentHost"
+                    Padding="{TemplateBinding Padding}"
+                    Background="{TemplateBinding Background}"
+                    Focusable="False"
+                    VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}"
+                    HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}" />
+    </ControlTemplate>
+
+    <Style x:Key="ReaderDraftInput" TargetType="TextBox">
+      <Setter Property="Padding" Value="21,12,21,16" />
+      <Setter Property="FontFamily" Value="Georgia" />
+      <Setter Property="FontSize" Value="23" />
+      <Setter Property="VerticalContentAlignment" Value="Top" />
+      <Setter Property="Foreground" Value="#182237" />
+      <Setter Property="Background" Value="#F9F2E8" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CaretBrush" Value="#C28C2B" />
+      <Setter Property="SelectionBrush" Value="#D8B36A" />
+      <Setter Property="SelectionOpacity" Value="0.42" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template" Value="{StaticResource ReaderDraftInputTemplate}" />
+      <Setter Property="AcceptsReturn" Value="True" />
+      <Setter Property="AcceptsTab" Value="True" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+      <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+    </Style>
+
+    <ControlTemplate x:Key="ReaderButtonTemplate" TargetType="Button">
+      <Border x:Name="ButtonSurface" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}"
+              BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
+        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" TextElement.Foreground="{TemplateBinding Foreground}" />
+      </Border>
+      <ControlTemplate.Triggers>
+        <Trigger Property="IsEnabled" Value="False"><Setter TargetName="ButtonSurface" Property="Opacity" Value="0.42" /></Trigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate>
+    <Style x:Key="ReaderSecondaryButton" TargetType="Button">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.Control}" />
+      <Setter Property="Padding" Value="15,7" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Surface.Elevated}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Template" Value="{StaticResource ReaderButtonTemplate}" />
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Brush.Control.Hover}" /><Setter Property="BorderBrush" Value="{DynamicResource Brush.Text.Secondary}" /></Trigger>
+        <Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="{DynamicResource Brush.Control.Pressed}" /></Trigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="ReaderPrimaryButton" TargetType="Button" BasedOn="{StaticResource ReaderSecondaryButton}">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Inverse}" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Primary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Control.Primary}" />
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Brush.Control.PrimaryHover}" /><Setter Property="BorderBrush" Value="{DynamicResource Brush.Control.PrimaryHover}" /></Trigger>
+        <Trigger Property="IsPressed" Value="True"><Setter Property="Background" Value="{DynamicResource Brush.Control.PrimaryPressed}" /></Trigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="ReaderIconButton" TargetType="Button" BasedOn="{StaticResource ReaderSecondaryButton}">
+      <Setter Property="Width" Value="42" />
+      <Setter Property="Height" Value="38" />
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="Padding" Value="10" />
+    </Style>
+    <Style x:Key="ReaderBareIconButton" TargetType="Button">
+      <Setter Property="Width" Value="34" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Padding" Value="7" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="FocusSurface"
+                    Padding="{TemplateBinding Padding}"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="8">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource Brush.Control.Primary}" /></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter Property="Foreground" Value="{DynamicResource Brush.Control.PrimaryPressed}" /><Setter Property="Opacity" Value="0.72" /></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusSurface" Property="BorderBrush" Value="{DynamicResource Brush.Control.Primary}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.42" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="ReaderWindowControlButton" TargetType="Button">
+      <Setter Property="Width" Value="38" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="ControlSurface" Background="{TemplateBinding Background}" CornerRadius="7">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ControlSurface" Property="Background" Value="{DynamicResource Brush.Control.Hover}" /></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="ControlSurface" Property="Background" Value="{DynamicResource Brush.Control.Pressed}" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="ReaderSlider" TargetType="Slider">
+      <Setter Property="Height" Value="20" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Slider">
+            <Grid Height="20">
+              <Border Height="3" VerticalAlignment="Center" Background="{DynamicResource Brush.Progress.Track}" CornerRadius="2" />
+              <Track x:Name="PART_Track" VerticalAlignment="Center">
+                <Track.DecreaseRepeatButton>
+                  <RepeatButton Command="Slider.DecreaseLarge" Focusable="False">
+                    <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Height="3" VerticalAlignment="Center" Background="{DynamicResource Brush.Progress.Value}" CornerRadius="2" /></ControlTemplate></RepeatButton.Template>
+                  </RepeatButton>
+                </Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb Width="13" Height="13">
+                    <Thumb.Template><ControlTemplate TargetType="Thumb"><Ellipse Fill="{DynamicResource Brush.Surface.Base}" Stroke="{DynamicResource Brush.Progress.Value}" StrokeThickness="1.5" /></ControlTemplate></Thumb.Template>
+                  </Thumb>
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton>
+                  <RepeatButton Command="Slider.IncreaseLarge" Focusable="False" Opacity="0" />
+                </Track.IncreaseRepeatButton>
+              </Track>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ReaderProgress" TargetType="ProgressBar">
+      <Setter Property="Height" Value="4" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Progress.Track}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Progress.Value}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ProgressBar">
+            <Border Background="{TemplateBinding Background}" CornerRadius="2">
+              <Grid x:Name="PART_Track" ClipToBounds="True">
+                <Border x:Name="PART_Indicator" HorizontalAlignment="Left" Background="{TemplateBinding Foreground}" CornerRadius="2" />
+              </Grid>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ReaderProcessingToggle" TargetType="ToggleButton">
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.Control}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Input}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="Outer" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9" Padding="3">
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <Border x:Name="SoonSurface" Background="{DynamicResource Brush.Control.Primary}" CornerRadius="6" />
+                <Border x:Name="FullSurface" Grid.Column="1" Background="Transparent" CornerRadius="6" />
+                <TextBlock x:Name="SoonLabel" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Brush.Text.Inverse}" FontSize="{DynamicResource Font.Size.FieldLabel}" FontWeight="SemiBold" Text="Start Sooner" />
+                <TextBlock x:Name="FullLabel" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" FontWeight="SemiBold" Text="Full Range" />
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="SoonSurface" Property="Background" Value="Transparent" />
+                <Setter TargetName="FullSurface" Property="Background" Value="{DynamicResource Brush.Control.Primary}" />
+                <Setter TargetName="SoonLabel" Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+                <Setter TargetName="FullLabel" Property="Foreground" Value="{DynamicResource Brush.Text.Inverse}" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Outer" Property="BorderBrush" Value="{DynamicResource Brush.Text.Secondary}" /></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Outer" Property="BorderBrush" Value="{DynamicResource Brush.Control.Primary}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Outer" Property="Opacity" Value="0.48" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ReaderSwatchList" TargetType="ListBox">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+      <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBox">
+            <ScrollViewer Padding="{TemplateBinding Padding}" Focusable="False">
+              <ItemsPresenter />
+            </ScrollViewer>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.48" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ReaderSwatchItem" TargetType="ListBoxItem">
+      <Setter Property="Height" Value="42" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Grid Width="42" Height="42" Background="Transparent">
+              <Ellipse x:Name="SelectionRing" Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Fill="Transparent" Stroke="Transparent" StrokeThickness="2" />
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="SelectionRing" Property="Stroke" Value="{DynamicResource Brush.Text.Secondary}" /></Trigger>
+              <Trigger Property="IsSelected" Value="True"><Setter TargetName="SelectionRing" Property="Stroke" Value="{DynamicResource Brush.Text.Primary}" /><Setter TargetName="SelectionRing" Property="StrokeThickness" Value="2.5" /></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="SelectionRing" Property="Stroke" Value="{DynamicResource Brush.Control.Primary}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.48" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+  </Window.Resources>
+
+  <Grid x:Name="ReaderShell">
+    <Grid.RowDefinitions>
+      <RowDefinition x:Name="ReaderChromeRow" Height="46" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition x:Name="ReaderSidebarColumn" Width="{DynamicResource Layout.Reader.SidebarWidth}" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <reading:ReaderSidebarView x:Name="SidebarView" Grid.RowSpan="2" Grid.Column="0" />
+
+    <Grid x:Name="ReaderMainSurface" Grid.Row="1" Grid.Column="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <reading:ReaderDocumentView x:Name="DocumentView" Grid.Row="0" />
+      <reading:ReaderTransportView x:Name="TransportView" Grid.Row="1" />
+    </Grid>
+
+    <Border Grid.ColumnSpan="2" Panel.ZIndex="5" Height="42" VerticalAlignment="Top" Background="Transparent"
+            presentation:WindowDragRegionBehavior.IsEnabled="True" />
+
+    <presentation:WindowCaptionButtons x:Name="WindowCaptionControls"
+                                       Grid.ColumnSpan="2"
+                                       Panel.ZIndex="10"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Top"
+                                       Margin="0,8,14,0"
+                                       ContextTitle="Reading Studio" />
+
+    <Button x:Name="SidebarToggleButton" Grid.ColumnSpan="2" Panel.ZIndex="10"
+            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,8,0,0"
+            Style="{StaticResource ReaderWindowControlButton}"
+            AutomationProperties.Name="Hide reading controls"
+            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+            Click="OnToggleSidebarClicked">
+      <Path x:Name="SidebarToggleGlyph"
+            Style="{StaticResource AppSidebarToggleIconStyle}" />
+    </Button>
+
+    <TextBlock Grid.ColumnSpan="2" Panel.ZIndex="10"
+               HorizontalAlignment="Left" VerticalAlignment="Top" Margin="62,13,0,0"
+               Foreground="{DynamicResource Brush.Control.Primary}" FontSize="{DynamicResource Font.Size.Control}" FontWeight="SemiBold"
+               Text="Reading Studio" IsHitTestVisible="False" />
+
+    <Border x:Name="HighContrastWindowBoundary"
+            Grid.RowSpan="2"
+            Grid.ColumnSpan="2"
+            CornerRadius="16"
+            Style="{StaticResource AppHighContrastWindowBoundaryStyle}" />
+  </Grid>
+</Window>

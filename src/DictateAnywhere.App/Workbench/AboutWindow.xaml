@@ -1,0 +1,169 @@
+<Window x:Class="DictateAnywhere.App.Workbench.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        FontFamily="Segoe UI"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        Title="About Koncus Nai"
+        Width="920"
+        Height="740"
+        MinWidth="720"
+        MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        BorderThickness="0"
+        Background="{DynamicResource Brush.Surface.Canvas}"
+        Foreground="{DynamicResource Brush.Text.Primary}">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="50" ResizeBorderThickness="7" CornerRadius="14" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+
+  <Window.Resources>
+    <Style x:Key="AboutCard" TargetType="Border">
+      <Setter Property="Margin" Value="6" />
+      <Setter Property="Padding" Value="20" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Surface.Elevated}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="13" />
+    </Style>
+
+    <Style x:Key="AboutCardTitle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.Section}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,7" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+    </Style>
+
+    <Style x:Key="AboutBody" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.BodyComfortable}" />
+      <Setter Property="LineHeight" Value="{DynamicResource Line.Height.Body}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+    </Style>
+
+    <Style x:Key="AboutBadge" TargetType="Border">
+      <Setter Property="Margin" Value="0,0,8,8" />
+      <Setter Property="Padding" Value="10,5" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Muted}" />
+      <Setter Property="CornerRadius" Value="12" />
+    </Style>
+  </Window.Resources>
+
+  <Border Background="{DynamicResource Brush.Surface.Canvas}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="14">
+    <Grid>
+      <Grid.RowDefinitions><RowDefinition Height="54" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+
+      <Grid Grid.Row="0" Margin="20,0,12,0" presentation:WindowDragRegionBehavior.IsEnabled="True">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <Grid VerticalAlignment="Center" Margin="0,0,12,0"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+          <Image Width="26" Height="26" Margin="0,0,11,0" Style="{DynamicResource AppBrandMarkStyle}" />
+          <TextBlock Grid.Column="1" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="{DynamicResource Font.Size.Section}" FontWeight="SemiBold" Text="About Koncus Nai" />
+          <TextBlock Grid.Column="2" x:Name="VersionTextBlock" Margin="10,1,0,0" VerticalAlignment="Center" Style="{StaticResource AppCaptionTextBlockStyle}" />
+        </Grid>
+        <presentation:WindowCaptionButtons Grid.Column="1" ContextTitle="About Koncus Nai" />
+      </Grid>
+
+      <ScrollViewer x:Name="AboutContentScrollViewer"
+                    Grid.Row="1"
+                    presentation:StaticContentScrollViewerBehavior.IsEnabled="True"
+                    Focusable="True"
+                    IsTabStop="True"
+                    FocusVisualStyle="{DynamicResource AppKeyboardFocusVisualStyle}"
+                    AutomationProperties.Name="About Koncus Nai content"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+        <StackPanel MaxWidth="820" Margin="42,28,42,36" HorizontalAlignment="Center">
+          <TextBlock FontFamily="Georgia" FontSize="{DynamicResource Font.Size.Hero}" FontWeight="SemiBold" TextWrapping="Wrap" Text="Your voice, your words, your device." />
+          <TextBlock Margin="0,10,0,18" MaxWidth="820" HorizontalAlignment="Left" Style="{StaticResource AboutBody}" FontSize="{DynamicResource Font.Size.Lead}" LineHeight="{DynamicResource Line.Height.Lead}"
+                     Text="Dictate, chat, and turn documents into narrated reading experiences. Koncus Nai keeps the core work on your Windows device." />
+
+          <Border Style="{StaticResource AboutCard}" Margin="0,0,0,20">
+            <StackPanel>
+              <TextBlock Style="{StaticResource AboutCardTitle}" Text="Why Koncus Nai?" />
+              <TextBlock Style="{StaticResource AboutBody}" Text="Koncus Nai is our playful take on “conscious nahi” — “not conscious.” “Koncus” reimagines “conscious,” and “Nai” is our stylized spelling of “nahi.”" />
+              <TextBlock Margin="0,10,0,0" Style="{StaticResource AboutBody}" Text="The name reflects our approach: useful AI, with you in control." />
+            </StackPanel>
+          </Border>
+
+          <WrapPanel Margin="0,0,0,18">
+            <Border Style="{StaticResource AboutBadge}"><TextBlock FontSize="{DynamicResource Font.Size.Body}" FontWeight="SemiBold" Text="Local first" /></Border>
+            <Border Style="{StaticResource AboutBadge}"><TextBlock FontSize="{DynamicResource Font.Size.Body}" FontWeight="SemiBold" Text="Windows 11" /></Border>
+            <Border Style="{StaticResource AboutBadge}"><TextBlock FontSize="{DynamicResource Font.Size.Body}" FontWeight="SemiBold" Text="Local history" /></Border>
+            <Border Style="{StaticResource AboutBadge}"><TextBlock FontSize="{DynamicResource Font.Size.Body}" FontWeight="SemiBold" Text="Multilingual" /></Border>
+            <Border Style="{StaticResource AboutBadge}"><TextBlock FontSize="{DynamicResource Font.Size.Body}" FontWeight="SemiBold" Text="Accessible reading" /></Border>
+          </WrapPanel>
+
+          <Border Margin="6,14,6,0" Padding="22" Background="{DynamicResource Brush.Surface.BlueWash}" CornerRadius="13">
+            <StackPanel>
+              <TextBlock Style="{StaticResource AboutCardTitle}" Text="Your data, on your device" />
+              <TextBlock Style="{StaticResource AboutBody}" Foreground="{DynamicResource Brush.Text.Primary}"
+                         Text="Core dictation, transcription, spoken formatting commands, chat, document extraction, OCR, narration, alignment, and rendering run on this device. Network access is used for model/runtime downloads and optional publishing. Dictation and chat history are always saved as local plaintext and protected by your Windows account and file permissions; history never stores raw microphone audio." />
+            </StackPanel>
+          </Border>
+
+          <Border Style="{StaticResource AboutCard}" Margin="0,20,0,12">
+            <StackPanel>
+              <TextBlock Style="{StaticResource AboutCardTitle}" Text="Models and their terms" />
+              <TextBlock Style="{StaticResource AboutBody}"
+                         Text="Model weights are separate downloads and are not part of the Koncus Nai source repository. Cohere Transcribe and Indic Parler require your own Hugging Face account and acceptance of their model pages before download." />
+              <TextBlock Margin="0,10,0,0" Style="{StaticResource AboutBody}"
+                         Text="Before using any model offered through Koncus Nai, review its upstream license, model card, and access conditions. You are responsible for following those terms and obtaining any permission your intended use or generated output requires." />
+              <TextBlock Margin="0,10,0,0" Style="{StaticResource AboutBody}"
+                         Text="CrisperWhisper is optional. Its weights and outputs—including transcripts, timestamps, and derived annotations—are restricted to non-commercial research use by its upstream license. Koncus Nai asks for explicit acceptance before using those weights. See MODEL_LICENSES.md and THIRD_PARTY_NOTICES.md in the source repository for exact model revisions and links." />
+            </StackPanel>
+          </Border>
+
+          <Border Style="{StaticResource AboutCard}" Margin="0,8,0,12">
+            <StackPanel>
+              <TextBlock Style="{StaticResource AboutCardTitle}" Text="License, privacy, and safety" />
+              <TextBlock Style="{StaticResource AboutBody}" Margin="0,0,0,12"
+                         Text="Koncus Nai is source-available under PolyForm Noncommercial 1.0.0 and is not OSI-approved open source. Noncommercial use, modification, and redistribution are permitted by that license. Commercial use requires separate written permission from Ram Adhikari through koncusnai@gmail.com. Third-party code, models, and assets keep their own terms." />
+              <WrapPanel>
+                <Button Margin="0,0,8,8" Padding="12,6" Content="License" Tag="LICENSE" Click="OnOpenLegalDocumentClick" />
+                <Button Margin="0,0,8,8" Padding="12,6" Content="Disclaimer" Tag="DISCLAIMER.md" Click="OnOpenLegalDocumentClick" />
+                <Button Margin="0,0,8,8" Padding="12,6" Content="Privacy" Tag="PRIVACY.md" Click="OnOpenLegalDocumentClick" />
+                <Button Margin="0,0,8,8" Padding="12,6" Content="Security" Tag="SECURITY.md" Click="OnOpenLegalDocumentClick" />
+                <Button Margin="0,0,8,8" Padding="12,6" Content="Model licenses" Tag="MODEL_LICENSES.md" Click="OnOpenLegalDocumentClick" />
+                <Button Margin="0,0,8,8" Padding="12,6" Content="Third-party notices" Tag="THIRD_PARTY_NOTICES.md" Click="OnOpenLegalDocumentClick" />
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+
+<Expander Header="Runtime details" Margin="0,0,0,8">
+            <TextBlock Margin="12,8,12,12" Style="{StaticResource AboutBody}" Text="Larger local models may take longer on their first request while a worker starts and model weights load, then stay warm only for the active session. Ollama is kept on demand and is not started by passive readiness checks." />
+          </Expander>
+          <Expander Header="Explore what Koncus Nai can do" Margin="0,8,0,8"><StackPanel Margin="0,12,0,0"><Expander Header="Dictate anywhere" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12">
+                <TextBlock Style="{StaticResource AboutBody}" Text="Start or stop from a global toggle shortcut, follow the bottom-center recording and status indicator, and insert the result into the app where dictation began. If that target disappears, Koncus Nai keeps a recovery copy and saves it to local history. Clipboard restoration, Unicode fallback, secure-field detection, and optional elevated insertion keep the destination predictable." />
+              </StackPanel></Expander>
+<Expander Header="Workbench" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12">
+                <TextBlock Style="{StaticResource AboutBody}" Text="Record into a focused composer, edit transcripts, import audio or video for transcription, and use private local chat. Search saved chats and dictations, rename or delete entries, copy responses, and export conversations. A continuous text-size slider and the selected chat typeface apply while writing as well as while reading replies." />
+              </StackPanel></Expander>
+<Expander Header="Speech to text" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12">
+                <TextBlock Style="{StaticResource AboutBody}" Text="Choose Cohere or CrisperWhisper with compatible language selection, local model downloads, activation, readiness checks, and diagnostics. Long recordings use silence-aware chunking and ordered transcript assembly. Cohere automatic punctuation is on by default and can be turned off in All settings. Spoken formatting commands convert the phrases â€˜new line,â€™ â€˜comma,â€™ and â€˜bulletâ€™ when that option is enabled." />
+              </StackPanel></Expander>
+<Expander Header="Simple controls" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12">
+                <TextBlock Style="{StaticResource AboutBody}" Text="The main menu keeps theme, chat-model, and speech choices close at hand. All settings focus on the dictation shortcut, microphone, transcription model, automatic punctuation, spoken formatting commands, insertion safety, chat typeface, and private local-history controls." />
+              </StackPanel></Expander>
+<Expander Header="Reading Studio" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12">
+                <TextBlock Style="{StaticResource AboutBody}" Text="New sessions open as a blank, focused writing page with Reading Studio controls still visible. Type directly or import EPUB, DOCX, PDF, RTF, HTML, Markdown, text, data files, and supported images. Create narration turns the draft into a synchronized reader; the pencil returns to non-destructive editing, section choices refresh while you write, and unchanged prepared narration stays playable. Searchable PDFs use their text layer and formatting-aware title detection, while scanned pages and images can use local OCR." />
+              </StackPanel></Expander>
+<Expander Header="Local narration" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12">
+                <TextBlock Style="{StaticResource AboutBody}" Text="Kokoro provides fast voices and native English word timing, while Indic Parler expands narration across official and clearly marked experimental Indic languages. Semantic titles receive a natural pause before the story begins. Sanskrit uses smaller sentence-aware chunks, and Devanagari layouts reserve enough height for upper marks at large text sizes. Preview a voice before preparing a selected section or the complete range." />
+              </StackPanel></Expander>
+<Expander Header="Reading focus and accessibility" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12">
+                <TextBlock Style="{StaticResource AboutBody}" Text="Follow words or sentences on the page, isolate a focused sentence or word, or turn synchronized emphasis off. Choose highlight behavior, directly visible focus colors, reading themes, typefacesâ€”including Devanagari fontsâ€”text size, speed, fullscreen reading, and accessible focus-ring or spotlight styles." />
+              </StackPanel></Expander>
+<Expander Header="Export and publish" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12">
+                <TextBlock Style="{StaticResource AboutBody}" Text="Export narration as an audiobook or render a landscape reading video or vertical YouTube Short with synchronized word timing and the selected reader design. Highlight paint changes without reflowing surrounding words. A guided, consistently rounded publishing flow can split a long work into episodes, preserve recoverable jobs, and upload a YouTube series only when you explicitly ask it to." />
+              </StackPanel></Expander></StackPanel></Expander>
+
+          <TextBlock Margin="8,20,8,0" Style="{StaticResource AboutBody}"
+                     Text="This is pre-release software. This page describes the features implemented in this build; model availability, licensing, and optional publishing setup can vary by installation." />
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</Window>

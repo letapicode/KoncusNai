@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "canonicalDocuments": [
+    {
+      "id": "navigation",
+      "path": "README.md",
+      "owns": ["repository-entry-point"],
+      "requiredHeadings": ["Start here", "Local build"]
+    },
+    {
+      "id": "documentation-map",
+      "path": "docs/documentation-map.md",
+      "owns": ["documentation-ownership-map"],
+      "requiredHeadings": ["Canonical owners", "Planning document disposition", "Validation"]
+    },
+    {
+      "id": "product-capabilities",
+      "path": "docs/architecture/product-capability-matrix.md",
+      "owns": ["supported-product-capabilities", "retired-product-capabilities"],
+      "requiredHeadings": ["Supported capabilities", "Explicit non-capabilities"]
+    },
+    {
+      "id": "system-architecture",
+      "path": "docs/architecture/system-architecture.md",
+      "owns": ["component-boundaries", "runtime-flow", "state-lifetime-ownership"],
+      "requiredHeadings": ["Current production dependency graph", "Feature ownership map", "State and lifetime model"]
+    },
+    {
+      "id": "public-api-contract",
+      "path": "docs/architecture/public-api-and-dependency-contract.md",
+      "owns": ["intentional-compiled-api-and-assembly-dependency-contract"],
+      "requiredHeadings": ["Assembly ownership and disposition", "Captured contract", "Validation and baseline review"]
+    },
+    {
+      "id": "developer-guide",
+      "path": "docs/guides/developer-guide.md",
+      "owns": ["contributor-setup", "developer-command-index"],
+      "requiredHeadings": ["Local Build and Test", "Quality and Acceptance", "Packaging Workflow"]
+    },
+    {
+      "id": "test-strategy",
+      "path": "docs/quality/test-strategy.md",
+      "owns": ["test-taxonomy", "automated-quality-gates"],
+      "requiredHeadings": ["Executable taxonomy", "Focused commands", "Release gates"]
+    },
+    {
+      "id": "supply-chain-provenance",
+      "path": "docs/security/supply-chain-provenance.json",
+      "owns": ["dependency-model-runtime-action-provenance"]
+    },
+    {
+      "id": "threat-model",
+      "path": "docs/security/threat-model.md",
+      "owns": ["security-threat-boundaries"],
+      "requiredHeadings": ["History Storage & Local Persistence Guarantees", "Attack Surfaces & Security Controls"]
+    },
+    {
+      "id": "local-processing",
+      "path": "docs/security/local-processing-guarantees.md",
+      "owns": ["local-processing-product-guarantees"],
+      "requiredHeadings": ["Product Guarantees", "Allowed Network Usage", "History Storage Guarantees"]
+    },
+    {
+      "id": "installer-packaging",
+      "path": "docs/release/installer-packaging.md",
+      "owns": ["installer-payload-contract"],
+      "requiredHeadings": ["Installer Contract", "Static Validation Gates"]
+    },
+    {
+      "id": "size-budget-policy",
+      "path": "docs/release/size-budget-policy.json",
+      "owns": ["enforced-size-baselines-and-thresholds"]
+    },
+    {
+      "id": "size-budget-evidence",
+      "path": "docs/release/size-budgets.md",
+      "owns": ["size-measurement-method-and-interpretation"],
+      "requiredHeadings": ["Ownership and measurement", "Release output baseline", "External model and runtime footprints"]
+    },
+    {
+      "id": "release-checklist",
+      "path": "docs/release/release-checklist.md",
+      "owns": ["release-execution-order"],
+      "requiredHeadings": ["2. Build and Test Gates", "3. Packaging and Security Gates", "6. Publish"]
+    },
+    {
+      "id": "hardening-backlog",
+      "path": "planning/codebase-hardening-backlog.md",
+      "owns": ["hardening-item-scope", "hardening-item-status"],
+      "requiredHeadings": ["Mandate", "Fixed product decisions", "S3 — Medium-priority quality work"]
+    },
+    {
+      "id": "hardening-ledger",
+      "path": "planning/codebase-hardening-ledger.md",
+      "owns": ["packet-sequence", "packet-commit-evidence", "manual-gate-status"],
+      "requiredHeadings": ["2. Completed Packet Ledger", "3. Remaining Packet Dependency & Execution Queue", "4. Outstanding Manual and Hardware Gates"]
+    },
+    {
+      "id": "window-shell-manual-evidence",
+      "path": "docs/quality/window-shell-manual-evidence.md",
+      "owns": ["window-shell-operator-observations", "dictation-history-operator-observations"],
+      "requiredHeadings": ["4. Test Matrix & Scope", "6. Detailed Test Cases & Execution Plans (Marked Not Tested)"]
+    }
+  ],
+  "historicalDocuments": [
+    "docs/quality/codebase-health-baseline-2026-09-01.md",
+    "docs/release/performance-hardening-baseline.md",
+    "planning/global-insertion-hardening-plan.md",
+    "planning/indic-parler-tts-integration-plan.md",
+    "planning/kokoro-local-read-aloud-plan.md",
+    "planning/minimal-ui-and-reading-studio-refinement-plan.md",
+    "planning/reading-studio-draft-help-and-identity-plan.md",
+    "planning/reading-studio-experience.md",
+    "planning/reading-studio-quality-plan.md"
+  ],
+  "manualEvidenceDocuments": [
+    "docs/quality/window-shell-manual-evidence.md"
+  ],
+  "requiredPaths": [
+    "Directory.Build.props",
+    "Directory.Packages.props",
+    "tests/Directory.Build.props",
+    "DictateAnywhere.sln",
+    "DictateAnywhere.Production.slnf",
+    "DictateAnywhere.DeveloperTools.slnf",
+    "scripts/run-quality-suite.ps1",
+    "scripts/run-accessibility-preflight.ps1",
+    "scripts/run-history-preflight.ps1",
+    "scripts/history-preflight-scenarios.json",
+    "scripts/validate-public-api.ps1",
+    "scripts/security-compliance.ps1",
+    "scripts/validate-documentation-claims.ps1",
+    "scripts/validate-size-budgets.ps1",
+    "scripts/measure-release-sizes.ps1",
+    "scripts/validate-project-reference-guardrails.ps1",
+    "scripts/packaging-smoke.ps1",
+    "docs/architecture/public-api-baseline.json",
+    "src/DictateAnywhere.App/Composition/ApplicationComposition.cs",
+    "src/DictateAnywhere.UiAccessHelper/DictateAnywhere.UiAccessHelper.csproj",
+    "tools/DictateAnywhere.ModelBenchmark/DictateAnywhere.ModelBenchmark.csproj",
+    "tools/DictateAnywhere.TtsCli/DictateAnywhere.TtsCli.csproj",
+    "tools/DictateAnywhere.Spikes/DictateAnywhere.Spikes.csproj",
+    "tools/DictateAnywhere.VoicePreviewGenerator/DictateAnywhere.VoicePreviewGenerator.csproj"
+  ],
+  "requiredClaims": [
+    {
+      "id": "reader-window-dimensions",
+      "path": "docs/quality/window-shell-manual-evidence.md",
+      "pattern": "ReaderWindow.*Width=.?1380.? Height=.?860.? MinWidth=.?1040.? MinHeight=.?700",
+      "message": "ReaderWindow evidence must retain the current 1380x860 default and 1040x700 minimum."
+    },
+    {
+      "id": "history-plaintext-boundary",
+      "path": "docs/architecture/product-capability-matrix.md",
+      "pattern": "always-on local plaintext JSONL",
+      "message": "The product capability owner must state the always-on local plaintext JSONL history boundary."
+    },
+    {
+      "id": "explicit-theme-boundary",
+      "path": "docs/architecture/product-capability-matrix.md",
+      "pattern": "Explicit Dark/Light",
+      "message": "The product capability owner must state the explicit Dark/Light theme boundary."
+    }
+  ],
+  "retiredClaims": [
+    {
+      "id": "optional-history",
+      "pattern": "(?i)\\bhistory\\s+is\\s+(?:an?\\s+)?optional\\b",
+      "message": "History is always on; describe the local plaintext boundary instead."
+    },
+    {
+      "id": "encrypted-history-promise",
+      "pattern": "(?i)\\bhistory\\s+(?:stores?|uses|is)\\s+(?:locally\\s+)?encrypted\\b|\\bhistory stores encrypted text when enabled\\b",
+      "message": "History is not application-encrypted or optional."
+    },
+    {
+      "id": "raw-audio-in-history",
+      "pattern": "(?i)\\b(?:raw\\s+)?(?:microphone\\s+)?audio\\s+(?:is\\s+)?(?:stored|saved|retained)\\s+in\\s+history\\b",
+      "message": "Raw microphone audio is not stored in history."
+    },
+    {
+      "id": "cloud-local-workflow",
+      "pattern": "(?i)\\b(?:dictation|local chat)\\s+(?:runs?|is processed|processing occurs)\\s+(?:in|on|through)\\s+(?:the\\s+)?cloud\\b",
+      "message": "Dictation and local chat processing remain on-device."
+    },
+    {
+      "id": "system-theme-tracking",
+      "pattern": "(?i)\\b(?:supports?|uses?|tracks?|follows?)\\s+(?:the\\s+)?Windows\\s+System[- ]theme\\b",
+      "message": "Only explicit Dark/Light selection is supported."
+    },
+    {
+      "id": "mutable-llama-download",
+      "pattern": "(?i)\\b(?:download|resolve|fetch)(?:s|ed|ing)?\\b[^\\r\\n]{0,80}\\bllama(?:\\.cpp)?\\b[^\\r\\n]{0,80}\\b(?:latest|main|master)\\b",
+      "message": "llama.cpp acquisition must use its immutable recorded release."
+    },
+    {
+      "id": "tag-only-ci-action",
+      "pattern": "(?i)\\bactions/(?:checkout|setup-dotnet|upload-artifact)@v\\d+\\b",
+      "message": "GitHub Actions must use the immutable commit recorded by supply-chain provenance."
+    },
+    {
+      "id": "retired-tool-source-path",
+      "pattern": "(?i)\\bsrc[\\\\/]+DictateAnywhere\\.(?:ModelBenchmark|TtsCli|Spikes)(?:[\\\\/]|\\b)",
+      "message": "Retained developer executables live under tools, not src."
+    },
+    {
+      "id": "overlay-manual-exemption",
+      "pattern": "(?i)\\b(?:toast|overlay)[^\\r\\n]{0,100}\\bexempt\\s+from\\s+(?:theme|scaling|contrast|legibility)\\b",
+      "message": "Non-activating overlays are exempt only from caption/activation cases."
+    }
+  ]
+}

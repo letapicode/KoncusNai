@@ -1,0 +1,342 @@
+{
+  "schemaVersion": 1,
+  "packageSource": "https://api.nuget.org/v3/index.json",
+  "packages": [
+    {
+      "id": "bblanchon.PDFium.Linux",
+      "version": "152.0.7961",
+      "source": "https://www.nuget.org/packages/bblanchon.PDFium.Linux/152.0.7961",
+      "repository": "https://github.com/bblanchon/pdfium-binaries.git",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "bblanchon.PDFium.macOS",
+      "version": "152.0.7961",
+      "source": "https://www.nuget.org/packages/bblanchon.PDFium.macOS/152.0.7961",
+      "repository": "https://github.com/bblanchon/pdfium-binaries.git",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "bblanchon.PDFium.Win32",
+      "version": "152.0.7961",
+      "source": "https://www.nuget.org/packages/bblanchon.PDFium.Win32/152.0.7961",
+      "repository": "https://github.com/bblanchon/pdfium-binaries.git",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "coverlet.collector",
+      "version": "6.0.2",
+      "source": "https://www.nuget.org/packages/coverlet.collector/6.0.2",
+      "repository": "https://github.com/coverlet-coverage/coverlet.git",
+      "license": "MIT"
+    },
+    {
+      "id": "Google.Apis",
+      "version": "1.75.0",
+      "source": "https://www.nuget.org/packages/Google.Apis/1.75.0",
+      "repository": "https://github.com/googleapis/google-api-dotnet-client",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "Google.Apis.Auth",
+      "version": "1.75.0",
+      "source": "https://www.nuget.org/packages/Google.Apis.Auth/1.75.0",
+      "repository": "https://github.com/googleapis/google-api-dotnet-client",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "Google.Apis.Core",
+      "version": "1.75.0",
+      "source": "https://www.nuget.org/packages/Google.Apis.Core/1.75.0",
+      "repository": "https://github.com/googleapis/google-api-dotnet-client",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "Google.Apis.YouTube.v3",
+      "version": "1.75.0.4246",
+      "source": "https://www.nuget.org/packages/Google.Apis.YouTube.v3/1.75.0.4246",
+      "repository": "https://github.com/google/google-api-dotnet-client",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "Microsoft.CodeCoverage",
+      "version": "17.10.0",
+      "source": "https://www.nuget.org/packages/Microsoft.CodeCoverage/17.10.0",
+      "repository": "https://github.com/microsoft/vstest",
+      "license": "MIT"
+    },
+    {
+      "id": "Microsoft.NET.Test.Sdk",
+      "version": "17.10.0",
+      "source": "https://www.nuget.org/packages/Microsoft.NET.Test.Sdk/17.10.0",
+      "repository": "https://github.com/microsoft/vstest",
+      "license": "MIT"
+    },
+    {
+      "id": "Microsoft.NETCore.Platforms",
+      "version": "3.1.0",
+      "source": "https://www.nuget.org/packages/Microsoft.NETCore.Platforms/3.1.0",
+      "repository": "https://www.nuget.org/packages/Microsoft.NETCore.Platforms/3.1.0",
+      "license": "MIT"
+    },
+    {
+      "id": "Microsoft.TestPlatform.ObjectModel",
+      "version": "17.10.0",
+      "source": "https://www.nuget.org/packages/Microsoft.TestPlatform.ObjectModel/17.10.0",
+      "repository": "https://github.com/microsoft/vstest",
+      "license": "MIT"
+    },
+    {
+      "id": "Microsoft.TestPlatform.TestHost",
+      "version": "17.10.0",
+      "source": "https://www.nuget.org/packages/Microsoft.TestPlatform.TestHost/17.10.0",
+      "repository": "https://github.com/microsoft/vstest",
+      "license": "MIT"
+    },
+    {
+      "id": "Microsoft.Win32.Registry",
+      "version": "4.7.0",
+      "source": "https://www.nuget.org/packages/Microsoft.Win32.Registry/4.7.0",
+      "repository": "https://www.nuget.org/packages/Microsoft.Win32.Registry/4.7.0",
+      "license": "MIT"
+    },
+    {
+      "id": "NAudio",
+      "version": "2.2.1",
+      "source": "https://www.nuget.org/packages/NAudio/2.2.1",
+      "repository": "https://github.com/naudio/NAudio",
+      "license": "MIT"
+    },
+    {
+      "id": "NAudio.Asio",
+      "version": "2.2.1",
+      "source": "https://www.nuget.org/packages/NAudio.Asio/2.2.1",
+      "repository": "https://github.com/naudio/NAudio",
+      "license": "MIT"
+    },
+    {
+      "id": "NAudio.Core",
+      "version": "2.2.1",
+      "source": "https://www.nuget.org/packages/NAudio.Core/2.2.1",
+      "repository": "https://github.com/naudio/NAudio",
+      "license": "MIT"
+    },
+    {
+      "id": "NAudio.Midi",
+      "version": "2.2.1",
+      "source": "https://www.nuget.org/packages/NAudio.Midi/2.2.1",
+      "repository": "https://github.com/naudio/NAudio",
+      "license": "MIT"
+    },
+    {
+      "id": "NAudio.Wasapi",
+      "version": "2.2.1",
+      "source": "https://www.nuget.org/packages/NAudio.Wasapi/2.2.1",
+      "repository": "https://github.com/naudio/NAudio",
+      "license": "MIT"
+    },
+    {
+      "id": "NAudio.WinForms",
+      "version": "2.2.1",
+      "source": "https://www.nuget.org/packages/NAudio.WinForms/2.2.1",
+      "repository": "https://github.com/naudio/NAudio",
+      "license": "MIT"
+    },
+    {
+      "id": "NAudio.WinMM",
+      "version": "2.2.1",
+      "source": "https://www.nuget.org/packages/NAudio.WinMM/2.2.1",
+      "repository": "https://github.com/naudio/NAudio",
+      "license": "MIT"
+    },
+    {
+      "id": "Newtonsoft.Json",
+      "version": "13.0.1",
+      "source": "https://www.nuget.org/packages/Newtonsoft.Json/13.0.1",
+      "repository": "https://github.com/JamesNK/Newtonsoft.Json",
+      "license": "MIT"
+    },
+    {
+      "id": "Newtonsoft.Json",
+      "version": "13.0.4",
+      "source": "https://www.nuget.org/packages/Newtonsoft.Json/13.0.4",
+      "repository": "https://github.com/JamesNK/Newtonsoft.Json",
+      "license": "MIT"
+    },
+    {
+      "id": "PDFtoImage",
+      "version": "5.4.0",
+      "source": "https://www.nuget.org/packages/PDFtoImage/5.4.0",
+      "repository": "https://github.com/sungaila/PDFtoImage.git",
+      "license": "MIT"
+    },
+    {
+      "id": "SkiaSharp",
+      "version": "4.150.1",
+      "source": "https://www.nuget.org/packages/SkiaSharp/4.150.1",
+      "repository": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "license": "MIT"
+    },
+    {
+      "id": "SkiaSharp.NativeAssets.Linux.NoDependencies",
+      "version": "4.150.1",
+      "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.Linux.NoDependencies/4.150.1",
+      "repository": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "license": "MIT"
+    },
+    {
+      "id": "SkiaSharp.NativeAssets.macOS",
+      "version": "4.150.1",
+      "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.macOS/4.150.1",
+      "repository": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "license": "MIT"
+    },
+    {
+      "id": "SkiaSharp.NativeAssets.Win32",
+      "version": "4.150.1",
+      "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.Win32/4.150.1",
+      "repository": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "license": "MIT"
+    },
+    {
+      "id": "System.CodeDom",
+      "version": "7.0.0",
+      "source": "https://www.nuget.org/packages/System.CodeDom/7.0.0",
+      "repository": "https://github.com/dotnet/runtime",
+      "license": "MIT"
+    },
+    {
+      "id": "System.Management",
+      "version": "7.0.2",
+      "source": "https://www.nuget.org/packages/System.Management/7.0.2",
+      "repository": "https://github.com/dotnet/runtime",
+      "license": "MIT"
+    },
+    {
+      "id": "System.Reflection.Metadata",
+      "version": "1.6.0",
+      "source": "https://www.nuget.org/packages/System.Reflection.Metadata/1.6.0",
+      "repository": "https://www.nuget.org/packages/System.Reflection.Metadata/1.6.0",
+      "license": "MIT"
+    },
+    {
+      "id": "System.Security.AccessControl",
+      "version": "4.7.0",
+      "source": "https://www.nuget.org/packages/System.Security.AccessControl/4.7.0",
+      "repository": "https://www.nuget.org/packages/System.Security.AccessControl/4.7.0",
+      "license": "MIT"
+    },
+    {
+      "id": "System.Security.Cryptography.ProtectedData",
+      "version": "8.0.0",
+      "source": "https://www.nuget.org/packages/System.Security.Cryptography.ProtectedData/8.0.0",
+      "repository": "https://github.com/dotnet/runtime",
+      "license": "MIT"
+    },
+    {
+      "id": "System.Security.Principal.Windows",
+      "version": "4.7.0",
+      "source": "https://www.nuget.org/packages/System.Security.Principal.Windows/4.7.0",
+      "repository": "https://www.nuget.org/packages/System.Security.Principal.Windows/4.7.0",
+      "license": "MIT"
+    },
+    {
+      "id": "UglyToad.PdfPig",
+      "version": "1.7.0-custom-5",
+      "source": "https://www.nuget.org/packages/UglyToad.PdfPig/1.7.0-custom-5",
+      "repository": "https://github.com/UglyToad/PdfPig/tree/6ebcf528e098f0b88a4588e9d710a994c9c251e0",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "UglyToad.PdfPig.Core",
+      "version": "1.7.0-custom-5",
+      "source": "https://www.nuget.org/packages/UglyToad.PdfPig.Core/1.7.0-custom-5",
+      "repository": "https://github.com/UglyToad/PdfPig/tree/6ebcf528e098f0b88a4588e9d710a994c9c251e0",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "UglyToad.PdfPig.Fonts",
+      "version": "1.7.0-custom-5",
+      "source": "https://www.nuget.org/packages/UglyToad.PdfPig.Fonts/1.7.0-custom-5",
+      "repository": "https://github.com/UglyToad/PdfPig/tree/6ebcf528e098f0b88a4588e9d710a994c9c251e0",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "UglyToad.PdfPig.Tokenization",
+      "version": "1.7.0-custom-5",
+      "source": "https://www.nuget.org/packages/UglyToad.PdfPig.Tokenization/1.7.0-custom-5",
+      "repository": "https://github.com/UglyToad/PdfPig/tree/6ebcf528e098f0b88a4588e9d710a994c9c251e0",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "UglyToad.PdfPig.Tokens",
+      "version": "1.7.0-custom-5",
+      "source": "https://www.nuget.org/packages/UglyToad.PdfPig.Tokens/1.7.0-custom-5",
+      "repository": "https://github.com/UglyToad/PdfPig/tree/6ebcf528e098f0b88a4588e9d710a994c9c251e0",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "xunit",
+      "version": "2.6.6",
+      "source": "https://www.nuget.org/packages/xunit/2.6.6",
+      "repository": "https://github.com/xunit/xunit",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "xunit.abstractions",
+      "version": "2.0.3",
+      "source": "https://www.nuget.org/packages/xunit.abstractions/2.0.3",
+      "repository": "https://www.nuget.org/packages/xunit.abstractions/2.0.3",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "xunit.analyzers",
+      "version": "1.10.0",
+      "source": "https://www.nuget.org/packages/xunit.analyzers/1.10.0",
+      "repository": "https://github.com/xunit/xunit.analyzers",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "xunit.assert",
+      "version": "2.6.6",
+      "source": "https://www.nuget.org/packages/xunit.assert/2.6.6",
+      "repository": "https://github.com/xunit/xunit",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "xunit.core",
+      "version": "2.6.6",
+      "source": "https://www.nuget.org/packages/xunit.core/2.6.6",
+      "repository": "https://github.com/xunit/xunit",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "xunit.extensibility.core",
+      "version": "2.6.6",
+      "source": "https://www.nuget.org/packages/xunit.extensibility.core/2.6.6",
+      "repository": "https://github.com/xunit/xunit",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "xunit.extensibility.execution",
+      "version": "2.6.6",
+      "source": "https://www.nuget.org/packages/xunit.extensibility.execution/2.6.6",
+      "repository": "https://github.com/xunit/xunit",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "xunit.runner.visualstudio",
+      "version": "2.5.8",
+      "source": "https://www.nuget.org/packages/xunit.runner.visualstudio/2.5.8",
+      "repository": "https://github.com/xunit/visualstudio.xunit",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "Markdig",
+      "version": "1.3.2",
+      "source": "https://www.nuget.org/packages/Markdig/1.3.2",
+      "repository": "https://github.com/xoofx/markdig",
+      "license": "BSD-2-Clause"
+    }
+  ]
+}

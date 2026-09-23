@@ -1,0 +1,625 @@
+{
+  "schemaVersion": 2,
+  "manualEvidenceStatus": "NotTested",
+  "canonicalShellInventory": "docs/architecture/window-shell-inventory.md",
+  "scenarios": [
+    {
+      "id": "workbench-empty",
+      "owner": "Workbench",
+      "controls": [
+        { "name": "New chat", "state": "enabled" },
+        { "name": "Settings", "state": "enabled" },
+        { "name": "Add file", "state": "enabled" },
+        { "name": "Open Reading Studio", "state": "enabled" },
+        { "name": "Dictate", "state": "conditional" },
+        { "name": "Expand composer", "state": "hidden" },
+        { "name": "Submit", "state": "hidden" }
+      ]
+    },
+    {
+      "id": "workbench-short-input-model-unavailable",
+      "owner": "Workbench",
+      "controls": [
+        { "name": "Expand composer", "state": "hidden" },
+        { "name": "Submit", "state": "disabled" }
+      ]
+    },
+    {
+      "id": "workbench-long-input-model-ready",
+      "owner": "Workbench",
+      "controls": [
+        { "name": "Expand composer", "state": "enabled" },
+        { "name": "Submit", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "workbench-active-response",
+      "owner": "Workbench",
+      "controls": [
+        { "name": "Submit", "state": "hidden" },
+        { "name": "Stop response", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "workbench-sidebar-visible",
+      "owner": "Workbench",
+      "controls": [
+        { "name": "Hide sidebar", "state": "enabled" },
+        { "name": "Shared semantic sidebar toggle glyph", "state": "enabled" },
+        { "name": "New chat", "state": "enabled" },
+        { "name": "Settings", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "workbench-sidebar-hidden",
+      "owner": "Workbench",
+      "controls": [
+        { "name": "Show sidebar", "state": "enabled" },
+        { "name": "New chat", "state": "hidden" },
+        { "name": "Settings", "state": "hidden" }
+      ]
+    },
+    {
+      "id": "quick-settings-open",
+      "owner": "Workbench",
+      "controls": [
+        { "name": "Advanced settings", "state": "enabled" },
+        { "name": "Toggle theme", "state": "enabled" },
+        { "name": "Chat text size", "state": "enabled" },
+        { "name": "Download chat model", "state": "conditional" },
+        { "name": "About Koncus Nai", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "quick-settings-focus-contained",
+      "owner": "WorkbenchQuickSettingsView and TextboxWorkbenchWindow",
+      "controls": [
+        { "name": "Advanced settings", "state": "enabled" },
+        { "name": "Toggle theme", "state": "enabled" },
+        { "name": "Chat text size", "state": "enabled" },
+        { "name": "Underlying Workbench controls", "state": "disabled" }
+      ]
+    },
+    {
+      "id": "settings-open",
+      "owner": "Settings",
+      "controls": [
+        { "name": "Back", "state": "enabled" },
+        { "name": "Microphone", "state": "enabled" },
+        { "name": "Transcription provider", "state": "enabled" },
+        { "name": "Transcription model", "state": "conditional" },
+        { "name": "Change hotkey", "state": "enabled" },
+        { "name": "Manage history", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "settings-focus-contained",
+      "owner": "WorkbenchInlineSettingsView and TextboxWorkbenchWindow",
+      "controls": [
+        { "name": "Back", "state": "enabled" },
+        { "name": "Window caption controls", "state": "enabled" },
+        { "name": "Covered Workbench controls", "state": "disabled" }
+      ]
+    },
+    {
+      "id": "settings-scroll-focus-clipped",
+      "owner": "SettingsPanel",
+      "controls": [
+        { "name": "Manage Dictation History", "state": "enabled" },
+        { "name": "Settings scroll viewport", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "workbench-minimum-width-composer",
+      "owner": "WorkbenchComposerView",
+      "controls": [
+        { "name": "Add file", "state": "enabled" },
+        { "name": "Open Reading Studio", "state": "enabled" },
+        { "name": "Dictate", "state": "conditional" },
+        { "name": "Submit", "state": "conditional" }
+      ]
+    },
+    {
+      "id": "custom-window-high-contrast-outer-boundary",
+      "owner": "WindowThemeBehavior and AppHighContrastWindowBoundaryStyle",
+      "controls": [
+        { "name": "Restored Light ordinary client edge", "state": "enabled" },
+        { "name": "Restored Dark ordinary client edge", "state": "enabled" },
+        { "name": "Restored High Contrast client boundary", "state": "enabled" },
+        { "name": "Exactly one client boundary per custom shell", "state": "enabled" },
+        { "name": "DWM boundary color is a complementary native hint", "state": "enabled" },
+        { "name": "Existing About and Help boundaries are not duplicated", "state": "enabled" },
+        { "name": "Boundary is layout-neutral and noninteractive", "state": "enabled" },
+        { "name": "Runtime High Contrast entry and exit", "state": "enabled" },
+        { "name": "Maximized Windows-managed screen edge", "state": "conditional" }
+      ]
+    },
+    {
+      "id": "history-no-selection",
+      "owner": "History",
+      "controls": [
+        { "name": "Search dictation history", "state": "enabled" },
+        { "name": "Save dictation changes", "state": "disabled" },
+        { "name": "Delete selected dictation", "state": "disabled" }
+      ]
+    },
+    {
+      "id": "history-selection",
+      "owner": "History",
+      "controls": [
+        { "name": "Save dictation changes", "state": "conditional" },
+        { "name": "Delete selected dictation", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "reading-studio-idle",
+      "owner": "Reading Studio",
+      "controls": [
+        { "name": "Open document", "state": "enabled" },
+        { "name": "Reading Studio help", "state": "enabled" },
+        { "name": "Shared semantic sidebar toggle glyph", "state": "enabled" },
+        { "name": "Prepare section range", "state": "conditional" },
+        { "name": "Play", "state": "conditional" },
+        { "name": "Export audiobook", "state": "conditional" },
+        { "name": "Publish a YouTube series", "state": "conditional" }
+      ]
+    },
+    {
+      "id": "reading-studio-work-area-placement",
+      "owner": "WindowWorkAreaConstraintBehavior",
+      "controls": [
+        { "name": "Reading Studio title and caption controls", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "reading-studio-sidebar-scroll-focus-clipped",
+      "owner": "ReaderSidebarView",
+      "controls": [
+        { "name": "Reading Studio fixed sidebar header", "state": "enabled" },
+        { "name": "Reading Studio sidebar scroll viewport", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "reading-studio-draft-tab-escape",
+      "owner": "ReaderDocumentView",
+      "controls": [
+        { "name": "Reading draft plain Tab insertion", "state": "enabled" },
+        { "name": "Reading draft Ctrl+Tab escape", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "reading-studio-document-gutter-symmetry",
+      "owner": "ReaderDocumentView and ReaderDocumentLayoutMetrics",
+      "controls": [
+        { "name": "Standard draft outer gutter symmetry", "state": "enabled" },
+        { "name": "Standard draft effective text gutter symmetry", "state": "enabled" },
+        { "name": "Draft hidden scrollbar lane", "state": "conditional" },
+        { "name": "Draft visible scrollbar lane", "state": "conditional" },
+        { "name": "Read-only text alignment", "state": "enabled" },
+        { "name": "Light Dark and High Contrast geometry invariance", "state": "enabled" },
+        { "name": "Minimum and maximum Reader page widths", "state": "enabled" },
+        { "name": "Distraction-free explicit geometry", "state": "conditional" },
+        { "name": "Slash and backslash wrap-point editing stability", "state": "enabled" },
+        { "name": "Visible-scrollbar inset stability during edits", "state": "enabled" },
+        { "name": "Offset-only scrolling without inset scheduling", "state": "enabled" },
+        { "name": "Bounded draft layout convergence", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "reading-studio-draft-editing-and-scrollbar-contrast",
+      "owner": "ReaderDocumentView and Windows overlay presentation",
+      "controls": [
+        { "name": "Reader-page-relative High Contrast scrollbar thumb", "state": "conditional" },
+        { "name": "Reader scrollbar hover state", "state": "conditional" },
+        { "name": "Reading draft concise help", "state": "enabled" },
+        { "name": "Reading draft validation help", "state": "conditional" },
+        { "name": "Reading draft Tab undo unit", "state": "enabled" },
+        { "name": "Reading draft Ctrl+Tab escape", "state": "enabled" },
+        { "name": "Programmatic draft load undo reset", "state": "conditional" },
+        { "name": "Non-activating recording indicator pill", "state": "conditional" }
+      ]
+    },
+    {
+      "id": "reader-hover-help-centered-overlay-and-composer-and-draft-focus",
+      "owner": "ReaderSidebarView, ReaderDocumentView, WorkbenchComposerView, WindowsOverlayAnchorProvider, and OverlayIndicatorPlacementPolicy",
+      "controls": [
+        { "name": "Open document icon accessible name and matching tooltip", "state": "enabled" },
+        { "name": "Reading Studio help icon accessible name and matching tooltip", "state": "enabled" },
+        { "name": "Reading draft compact UI-typography tooltip", "state": "enabled" },
+        { "name": "Reading draft bounded validation tooltip", "state": "conditional" },
+        { "name": "Caret, focused-control, and foreground-window monitor selection", "state": "conditional" },
+        { "name": "Selected-monitor bottom-center recording and transcribing placement", "state": "conditional" },
+        { "name": "Safe corner fallback when no anchor exists", "state": "conditional" },
+        { "name": "Synthetic recording indicator dot, elapsed text, non-activation, and cleanup", "state": "conditional" },
+        { "name": "Prompt without inner adorner and layout-neutral semantic composer keyboard focus", "state": "conditional" },
+        { "name": "Reading draft without a nested TextBox focus adorner", "state": "conditional" },
+        { "name": "Reading draft semantic outer-frame keyboard focus boundary", "state": "conditional" },
+        { "name": "Reading draft pointer versus keyboard and Alt-cue focus ownership", "state": "conditional" },
+        { "name": "Reading draft focus exit and runtime High Contrast cleanup", "state": "conditional" },
+        { "name": "Reading draft focus, gutter, and scrollbar geometry invariance", "state": "conditional" },
+        { "name": "Reading draft deterministic borderless TextBox template", "state": "enabled" },
+        { "name": "Reading draft valid nonfocusable PART_ContentHost", "state": "enabled" },
+        { "name": "Reading draft without system High Contrast TextBox-sized chrome", "state": "conditional" }
+      ]
+    },
+    {
+      "id": "static-information-scroll-regions",
+      "owner": "AboutWindow and ReadingStudioHelpWindow",
+      "controls": [
+        { "name": "About Koncus Nai content", "state": "enabled" },
+        { "name": "Reading Studio help content", "state": "enabled" },
+        { "name": "Home reaches vertical beginning", "state": "enabled" },
+        { "name": "End reaches vertical end", "state": "enabled" },
+        { "name": "Page Up and Page Down remain native", "state": "enabled" },
+        { "name": "Keyboard focus remains on content", "state": "enabled" },
+        { "name": "Caption controls remain isolated", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "publishing-safe-default",
+      "owner": "Publishing",
+      "controls": [
+        { "name": "Connect YouTube", "state": "enabled" },
+        { "name": "Setup guide", "state": "enabled" },
+        { "name": "Cancel", "state": "enabled" },
+        { "name": "Approve and publish series", "state": "disabled" }
+      ]
+    },
+    {
+      "id": "first-run-and-hotkey-windows",
+      "owner": "Onboarding and hotkeys",
+      "controls": [
+        { "name": "Select model", "state": "enabled" },
+        { "name": "Change hotkey", "state": "enabled" },
+        { "name": "Captured hotkey events", "state": "enabled" }
+      ]
+    },
+    {
+      "id": "shared-windows-text-scale-and-responsive-layout",
+      "owner": "AppTextScaleManager and semantic application typography resources",
+      "controls": [
+        { "name": "Windows text scale remains independent of display DPI", "state": "enabled" },
+        { "name": "Semantic caption body control and heading hierarchy", "state": "enabled" },
+        { "name": "Runtime text-scale entry exit and coalesced cleanup", "state": "conditional" },
+        { "name": "Workbench sidebar and composer large-text reachability", "state": "conditional" },
+        { "name": "Quick Settings bounded large-text surface", "state": "conditional" },
+        { "name": "Advanced Settings responsive cards and vertical scrolling", "state": "conditional" },
+        { "name": "History large-text search list details and actions", "state": "conditional" },
+        { "name": "About and Reading Studio Help responsive cards", "state": "conditional" },
+        { "name": "Reading Studio sidebar and document separation", "state": "conditional" },
+        { "name": "Publishing first-run hotkey and toast semantic typography", "state": "conditional" },
+        { "name": "Light Dark and High Contrast resource independence", "state": "conditional" },
+        { "name": "User-controlled chat and Reader document typography preserved", "state": "enabled" }
+      ]
+    }
+  ],
+  "shells": [
+    {
+      "id": "workbench",
+      "inventoryName": "Workbench",
+      "className": "DictateAnywhere.App.Workbench.TextboxWorkbenchWindow",
+      "xamlPath": "src/DictateAnywhere.App/Workbench/TextboxWorkbenchWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/Workbench/TextboxWorkbenchWindow.xaml.cs",
+      "owner": "ApplicationComposition constructs it; WindowCoordinator owns its modeless lifetime.",
+      "invocation": "Launch Koncus Nai; if it is hidden, use the tray command Open Textbox Workbench.",
+      "defaultSize": { "width": 1320, "height": 780 },
+      "minimumSize": { "width": 1040, "height": 680 },
+      "resizeMode": "CanResize",
+      "chrome": "custom-caption",
+      "lifetime": "modeless-main",
+      "focusOwner": "Workbench views own initial/control focus; WindowCaptionButtons owns caption focus.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager",
+      "capabilities": ["minimize", "maximize-restore", "close", "drag", "resize"],
+      "states": ["normal", "maximized", "sidebar-visible", "sidebar-hidden", "empty-composer", "long-input-model-ready"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "100% scale", "150% scale", "200% scale", "keyboard focus", "caption names", "minimum size"],
+      "operatorCases": [
+        {
+          "id": "SHELL-WB-01",
+          "setup": "Start the exact preflight-approved Release build. Open the Koncus Nai Workbench and leave it restored, with the sidebar visible and the composer empty.",
+          "action": "Press Tab one keypress at a time through New chat, Settings, Add file, Open Reading Studio, Dictate when available, and the three caption buttons. Use Enter only on New chat or Settings; do not press Alt+Space.",
+          "expected": "Every enabled focused control has a visible outline. Hidden or disabled conditional controls are skipped. In the current Workbench context, the caption actions are announced as Minimize, Maximize or Restore, and Close.",
+          "report": "Report the exact focus sequence, any control with no visible outline, any unexpected disabled/hidden control, and PASS, FAIL, BLOCKED, or NOT TESTED.",
+          "status": "NotTested"
+        },
+        {
+          "id": "SHELL-WB-02",
+          "setup": "Keep the Workbench open in a restored state and ensure no dictation or chat request is active.",
+          "action": "Activate Maximize with Enter, verify the button becomes Restore, activate it again, then drag the title region and resize to the documented minimum.",
+          "expected": "Maximize and restore change the glyph/name correctly, the taskbar is not covered, dragging works, and controls remain reachable at 1040 by 680.",
+          "report": "Report maximize/restore name and glyph behavior, restored sizing, any clipping or overlap, and one classification.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "inventoryName": "Settings",
+      "className": "DictateAnywhere.App.Settings.SettingsWindow",
+      "xamlPath": "src/DictateAnywhere.App/Settings/SettingsWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/Settings/SettingsWindow.xaml.cs",
+      "owner": "ApplicationComposition constructs it; WindowCoordinator owns its modeless lifetime.",
+      "invocation": "In the Workbench, select Settings, or use the tray command Open Settings.",
+      "defaultSize": { "width": 1040, "height": 760 },
+      "minimumSize": { "width": 900, "height": 640 },
+      "resizeMode": "CanResize",
+      "chrome": "custom-caption",
+      "lifetime": "modeless-owned-surface",
+      "focusOwner": "SettingsPanel owns field focus; WindowCaptionButtons owns caption focus.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager",
+      "capabilities": ["minimize", "maximize-restore", "close", "drag", "resize"],
+      "states": ["normal", "maximized", "valid-draft", "invalid-draft", "conditional-model-list"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "keyboard focus", "caption names", "minimum size", "focus restoration"],
+      "operatorCases": [
+        {
+          "id": "SHELL-SET-01",
+          "setup": "Open Settings from the Workbench or tray. Do not change the configured dictation hotkey.",
+          "action": "Tab through Back, Microphone, Transcription provider, available model controls, Change hotkey, Manage Dictation History, and the caption buttons; then close Settings.",
+          "expected": "Only visible enabled controls receive focus, every focused control has a visible cue, caption names include Koncus Nai Settings, and focus returns to the control that opened Settings when that owner still exists.",
+          "report": "Report the exact missing/skipped controls, focus-return destination, any clipping at 900 by 640, and one classification.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "inventoryName": "Dictation History",
+      "className": "DictateAnywhere.App.History.HistoryWindow",
+      "xamlPath": "src/DictateAnywhere.App/History/HistoryWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/History/HistoryWindow.xaml.cs",
+      "owner": "ApplicationComposition constructs it; WindowCoordinator owns its single modeless instance.",
+      "invocation": "Open Settings, then select Manage Dictation History; the tray command Open Dictation History is an alternative.",
+      "defaultSize": { "width": 980, "height": 650 },
+      "minimumSize": { "width": 760, "height": 520 },
+      "resizeMode": "CanResize",
+      "chrome": "custom-caption",
+      "lifetime": "modeless-single-instance",
+      "focusOwner": "History query/selection views own content focus; WindowCaptionButtons owns caption focus.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager",
+      "capabilities": ["minimize", "maximize-restore", "close", "drag", "resize"],
+      "states": ["loading", "empty", "no-selection", "selection", "edited-selection", "no-results", "error"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "keyboard focus", "caption names", "minimum size", "search/selection state"],
+      "operatorCases": [
+        {
+          "id": "SHELL-HIST-01",
+          "setup": "Open Dictation History. Use only non-sensitive existing or test-owned entries; if none exist, test the empty state and do not create a real dictation for this shell case.",
+          "action": "Tab through Search dictation history and the visible list/detail controls. Confirm Save and Delete are skipped while disabled. If a safe test entry exists, select it and repeat. Maximize, restore, and resize to 760 by 520.",
+          "expected": "Tab order follows visible enabled controls, Save/Delete state follows selection/edit state, caption names include Dictation History, and the minimum layout stays reachable without overlap.",
+          "report": "Report the tested state (empty/no selection/selection), focus sequence, caption behavior, layout issues, and one classification without recording history text.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "about",
+      "inventoryName": "About",
+      "className": "DictateAnywhere.App.Workbench.AboutWindow",
+      "xamlPath": "src/DictateAnywhere.App/Workbench/AboutWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/Workbench/AboutWindow.xaml.cs",
+      "owner": "TextboxWorkbenchWindow creates the modal dialog; the dialog owns only its visual lifetime.",
+      "invocation": "In the Workbench, open Quick settings, then select About Koncus Nai.",
+      "defaultSize": { "width": 920, "height": 740 },
+      "minimumSize": { "width": 720, "height": 560 },
+      "resizeMode": "CanResize",
+      "chrome": "custom-caption",
+      "lifetime": "modal-owned-by-workbench",
+      "focusOwner": "The modal dialog and WindowCaptionButtons own focus containment and close return.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager",
+      "capabilities": ["minimize", "maximize-restore", "close", "drag", "resize"],
+      "states": ["normal", "maximized", "scrolled"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "keyboard focus", "caption names", "minimum size", "scroll reachability"],
+      "operatorCases": [
+        {
+          "id": "SHELL-ABT-01",
+          "setup": "Open Quick settings in the Workbench and select About Koncus Nai.",
+          "action": "Use Tab and Shift+Tab through the named About Koncus Nai content region and caption buttons. With the content region focused, use Page Up and Page Down for incremental vertical scrolling, press End to reach the vertical bottom, and press Home to return to the vertical top. Maximize/restore, then close with Escape if supported or Close About Koncus Nai.",
+          "expected": "Static text is not added as dozens of Tab stops; Page Up/Down scroll incrementally, End reaches the vertical bottom, and Home reaches the vertical top while focus stays on the one named content region; focus stays inside the modal, all content is reachable at 720 by 560, and closing returns to the still-valid Settings invoker without reopening Quick Settings.",
+          "report": "Report focus containment/return, scroll reachability, any clipping, and one classification.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "reading-studio-help",
+      "inventoryName": "Reading Studio help",
+      "className": "DictateAnywhere.App.Workbench.Reading.ReadingStudioHelpWindow",
+      "xamlPath": "src/DictateAnywhere.App/Workbench/Reading/ReadingStudioHelpWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/Workbench/Reading/ReadingStudioHelpWindow.xaml.cs",
+      "owner": "ReaderWindow creates and owns the modal help dialog.",
+      "invocation": "Open Reading Studio from the Workbench, then select Reading Studio help.",
+      "defaultSize": { "width": 920, "height": 740 },
+      "minimumSize": { "width": 720, "height": 560 },
+      "resizeMode": "CanResize",
+      "chrome": "custom-caption",
+      "lifetime": "modal-owned-by-reader",
+      "focusOwner": "The modal dialog and WindowCaptionButtons own focus containment and close return.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager",
+      "capabilities": ["minimize", "maximize-restore", "close", "drag", "resize"],
+      "states": ["normal", "maximized", "scrolled"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "keyboard focus", "caption names", "minimum size", "scroll reachability"],
+      "operatorCases": [
+        {
+          "id": "SHELL-RHLP-01",
+          "setup": "Open Reading Studio, then activate Reading Studio help without preparing narration.",
+          "action": "Tab and Shift+Tab through the named Reading Studio help content region and caption buttons. With the content region focused, use Page Up and Page Down for incremental vertical scrolling, press End to reach the vertical bottom, and press Home to return to the vertical top. Maximize/restore, then close it.",
+          "expected": "Static text is not added as dozens of Tab stops; Page Up/Down scroll incrementally, End reaches the vertical bottom, and Home reaches the vertical top while focus stays on the one named content region; all help content and caption buttons remain reachable, and closing returns focus to the Reader help control when it still exists.",
+          "report": "Report focus order/return, scrolling, caption behavior, any clipping at 720 by 560, and one classification.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "reading-studio",
+      "inventoryName": "Reading Studio",
+      "className": "DictateAnywhere.App.Workbench.Reading.ReaderWindow",
+      "xamlPath": "src/DictateAnywhere.App/Workbench/Reading/ReaderWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/Workbench/Reading/ReaderWindow.xaml.cs",
+      "owner": "ApplicationComposition creates it; each ReaderWindow owns its operation and child-dialog lifetime.",
+      "invocation": "In the Workbench, select Open Reading Studio.",
+      "defaultSize": { "width": 1380, "height": 860 },
+      "minimumSize": { "width": 1040, "height": 700 },
+      "resizeMode": "CanResize",
+      "chrome": "custom-caption",
+      "lifetime": "modeless-owned-by-workbench",
+      "focusOwner": "Reader views own document/sidebar/transport focus; WindowCaptionButtons owns caption focus.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager",
+      "capabilities": ["minimize", "maximize-restore", "close", "drag", "resize"],
+      "states": ["draft-empty", "draft-text", "document-prepared", "playing", "paused", "operation-active", "sidebar-visible", "sidebar-hidden"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "keyboard focus", "caption names", "minimum size", "conditional transport", "focus restoration"],
+      "operatorCases": [
+        {
+          "id": "SHELL-RDR-01",
+          "setup": "Open Reading Studio from the Workbench. Leave the new draft empty; do not download a voice, prepare narration, export, or publish.",
+          "action": "Confirm the complete title and caption row starts inside the visible work area. Tab through Open document, Reading Studio help, the draft editor, enabled sidebar actions, and caption buttons. In the multiline editor confirm plain Tab inserts indentation, Ctrl+Tab leaves it forward, and Ctrl+Shift+Tab leaves it backward. Focus a lower sidebar control; scroll with the pointer wheel, scrollbar, Page Up/Down, and Home/End. Maximize, restore, hide/show the sidebar when present, and resize to 1040 by 700.",
+          "expected": "The initial title/captions are fully on-screen; unavailable actions are skipped; the sidebar header stays fixed while content and its clipped focus cue move together; the editor has the documented escape chords; sidebar names follow visibility; and the minimum layout remains reachable.",
+          "report": "Report the actual enabled focus sequence, sidebar state/name, caption behavior, any clipping/overlap, and one classification.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "youtube-publishing",
+      "inventoryName": "YouTube publishing",
+      "className": "DictateAnywhere.App.Workbench.Publishing.YouTubePublishingWindow",
+      "xamlPath": "src/DictateAnywhere.App/Workbench/Publishing/YouTubePublishingWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/Workbench/Publishing/YouTubePublishingWindow.xaml.cs",
+      "owner": "ReaderWindow creates the modal; the publishing window owns draft validation and its dedicated title actions.",
+      "invocation": "From a safely prepared Reading Studio document, select Publish a YouTube series. If preparation is unavailable without a download or external operation, classify this window BLOCKED.",
+      "defaultSize": { "width": 860, "height": 820 },
+      "minimumSize": { "width": 760, "height": 680 },
+      "resizeMode": "CanResize",
+      "chrome": "specialized-custom",
+      "lifetime": "modal-owned-by-reader",
+      "focusOwner": "The publishing modal owns field focus, validation focus, and its dedicated close action.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager",
+      "capabilities": ["close", "drag", "resize"],
+      "states": ["safe-default", "invalid-fields", "valid-plan", "connecting", "cancelling"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "keyboard focus", "dedicated close name", "minimum size", "validation state"],
+      "operatorCases": [
+        {
+          "id": "SHELL-YTP-01",
+          "setup": "Open Publish a YouTube series only from an already prepared, non-sensitive test document. Do not connect an account or approve publishing.",
+          "action": "Tab through Connect YouTube, Setup guide, metadata fields, Cancel, and the dedicated Close control. Leave Approve and publish series disabled by keeping required data incomplete, then resize to 760 by 680 and close.",
+          "expected": "Enabled controls have visible focus, the disabled publish action is skipped, validation remains local and actionable, no maximize control appears, and Close ends only this modal.",
+          "report": "Report the focus sequence, validation announcement/visibility separately, close/focus return, or BLOCKED if the window cannot be reached safely.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "first-run",
+      "inventoryName": "First-run setup",
+      "className": "DictateAnywhere.App.FirstRun.FirstRunWizardWindow",
+      "xamlPath": "src/DictateAnywhere.App/FirstRun/FirstRunWizardWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/FirstRun/FirstRunWizardWindow.xaml.cs",
+      "owner": "App creates the modal during first-run state; the wizard owns onboarding navigation.",
+      "invocation": "It opens automatically only for a genuine first-run state. Do not reset or overwrite current settings solely for this test; otherwise classify it BLOCKED.",
+      "defaultSize": { "width": 760, "height": 600 },
+      "minimumSize": { "width": 640, "height": 480 },
+      "resizeMode": "CanResize",
+      "chrome": "native",
+      "lifetime": "startup-modal",
+      "focusOwner": "FirstRunWizardWindow owns page and navigation focus; Windows owns native caption focus.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager native DWM application",
+      "capabilities": ["minimize", "maximize-restore", "close", "drag", "resize"],
+      "states": ["welcome", "model-selection", "hotkey", "completion"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "native keyboard focus", "minimum size", "page transition focus"],
+      "operatorCases": [
+        {
+          "id": "SHELL-FRW-01",
+          "setup": "Use an already available genuine first-run test profile. Do not delete or replace the current Koncus Nai settings. If no test profile exists, classify this case BLOCKED.",
+          "action": "Tab and Shift+Tab through each visible onboarding page, use Enter/Space on non-destructive navigation controls, inspect the native caption, and resize to 640 by 480.",
+          "expected": "Only current-page controls receive focus, page changes move focus logically, native caption controls remain usable, and the minimum layout remains reachable.",
+          "report": "Report pages actually reached, focus order/visibility, native caption behavior, or the exact blocker.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "hotkey-settings",
+      "inventoryName": "Hotkey settings",
+      "className": "DictateAnywhere.App.Hotkeys.HotkeySettingsWindow",
+      "xamlPath": "src/DictateAnywhere.App/Hotkeys/HotkeySettingsWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/Hotkeys/HotkeySettingsWindow.xaml.cs",
+      "owner": "Settings creates the modal; HotkeySettingsWindow owns draft capture/validation only.",
+      "invocation": "Open Settings and select Change hotkey.",
+      "defaultSize": { "width": 700, "height": 360 },
+      "minimumSize": { "width": 500, "height": 300 },
+      "resizeMode": "CanResize",
+      "chrome": "native",
+      "lifetime": "modal-owned-by-settings",
+      "focusOwner": "HotkeySettingsWindow owns capture/action focus; Windows owns native caption focus.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager native DWM application",
+      "capabilities": ["minimize", "maximize-restore", "close", "drag", "resize"],
+      "states": ["unchanged", "capturing", "valid-draft", "invalid-draft", "test-window-open"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "native keyboard focus", "minimum size", "modal focus restoration"],
+      "operatorCases": [
+        {
+          "id": "SHELL-HKS-01",
+          "setup": "Open Settings, choose Change hotkey, and note the displayed chord. Do not save a replacement chord.",
+          "action": "Tab through capture, Test hotkey, Save, and Cancel controls. Open Hotkey Test if available, close it, then cancel Hotkey Settings.",
+          "expected": "Focus is visible, modal focus returns correctly, Cancel leaves the configured hotkey unchanged, and the native caption remains usable at 500 by 300.",
+          "report": "Report focus sequence/return and whether the original chord remained unchanged; do not record unrelated settings.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "hotkey-test",
+      "inventoryName": "Hotkey test",
+      "className": "DictateAnywhere.App.Hotkeys.HotkeyTestWindow",
+      "xamlPath": "src/DictateAnywhere.App/Hotkeys/HotkeyTestWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/Hotkeys/HotkeyTestWindow.xaml.cs",
+      "owner": "First-run or Hotkey Settings creates the modal; it owns only test-event presentation.",
+      "invocation": "From Change hotkey, select Test hotkey; first-run can also open it when that page is legitimately available.",
+      "defaultSize": { "width": 760, "height": 500 },
+      "minimumSize": { "width": 500, "height": 350 },
+      "resizeMode": "CanResize",
+      "chrome": "native",
+      "lifetime": "modal-owned-by-hotkey-flow",
+      "focusOwner": "HotkeyTestWindow owns event-list and close focus; Windows owns native caption focus.",
+      "themeOwner": "WindowThemeBehavior and AppThemeManager native DWM application",
+      "capabilities": ["minimize", "maximize-restore", "close", "drag", "resize"],
+      "states": ["empty-events", "captured-events"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "native keyboard focus", "minimum size", "empty/event states"],
+      "operatorCases": [
+        {
+          "id": "SHELL-HKT-01",
+          "setup": "Open Hotkey Test from Change hotkey. Keep the current Alt+Space dictation shortcut unchanged and do not use it as a Windows system-menu command.",
+          "action": "Tab through the event list and close action. Use only a nonconflicting harmless key for event display if the window explicitly requests one, then close and verify focus returns to Change hotkey.",
+          "expected": "The empty and captured-event states remain readable, focus is visible, the native caption works, and no global binding is changed.",
+          "report": "Report the key used without other settings, focus sequence/return, event-state result, and one classification.",
+          "status": "NotTested"
+        }
+      ]
+    },
+    {
+      "id": "reader-completion-toast",
+      "inventoryName": "Reader completion toast",
+      "className": "DictateAnywhere.App.Workbench.Reading.ReaderCompletionToastWindow",
+      "xamlPath": "src/DictateAnywhere.App/Workbench/Reading/ReaderCompletionToastWindow.xaml",
+      "codeBehindPath": "src/DictateAnywhere.App/Workbench/Reading/ReaderCompletionToastWindow.xaml.cs",
+      "owner": "ReaderWindow creates it after an owned completion; the toast owns its bounded timer and animation cleanup.",
+      "invocation": "It appears only after a legitimate Reader completion. Do not run a model or export solely to produce it; classify BLOCKED if no safe completed fixture is available.",
+      "defaultSize": { "width": 390, "height": 118 },
+      "minimumSize": { "width": 0, "height": 118 },
+      "resizeMode": "NoResize",
+      "chrome": "toast",
+      "lifetime": "non-activating-bounded-toast",
+      "focusOwner": "The toast never activates and must not take keyboard focus.",
+      "themeOwner": "Dedicated transparent toast resources; it remains subject to legibility and contrast evidence.",
+      "capabilities": ["auto-close"],
+      "states": ["static-reduced-motion", "animated", "closing"],
+      "manualChecks": ["Dark", "Light", "High Contrast", "non-activation", "reduced motion", "screen-edge placement", "legibility"],
+      "operatorCases": [
+        {
+          "id": "SHELL-TOAST-01",
+          "setup": "Use an already available safe Reader completion that produces the toast. Do not start narration, export, or a model only for this case; otherwise classify it BLOCKED.",
+          "action": "Keep keyboard focus in Reading Studio while the toast appears. Observe its placement and whether it closes without interaction, then repeat with reduced motion only during the separately owned manual batch.",
+          "expected": "The toast does not activate or steal focus, remains legible near the lower screen corner, respects reduced motion, and closes on its bounded lifetime.",
+          "report": "Report focus before/during/after, placement, legibility, close behavior, or the exact blocker.",
+          "status": "NotTested"
+        }
+      ]
+    }
+  ]
+}

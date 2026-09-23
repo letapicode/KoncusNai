@@ -1,0 +1,44 @@
+<UserControl x:Class="DictateAnywhere.App.Workbench.WorkbenchOperationalStatusView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Visibility="Collapsed">
+  <StackPanel HorizontalAlignment="Center"
+              VerticalAlignment="Top">
+    <Grid Width="720">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <ProgressBar x:Name="ModelProgress"
+                   Grid.Column="0"
+                   Width="110"
+                   Height="8"
+                   Minimum="0"
+                   Maximum="100"
+                   VerticalAlignment="Center"
+                   AutomationProperties.Name="Model status progress" />
+      <TextBlock x:Name="ModelReadiness"
+                 Grid.Column="1"
+                 Margin="12,0,0,0"
+                 VerticalAlignment="Center"
+                 Style="{DynamicResource SubtleLabelStyle}"
+                 Text="Checking model..."
+                 AutomationProperties.LiveSetting="Polite" />
+      <TextBlock x:Name="SessionStatus"
+                 Grid.Column="2"
+                 Margin="14,0,0,0"
+                 VerticalAlignment="Center"
+                 Style="{DynamicResource SubtleLabelStyle}"
+                 Text="Idle"
+                 AutomationProperties.LiveSetting="Polite" />
+    </Grid>
+    <TextBlock x:Name="ModelDetail"
+               Width="720"
+               Margin="0,7,0,0"
+               Style="{DynamicResource SubtleLabelStyle}"
+               TextWrapping="Wrap"
+               Visibility="Collapsed"
+               AutomationProperties.LiveSetting="Polite" />
+  </StackPanel>
+</UserControl>

@@ -1,0 +1,154 @@
+<UserControl x:Class="DictateAnywhere.App.Workbench.Reading.ReaderSidebarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+  <Border x:Name="SidebarSurface"
+          Background="{DynamicResource Brush.Surface.Sidebar}"
+          BorderBrush="{DynamicResource Brush.Border.Subtle}"
+          BorderThickness="0,0,1,0">
+    <Grid x:Name="SidebarLayoutRoot">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="46" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+      <ScrollViewer x:Name="ReaderSidebarScrollViewer"
+                    Grid.Row="1"
+                    ClipToBounds="True"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+        <AdornerDecorator ClipToBounds="True">
+          <StackPanel x:Name="ReaderSidebarContent" Margin="26,6,26,24">
+        <StackPanel Margin="0,0,0,15" Orientation="Horizontal">
+          <Button x:Name="OpenDocumentButton" Style="{DynamicResource AppActionButtonStyle}" Margin="0,0,8,0"
+                  ToolTip="Open document"
+                  AutomationProperties.Name="Open document">
+            <StackPanel Orientation="Horizontal"><Path Width="17" Height="17" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M4,4 H10 L12,7 H20 V19 H4 Z" />
+          <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" Text="Import document" /></StackPanel>
+          </Button>
+          <Button x:Name="ReadingHelpButton" Style="{DynamicResource ReaderBareIconButton}"
+                  ToolTip="Reading Studio help"
+                  AutomationProperties.Name="Reading Studio help">
+            <Viewbox Width="19" Height="19" SnapsToDevicePixels="True" UseLayoutRounding="True">
+              <Path Width="20" Height="20" Stretch="None" Fill="Transparent"
+                    Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                    StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                    Data="M10,1.5 A8.5,8.5 0 1 1 9.99,1.5 Z M7.25,7.1 C7.55,5.6 8.65,4.8 10.2,4.8 C11.9,4.8 13,5.8 13,7.25 C13,8.55 12.25,9.25 10.85,10.1 C10.15,10.55 9.85,11.05 9.85,11.85 M9.85,15.15 L9.85,15.25" />
+            </Viewbox>
+          </Button>
+        </StackPanel>
+
+        <Expander x:Name="SectionRangeExpander" Header="Section range" Margin="0,0,0,12" Visibility="Collapsed">
+          <StackPanel>        <TextBlock Margin="0,8,0,5" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Start Section" />
+        <ComboBox x:Name="StartSectionComboBox" Style="{DynamicResource ReaderControl}" AutomationProperties.Name="Start section" />
+        <TextBlock Margin="0,11,0,5" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="End Section" />
+        <ComboBox x:Name="EndSectionComboBox" Style="{DynamicResource ReaderControl}" AutomationProperties.Name="End section" />
+
+</StackPanel>
+        </Expander>
+        <TextBlock Text="Narrate" FontSize="{DynamicResource Font.Size.Section}" FontWeight="SemiBold" Margin="0,12,0,0" />
+        <TextBlock Margin="0,18,0,5" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Language" />
+        <ComboBox x:Name="LanguageComboBox" DisplayMemberPath="LanguageLabel" ToolTip="{Binding SelectedItem.DisplayName, RelativeSource={RelativeSource Self}}" Style="{DynamicResource ReaderControl}" AutomationProperties.Name="Reading language" />
+
+        <TextBlock Margin="0,11,0,5" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Voice"
+                   ToolTip="{Binding SelectedItem.CapabilitySummary, ElementName=LanguageComboBox}" />
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="42" /></Grid.ColumnDefinitions>
+          <ComboBox x:Name="VoiceComboBox" Style="{DynamicResource ReaderControl}" AutomationProperties.Name="Narration voice">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding DisplayName}" ToolTip="{Binding Note}" TextWrapping="Wrap" MaxWidth="320" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button x:Name="VoicePreviewButton" Grid.Column="2" Style="{DynamicResource ReaderIconButton}"
+                  AutomationProperties.Name="Preview voice">
+            <Path x:Name="VoicePreviewGlyph" Width="15" Height="15" Stretch="Uniform"
+                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="M5,3 L18,12 L5,21 Z" />
+          </Button>
+          <Grid x:Name="VoicePreviewStatusPanel" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,8,0,0" Visibility="Collapsed">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <ProgressBar x:Name="VoicePreviewProgressBar" Width="34" Height="3" Margin="0,0,8,0" VerticalAlignment="Center" IsIndeterminate="True" AutomationProperties.Name="Voice preview loading progress" />
+            <TextBlock x:Name="VoicePreviewStatusTextBlock" Grid.Column="1" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.Caption}" TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Polite" />
+          </Grid>
+        </Grid>
+
+        <TextBlock Margin="0,18,0,5" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Preparation" />
+        <ToggleButton x:Name="PreparationModeToggleButton" Style="{DynamicResource ReaderProcessingToggle}"
+                      AutomationProperties.Name="Processing mode" />
+        <Button x:Name="PrepareRangeButton" Margin="0,12,0,0" Style="{DynamicResource ReaderPrimaryButton}" Content="Create narration" AutomationProperties.Name="Prepare section range" />
+
+        <Expander x:Name="ReadingAppearanceExpander" Header="Reading appearance" Margin="0,24,0,0" IsExpanded="False">
+          <StackPanel>        <TextBlock Margin="0,18,0,5" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Reading Focus" />
+        <ComboBox x:Name="FollowAlongComboBox" Style="{DynamicResource ReaderControl}" AutomationProperties.Name="Reading focus" />
+        <TextBlock Margin="0,11,0,5" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Highlight Style" />
+        <ComboBox x:Name="HighlightStyleComboBox" Style="{DynamicResource ReaderControl}" AutomationProperties.Name="Highlight style" />
+        <TextBlock Margin="0,11,0,3" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Focus Color" />
+        <ListBox x:Name="HighlightColorListBox" Height="84" Style="{DynamicResource ReaderSwatchList}"
+                 ItemContainerStyle="{DynamicResource ReaderSwatchItem}" AutomationProperties.Name="Focus color">
+          <ListBox.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4" /></ItemsPanelTemplate></ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Grid ToolTip="{Binding DisplayName}" AutomationProperties.Name="{Binding DisplayName}">
+                <Ellipse Width="25" Height="25" Fill="{Binding HexColor}" Stroke="#55FFFFFF" StrokeThickness="1" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Margin="0,11,0,5" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Typeface" />
+        <ComboBox x:Name="FontComboBox" Style="{DynamicResource ReaderControl}" AutomationProperties.Name="Typeface" />
+        <TextBlock Margin="0,11,0,3" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Reading Theme" />
+        <ListBox x:Name="ThemeListBox" Height="42" Style="{DynamicResource ReaderSwatchList}"
+                 ItemContainerStyle="{DynamicResource ReaderSwatchItem}" AutomationProperties.Name="Reading theme">
+          <ListBox.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4" /></ItemsPanelTemplate></ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Grid ToolTip="{Binding DisplayName}" AutomationProperties.Name="{Binding DisplayName}">
+                <Ellipse Width="25" Height="25" Fill="{Binding PageColor}" Stroke="{Binding InkColor}" StrokeThickness="1" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <Grid Margin="0,15,0,4">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+          <TextBlock Text="Text Size" Style="{DynamicResource ReaderMicroLabel}" />
+          <TextBlock x:Name="FontSizeTextBlock" Grid.Column="1" Foreground="{DynamicResource Brush.Text.Primary}" FontSize="{DynamicResource Font.Size.FieldLabel}" />
+        </Grid>
+        <Slider x:Name="FontSizeSlider" Style="{DynamicResource ReaderSlider}" Minimum="18" Maximum="38" Value="23"
+                TickFrequency="1" IsSnapToTickEnabled="True" AutomationProperties.Name="Text size" />
+
+        <Grid Margin="0,13,0,4">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+          <TextBlock Text="Speed" Style="{DynamicResource ReaderMicroLabel}" />
+          <TextBlock x:Name="SpeedTextBlock" Grid.Column="1" Foreground="{DynamicResource Brush.Text.Primary}" FontSize="{DynamicResource Font.Size.FieldLabel}" />
+        </Grid>
+        <Slider x:Name="SpeedSlider" Style="{DynamicResource ReaderSlider}" Minimum="0.75" Maximum="2" Value="1"
+                TickFrequency="0.05" IsSnapToTickEnabled="True" AutomationProperties.Name="Playback speed" />
+
+</StackPanel>
+        </Expander>
+        <TextBlock Margin="0,19,0,0" Text="Export" Foreground="{DynamicResource Brush.Control.Primary}" FontSize="{DynamicResource Font.Size.FieldLabel}" FontWeight="SemiBold" />
+        <TextBlock x:Name="ExportReadinessText" Text="Create narration to export audio or video." Margin="0,8,0,0" TextWrapping="Wrap"
+                   FontSize="{DynamicResource Font.Size.Caption}" Foreground="{DynamicResource Brush.Text.Secondary}" />
+        <StackPanel x:Name="ExportControls" Visibility="Collapsed">        <TextBlock Margin="0,9,0,5" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Video Canvas" />
+        <ComboBox x:Name="VideoFormatComboBox" Style="{DynamicResource ReaderControl}" AutomationProperties.Name="Video canvas" />
+        <TextBlock x:Name="VideoExportHintTextBlock" Margin="0,8,0,0" Foreground="{DynamicResource Brush.Text.Secondary}"
+                   FontSize="{DynamicResource Font.Size.Caption}" LineHeight="{DynamicResource Line.Height.Caption}" TextWrapping="Wrap" />
+        <UniformGrid Margin="0,13,0,0" Rows="1" Columns="3">
+          <Button x:Name="ExportAudioButton" Margin="0,0,6,0" Style="{DynamicResource ReaderSecondaryButton}" Padding="10,8"
+                  ToolTip="Export audiobook" AutomationProperties.Name="Export audiobook"><TextBlock Text="Audio" /></Button>
+          <Button x:Name="ExportVideoButton" Margin="3,0" Style="{DynamicResource ReaderSecondaryButton}" Padding="10,8"
+                  ToolTip="Export reading video" AutomationProperties.Name="Export reading video"><TextBlock Text="Video" /></Button>
+          <Button x:Name="PublishYouTubeButton" Margin="6,0,0,0" Style="{DynamicResource ReaderSecondaryButton}" Padding="10,8"
+                  ToolTip="Publish a YouTube series" AutomationProperties.Name="Publish a YouTube series"><TextBlock Text="Publish" /></Button>
+        </UniformGrid></StackPanel>
+          </StackPanel>
+        </AdornerDecorator>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</UserControl>

@@ -1,0 +1,324 @@
+<Window x:Class="DictateAnywhere.App.Workbench.Publishing.YouTubePublishingWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        Title="Publish to YouTube" Width="860" Height="820" MinWidth="760" MinHeight="680"
+        WindowStartupLocation="CenterOwner" WindowStyle="None" ResizeMode="CanResize"
+        Background="{DynamicResource Brush.Surface.Canvas}" Foreground="{DynamicResource Brush.Text.Primary}"
+        UseLayoutRounding="True" SnapsToDevicePixels="True">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="7" GlassFrameThickness="0" CornerRadius="14" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+  <Window.Resources>
+    <Style TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+    </Style>
+    <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+    </Style>
+    <Style TargetType="TextBox" BasedOn="{StaticResource AppTextBoxStyle}">
+      <Setter Property="MinHeight" Value="42" /><Setter Property="Padding" Value="12,9" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Input}" /><Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="CaretBrush" Value="{DynamicResource Brush.Control.Primary}" /><Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+      <Setter Property="BorderThickness" Value="1" /><Setter Property="FontSize" Value="{DynamicResource Font.Size.BodyComfortable}" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style TargetType="PasswordBox">
+      <Setter Property="MinHeight" Value="42" /><Setter Property="Padding" Value="12,9" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Input}" /><Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="CaretBrush" Value="{DynamicResource Brush.Control.Primary}" /><Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+      <Setter Property="BorderThickness" Value="1" /><Setter Property="FontSize" Value="{DynamicResource Font.Size.BodyComfortable}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="PasswordBox">
+            <Border x:Name="PasswordSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+              <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="PasswordSurface" Property="BorderBrush" Value="{DynamicResource Brush.Control.Primary}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="PasswordSurface" Property="Background" Value="{DynamicResource Brush.Control.InputDisabled}" /><Setter Property="Opacity" Value="0.72" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="DatePicker">
+      <Setter Property="MinHeight" Value="42" /><Setter Property="Background" Value="{DynamicResource Brush.Control.Input}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" /><Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+      <Setter Property="BorderThickness" Value="1" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="DatePicker">
+            <Grid>
+              <Border x:Name="DateSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                <Grid>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="38" /></Grid.ColumnDefinitions>
+                  <DatePickerTextBox x:Name="PART_TextBox" Margin="4,1,0,1" Padding="8,0" VerticalContentAlignment="Center"
+                                     Background="Transparent" BorderThickness="0" Foreground="{TemplateBinding Foreground}" />
+                  <Button x:Name="PART_Button" Grid.Column="1" Background="Transparent" BorderThickness="0" Focusable="False" ToolTip="Open calendar">
+                    <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource Brush.Text.Secondary}" Text="&#xE787;" />
+                  </Button>
+                </Grid>
+              </Border>
+              <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" StaysOpen="False">
+                <Border Margin="0,5,0,0" Padding="5" Background="{DynamicResource Brush.Surface.Elevated}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="10">
+                  <Calendar x:Name="PART_Calendar" />
+                </Border>
+              </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="DateSurface" Property="BorderBrush" Value="{DynamicResource Brush.Control.Primary}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="DateSurface" Property="Background" Value="{DynamicResource Brush.Control.InputDisabled}" /><Setter Property="Opacity" Value="0.72" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="PublishingComboBoxItem" TargetType="ComboBoxItem">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" /><Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="12,9" /><Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBoxItem">
+            <Border x:Name="ItemSurface" Margin="3,2" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" CornerRadius="7">
+              <ContentPresenter VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemSurface" Property="Background" Value="{DynamicResource Brush.Control.Hover}" /><Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" /></Trigger>
+              <Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemSurface" Property="Background" Value="{DynamicResource Brush.Control.Selection}" /><Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" /><Setter Property="FontWeight" Value="SemiBold" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="ComboBox">
+      <Setter Property="MinHeight" Value="42" /><Setter Property="Padding" Value="12,0" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Input}" /><Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" /><Setter Property="BorderThickness" Value="1" /><Setter Property="FontSize" Value="{DynamicResource Font.Size.BodyComfortable}" />
+      <Setter Property="ItemContainerStyle" Value="{StaticResource PublishingComboBoxItem}" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid>
+              <Border x:Name="ControlSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                <Grid>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
+                  <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center" Content="{TemplateBinding SelectionBoxItem}"
+                                    ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" TextElement.Foreground="{TemplateBinding Foreground}" />
+                  <Border Grid.Column="1" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1,0,0,0">
+                    <Path Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z" Fill="{DynamicResource Brush.Text.Secondary}" />
+                  </Border>
+                </Grid>
+              </Border>
+              <ToggleButton Background="Transparent" BorderThickness="0" ClickMode="Press" Focusable="False"
+                            IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="Transparent" /></ControlTemplate></ToggleButton.Template>
+              </ToggleButton>
+              <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" PopupAnimation="Fade">
+                <Border Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" Margin="0,6,0,0" Padding="3"
+                        Background="{DynamicResource Brush.Surface.Elevated}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="9">
+                  <ScrollViewer MaxHeight="340" CanContentScroll="True"><ItemsPresenter /></ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="ControlSurface" Property="BorderBrush" Value="{DynamicResource Brush.Progress.Value}" /></Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ControlSurface" Property="BorderBrush" Value="{DynamicResource Brush.Text.Secondary}" /></Trigger>
+              <Trigger Property="IsDropDownOpen" Value="True"><Setter TargetName="ControlSurface" Property="BorderBrush" Value="{DynamicResource Brush.Control.Primary}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="ControlSurface" Property="Opacity" Value="0.45" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="PublishingButtonBase" TargetType="Button">
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.Control}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Surface" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.88" /></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.72" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.42" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource PublishingButtonBase}">
+      <Setter Property="MinHeight" Value="42" /><Setter Property="Padding" Value="17,9" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Primary}" /><Setter Property="Foreground" Value="{DynamicResource Brush.Text.Inverse}" />
+      <Setter Property="BorderThickness" Value="0" /><Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PublishingButtonBase}">
+      <Setter Property="MinHeight" Value="40" /><Setter Property="Padding" Value="15,8" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Surface.Elevated}" /><Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" /><Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style x:Key="Label" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" /><Setter Property="FontSize" Value="{DynamicResource Font.Size.FieldLabel}" />
+      <Setter Property="Margin" Value="0,12,0,6" />
+    </Style>
+    <Style x:Key="PublishingWindowControlButton" TargetType="Button">
+      <Setter Property="Width" Value="38" /><Setter Property="Height" Value="32" />
+      <Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" /><Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Chrome" Background="Transparent" CornerRadius="7"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#C9343F" /><Setter Property="Foreground" Value="#FFFFFF" /></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#992832" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="PublishingScrollBar" TargetType="ScrollBar">
+      <Setter Property="Width" Value="8" /><Setter Property="MinWidth" Value="8" /><Setter Property="Background" Value="Transparent" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Track x:Name="PART_Track" IsDirectionReversed="True">
+              <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False" /></Track.DecreaseRepeatButton>
+              <Track.Thumb><Thumb MinHeight="42"><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Width="4" HorizontalAlignment="Center" Background="{DynamicResource Brush.Scrollbar.Thumb}" CornerRadius="2" /></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+              <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False" /></Track.IncreaseRepeatButton>
+            </Track>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <Border x:Name="PublishingShell" BorderThickness="0" Background="{DynamicResource Brush.Surface.Canvas}" CornerRadius="14">
+    <Grid x:Name="PublishingRoot">
+      <Grid.RowDefinitions><RowDefinition Height="72" /><RowDefinition Height="*" /><RowDefinition Height="76" /></Grid.RowDefinitions>
+
+      <Grid x:Name="PublishingHeader" Grid.Row="0" Background="{DynamicResource Brush.Surface.Canvas}" presentation:WindowDragRegionBehavior.IsEnabled="True">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+        <StackPanel Margin="24,14,0,0">
+          <TextBlock Text="YouTube Publishing" Foreground="{DynamicResource Brush.Control.Primary}" FontSize="{DynamicResource Font.Size.Caption}" FontWeight="SemiBold" />
+          <TextBlock Text="Build and publish your reading series" Margin="0,4,0,0" FontFamily="Georgia" FontSize="{DynamicResource Font.Size.Heading}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="Review one continuous plan before anything is uploaded." Margin="0,3,0,0" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.Caption}" TextWrapping="Wrap" />
+        </StackPanel>
+        <Button x:Name="ClosePublishingButton" Grid.Column="1" Margin="0,8,8,0" VerticalAlignment="Top" Style="{StaticResource PublishingWindowControlButton}" Click="OnCloseClicked" ToolTip="Close" AutomationProperties.Name="Close">
+          <TextBlock x:Name="ClosePublishingGlyphTextBlock" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="&#xE8BB;" />
+        </Button>
+      </Grid>
+
+      <ScrollViewer x:Name="PublishingScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer.Resources><Style TargetType="ScrollBar" BasedOn="{StaticResource PublishingScrollBar}" /></ScrollViewer.Resources>
+        <Grid Margin="24,10,24,24">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+
+          <StackPanel Grid.Column="0">
+            <Border x:Name="ResumePanel" Margin="0,0,0,18" Padding="18" Background="{DynamicResource Brush.Surface.Subtle}" BorderBrush="{DynamicResource Brush.Status.Warning}" BorderThickness="1" CornerRadius="12" Visibility="Collapsed">
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="14" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="Continue your saved series" Foreground="{DynamicResource Brush.Status.Warning}" FontFamily="Georgia" FontSize="{DynamicResource Font.Size.Section}" FontWeight="SemiBold" />
+                  <TextBlock x:Name="ResumeSummaryTextBlock" Margin="0,5,0,0" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Padding="15,8" Content="Resume" Click="OnResumePublishingClicked" />
+              </Grid>
+            </Border>
+            <Border Padding="18" Background="{DynamicResource Brush.Surface.Elevated}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="12">
+              <StackPanel>
+                <TextBlock Text="1 · Connect YouTube" FontFamily="Georgia" FontSize="{DynamicResource Font.Size.Section}" FontWeight="SemiBold" />
+                <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" TextWrapping="Wrap"
+                           Text="Use a Google Desktop OAuth client. The credentials and account token are encrypted for your Windows account." />
+                <TextBlock Style="{StaticResource Label}" Text="OAuth client ID" />
+                <TextBox x:Name="ClientIdTextBox" AutomationProperties.Name="OAuth client ID" />
+                <TextBlock Style="{StaticResource Label}" Text="OAuth client secret" />
+                <PasswordBox x:Name="ClientSecretPasswordBox" AutomationProperties.Name="OAuth client secret" />
+                <Grid Margin="0,14,0,0">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                  <Button x:Name="ConnectButton" Grid.Column="0" Style="{StaticResource PrimaryButton}" Content="Connect YouTube" Click="OnConnectClicked" />
+                  <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Setup guide" Click="OnOpenSetupGuideClicked" />
+                </Grid>
+                <TextBlock x:Name="ConnectionStatusTextBlock" Margin="0,10,0,0" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.FieldLabel}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+              </StackPanel>
+            </Border>
+
+            <Border Margin="0,18,0,0" Padding="18" Background="{DynamicResource Brush.Surface.Elevated}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="12">
+              <StackPanel>
+                <TextBlock Text="2 · Shape the series" FontFamily="Georgia" FontSize="{DynamicResource Font.Size.Section}" FontWeight="SemiBold" />
+                <TextBlock Style="{StaticResource Label}" Text="Series title" />
+                <TextBox x:Name="SeriesTitleTextBox" AutomationProperties.Name="Series title" />
+                <TextBlock Style="{StaticResource Label}" Text="Description" />
+                <TextBox x:Name="DescriptionTextBox" Height="100" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top" AutomationProperties.Name="Series description" />
+                <TextBlock Style="{StaticResource Label}" Text="Tags · separated by commas" />
+                <TextBox x:Name="TagsTextBox" AutomationProperties.Name="Tags" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <StackPanel Grid.Column="2">
+            <Border Padding="18" Background="{DynamicResource Brush.Surface.Elevated}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="12">
+              <StackPanel>
+                <TextBlock Text="3 · Choose delivery" FontFamily="Georgia" FontSize="{DynamicResource Font.Size.Section}" FontWeight="SemiBold" />
+                <TextBlock Style="{StaticResource Label}" Text="Video format" />
+                <ComboBox x:Name="VideoFormatComboBox" SelectionChanged="OnVideoFormatChanged" AutomationProperties.Name="Video format" />
+                <TextBlock Style="{StaticResource Label}" Text="Caption treatment" />
+                <ComboBox x:Name="CaptionStyleComboBox" AutomationProperties.Name="Caption treatment" />
+                <TextBlock Style="{StaticResource Label}" Text="Visibility" />
+                <ComboBox x:Name="PrivacyComboBox" SelectionChanged="OnPrivacyChanged" AutomationProperties.Name="Visibility" />
+                <Grid x:Name="SchedulePanel" Margin="0,4,0,0" Visibility="Collapsed">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="92" /></Grid.ColumnDefinitions>
+                  <StackPanel><TextBlock Style="{StaticResource Label}" Text="First publication" /><DatePicker x:Name="PublishDatePicker" MinHeight="42" AutomationProperties.Name="First publication date" /></StackPanel>
+                  <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource Label}" Text="Local time" /><TextBox x:Name="PublishTimeTextBox" Text="09:00" AutomationProperties.Name="First publication local time" /></StackPanel>
+                </Grid>
+                <TextBlock Style="{StaticResource Label}" Text="Hours between episodes" />
+                <TextBox x:Name="PublishingIntervalTextBox" Text="24" AutomationProperties.Name="Hours between episodes" />
+                <TextBlock x:Name="EpisodeSummaryTextBlock" Margin="0,15,0,0" Foreground="{DynamicResource Brush.Status.Warning}" FontSize="{DynamicResource Font.Size.Body}" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" />
+                <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.Caption}" TextWrapping="Wrap"
+                           Text="Private is the safest default. Scheduled videos are uploaded privately and published by YouTube at the selected times." />
+              </StackPanel>
+            </Border>
+
+            <Border Margin="0,18,0,0" Padding="18" Background="{DynamicResource Brush.Surface.Elevated}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="12">
+              <StackPanel>
+                <TextBlock Text="4 · Safety and disclosure" FontFamily="Georgia" FontSize="{DynamicResource Font.Size.Section}" FontWeight="SemiBold" />
+                <CheckBox x:Name="RightsCheckBox" Margin="0,14,0,0" Content="I own this content or have permission to publish it." />
+                <CheckBox x:Name="MadeForKidsCheckBox" Margin="0,12,0,0" Content="This series is made for children." />
+                <CheckBox x:Name="SyntheticMediaCheckBox" Margin="0,12,0,0" IsChecked="False"
+                          Content="Disclose realistic altered or synthetic media." />
+                <TextBlock Margin="0,12,0,0" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.Caption}" TextWrapping="Wrap"
+                           Text="Koncus Nai will never upload until you approve this complete plan. Afterwards, it can render and upload every episode without further prompts." />
+                <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="{DynamicResource Font.Size.Caption}" TextWrapping="Wrap"
+                           Text="Avoid repetitive or low-value bulk publishing. Review a private sample before scheduling a large series." />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+
+      <Grid x:Name="PublishingFooter" Grid.Row="2" Background="{DynamicResource Brush.Surface.Base}" Margin="0">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <TextBlock x:Name="ValidationTextBlock" Margin="24,0,16,0" VerticalAlignment="Center" Foreground="{DynamicResource Brush.Status.Error}" FontSize="{DynamicResource Font.Size.FieldLabel}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+        <StackPanel Grid.Column="1" Margin="0,14,24,14" Orientation="Horizontal">
+          <Button Margin="0,0,10,0" Style="{StaticResource SecondaryButton}" Content="Cancel" Click="OnCloseClicked" />
+          <Button x:Name="StartPublishingButton" Style="{StaticResource PrimaryButton}" Content="Approve and publish series" Click="OnStartPublishingClicked" />
+        </StackPanel>
+      </Grid>
+
+      <Border x:Name="HighContrastWindowBoundary"
+              Grid.RowSpan="3"
+              CornerRadius="14"
+              Style="{StaticResource AppHighContrastWindowBoundaryStyle}" />
+    </Grid>
+  </Border>
+</Window>

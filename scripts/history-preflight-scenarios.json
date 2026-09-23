@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "manualEvidenceStatus": "NotTested",
+  "accessibilityPreflight": "scripts/run-accessibility-preflight.ps1",
+  "historyWindow": {
+    "xamlPath": "src/DictateAnywhere.App/History/HistoryWindow.xaml",
+    "codeBehindPath": "src/DictateAnywhere.App/History/HistoryWindow.xaml.cs",
+    "title": "Dictation History",
+    "openRoute": "Open Koncus Nai Settings, then select Manage Dictation History. The tray command Open Dictation History is an alternative.",
+    "lifetimeOwner": "WindowCoordinator",
+    "presentationOwner": "HistoryWindow"
+  },
+  "scratchBoundary": {
+    "root": "artifacts/history-preflight",
+    "environmentVariable": "NOTYPE_HISTORY_PREFLIGHT_SCRATCH",
+    "mustBeUnique": true,
+    "mustBeEmptyAfterTests": true
+  },
+  "owners": [
+    { "id": "window", "owner": "HistoryWindow", "responsibility": "rendering, selection, editor state, and UI event forwarding" },
+    { "id": "query", "owner": "HistoryQueryCoordinator", "responsibility": "latest-query cancellation, bounded loading, filtering, and stable results" },
+    { "id": "commands", "owner": "HistoryCommandCoordinator", "responsibility": "serialized save/delete commands, cancellation, typed outcomes, and shutdown" },
+    { "id": "file-access", "owner": "HistoryFileAccessCoordinator", "responsibility": "per-file in-process serialization" },
+    { "id": "persistence", "owner": "LocalDictationHistoryStore and VersionedJsonLinesFile", "responsibility": "plaintext versioned JSONL persistence, corrupt-line preservation, and atomic rewrites" },
+    { "id": "failure", "owner": "HistoryPersistenceFailureClassifier", "responsibility": "expected persistence failure classification" },
+    { "id": "lifetime", "owner": "WindowCoordinator", "responsibility": "single modeless History window and refresh shutdown" },
+    { "id": "workbench", "owner": "WorkbenchHistoryController and WorkbenchHistoryInteractionController", "responsibility": "Workbench-specific history query, selection, mutation, and cache reconciliation" }
+  ],
+  "states": [
+    {
+      "id": "empty-store",
+      "ownerId": "query",
+      "controls": { "search": "enabled", "list": "enabled-empty", "editor": "disabled", "save": "disabled", "delete": "disabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryQueryCoordinatorTests.QueryLatestAsync_AlwaysReadsStore"]
+    },
+    {
+      "id": "populated-no-selection",
+      "ownerId": "window",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "disabled", "save": "disabled", "delete": "disabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryWindowStateTests.SaveRequiresASelectedNonemptyDirtyEntry"]
+    },
+    {
+      "id": "selected-clean",
+      "ownerId": "window",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "enabled", "save": "disabled", "delete": "enabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryWindowStateTests.SaveRequiresASelectedNonemptyDirtyEntry"]
+    },
+    {
+      "id": "selected-dirty",
+      "ownerId": "window",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "enabled", "save": "enabled", "delete": "enabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryWindowStateTests.SaveRequiresASelectedNonemptyDirtyEntry"]
+    },
+    {
+      "id": "whitespace-only-edit",
+      "ownerId": "window",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "enabled", "save": "disabled", "delete": "enabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryWindowStateTests.SaveRequiresASelectedNonemptyDirtyEntry"]
+    },
+    {
+      "id": "save-in-progress",
+      "ownerId": "commands",
+      "controls": { "search": "disabled", "list": "disabled", "editor": "disabled", "save": "disabled", "delete": "disabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryCommandCoordinatorTests.Commands_AreSerializedWithoutDroppingQueuedWork"]
+    },
+    {
+      "id": "save-success",
+      "ownerId": "commands",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "enabled", "save": "disabled", "delete": "enabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.WorkbenchHistoryControllerTests.SaveDictationEditAsync_NormalizesAndPersistsUpdatedRecord"]
+    },
+    {
+      "id": "save-failure",
+      "ownerId": "failure",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "enabled", "save": "enabled", "delete": "enabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryCommandCoordinatorTests.Command_TranslatesExpectedPersistenceFailure"]
+    },
+    {
+      "id": "delete-confirmation-open",
+      "ownerId": "window",
+      "controls": { "search": "blocked-by-modal", "list": "blocked-by-modal", "editor": "blocked-by-modal", "save": "blocked-by-modal", "delete": "blocked-by-modal" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryWindowArchitectureGuardrailTests.HistoryWindow_DelegatesReplaceableQueriesAndOwnsAsyncShutdown"]
+    },
+    {
+      "id": "delete-cancelled",
+      "ownerId": "window",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "enabled", "save": "state-dependent", "delete": "enabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.WorkbenchHistoryInteractionControllerTests.FailedOrCanceledDelete_PreservesLoadedComposerSelectionAndCache"]
+    },
+    {
+      "id": "delete-confirmed",
+      "ownerId": "commands",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "disabled", "save": "disabled", "delete": "disabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryCommandCoordinatorTests.UpdateAndDelete_MapStoreOutcomesToTypedResults"]
+    },
+    {
+      "id": "delete-failure",
+      "ownerId": "failure",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "enabled", "save": "state-dependent", "delete": "enabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryCommandCoordinatorTests.Command_TranslatesExpectedPersistenceFailure"]
+    },
+    {
+      "id": "search-matches",
+      "ownerId": "query",
+      "controls": { "search": "enabled", "list": "filtered-nonempty", "editor": "selection-dependent", "save": "dirty-selection-dependent", "delete": "selection-dependent" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistorySearchFilterTests.FilterLatestDictationSessions_RequiresAllSearchTerms"]
+    },
+    {
+      "id": "search-no-matches",
+      "ownerId": "query",
+      "controls": { "search": "enabled", "list": "enabled-empty", "editor": "disabled", "save": "disabled", "delete": "disabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryQueryCoordinatorTests.QueryLatestAsync_ReturnsAFilteredStableSnapshot"]
+    },
+    {
+      "id": "search-cleared",
+      "ownerId": "query",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "selection-dependent", "save": "dirty-selection-dependent", "delete": "selection-dependent" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryQueryCoordinatorTests.QueryLatestAsync_ReturnsAFilteredStableSnapshot"]
+    },
+    {
+      "id": "selection-filtered-out",
+      "ownerId": "window",
+      "controls": { "search": "enabled", "list": "filtered", "editor": "disabled", "save": "disabled", "delete": "disabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryWindowStateTests.RefreshPreservesDirtyEditorOnlyWhileTheSelectedRecordStillExists"]
+    },
+    {
+      "id": "selection-removed-during-refresh",
+      "ownerId": "window",
+      "controls": { "search": "enabled", "list": "enabled", "editor": "disabled", "save": "disabled", "delete": "disabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryWindowStateTests.RefreshPreservesDirtyEditorOnlyWhileTheSelectedRecordStillExists"]
+    },
+    {
+      "id": "external-change-notification",
+      "ownerId": "lifetime",
+      "controls": { "search": "state-dependent", "list": "state-dependent", "editor": "selection-dependent", "save": "dirty-selection-dependent", "delete": "selection-dependent" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryViewRefreshArchitectureGuardrailTests.WindowCoordinator_DelegatesHistoryNotificationsAndOwnsRefreshShutdown"]
+    },
+    {
+      "id": "load-failure",
+      "ownerId": "failure",
+      "controls": { "search": "enabled", "list": "enabled-empty", "editor": "disabled", "save": "disabled", "delete": "disabled" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryQueryCoordinatorTests.QueryLatestAsync_TranslatesExpectedPersistenceFailure"]
+    },
+    {
+      "id": "malformed-storage-recovery",
+      "ownerId": "persistence",
+      "controls": { "search": "enabled", "list": "valid-records-only", "editor": "selection-dependent", "save": "dirty-selection-dependent", "delete": "selection-dependent" },
+      "coverageTests": ["DictateAnywhere.App.Tests.LocalHistoryStoreTests.DictationMutation_PreservesCorruptLinesAndStableIds"]
+    },
+    {
+      "id": "closing-with-outstanding-work",
+      "ownerId": "lifetime",
+      "controls": { "search": "closing", "list": "closing", "editor": "closing", "save": "closing", "delete": "closing" },
+      "coverageTests": ["DictateAnywhere.App.Tests.HistoryCommandCoordinatorTests.DisposeAsync_CancelsAndWaitsForAcceptedCommands"]
+    }
+  ],
+  "operatorCases": [
+    {
+      "id": "HISTORY-01",
+      "requiresTestOwnedEntry": false,
+      "setup": "Open Koncus Nai Settings, select Manage Dictation History, and use the empty or no-selection state. Do not create a real dictation solely for this case.",
+      "action": "Press Tab through Search dictation history and the entries list. Confirm the editor, Save, and Delete are unavailable without a selection.",
+      "expected": "Search and the list are reachable; the empty state is understandable; the editor, Save, and Delete do not accept focus while disabled.",
+      "report": "Report the focus sequence, empty-state message, unexpected enabled actions, and PASS, FAIL, BLOCKED, or NOT TESTED without quoting stored text.",
+      "status": "NotTested"
+    },
+    {
+      "id": "HISTORY-02",
+      "requiresTestOwnedEntry": true,
+      "setup": "Select one explicitly test-owned non-sensitive entry in Dictation History.",
+      "action": "Inspect the selected detail, date/time, editor, Save, and Delete. Do not change the entry.",
+      "expected": "The localized date/time and editor appear without repeating a type label or selected title; Save is disabled until the text changes; Delete is enabled.",
+      "report": "Report the displayed date/time format, duplicated labels, action states, and one classification without recording entry text.",
+      "status": "NotTested"
+    },
+    {
+      "id": "HISTORY-03",
+      "requiresTestOwnedEntry": true,
+      "setup": "Select an explicitly test-owned entry and remember only its test identifier, not its text.",
+      "action": "Move the caret into the editor, make a harmless edit, confirm Save becomes enabled, save, close Dictation History, reopen it, and reselect the same test entry.",
+      "expected": "Caret movement is stable, Save is enabled only while dirty, one save occurs, the saved test edit remains after reopen, and Save returns to disabled.",
+      "report": "Report caret behavior, Save-state transitions, persistence after reopen, and one classification without quoting the entry.",
+      "status": "NotTested"
+    },
+    {
+      "id": "HISTORY-04",
+      "requiresTestOwnedEntry": true,
+      "setup": "Select an explicitly test-owned entry that may be deleted later.",
+      "action": "Activate Delete, choose Cancel in the confirmation dialog, and inspect the selection and editor afterward.",
+      "expected": "The modal confirmation contains a destructive action and Cancel; cancelling retains the entry, selection, editor, and focus context.",
+      "report": "Report dialog focus, cancellation status, retained selection, focus destination, and one classification.",
+      "status": "NotTested"
+    },
+    {
+      "id": "HISTORY-05",
+      "requiresTestOwnedEntry": true,
+      "setup": "Select an explicitly test-owned disposable entry. Never use personal History for this case.",
+      "action": "Activate Delete, confirm deletion once, search for the test identifier, close Dictation History, reopen it, and search again.",
+      "expected": "Exactly the selected test-owned session is removed, the editor/actions clear, no duplicate dialog appears, and the entry remains absent after reopen.",
+      "report": "Report affected entry count, editor/action state, persistence after reopen, and one classification without recording content.",
+      "status": "NotTested"
+    },
+    {
+      "id": "HISTORY-06",
+      "requiresTestOwnedEntry": true,
+      "setup": "Have at least two non-sensitive test-owned entries with distinct safe identifiers.",
+      "action": "Search for one identifier, then a no-match value, then clear Search. Repeat once rapidly and select an entry before clearing.",
+      "expected": "Only the latest query controls the list; no-match clears stale detail/actions; clearing restores matching records; no stale result replaces the newer query.",
+      "report": "Report counts and selection/action transitions only, plus PASS, FAIL, BLOCKED, or NOT TESTED.",
+      "status": "NotTested"
+    },
+    {
+      "id": "HISTORY-07",
+      "requiresTestOwnedEntry": true,
+      "setup": "Select a test-owned entry, make an unsaved harmless edit, and leave the editor focused.",
+      "action": "Cause a safe History refresh by adding another test-owned entry through the approved fixture procedure. Then change Search so the selected entry is filtered out.",
+      "expected": "Refresh preserves the unsaved editor and caret while the same selected entry exists; filtering it out clears stale detail, Save, and Delete.",
+      "report": "Report draft/caret preservation and filtered-out action states without quoting text, or BLOCKED if no approved fixture procedure exists.",
+      "status": "NotTested"
+    },
+    {
+      "id": "HISTORY-08",
+      "requiresTestOwnedEntry": false,
+      "setup": "Use the baseline environment, then test Dark and Light separately. Test High Contrast, 200% text size, and available display scaling only when settings can be safely restored.",
+      "action": "At each available variant, open Dictation History, test empty and selected states, Tab and Shift+Tab, minimum-size layout, focus visibility, and status announcements.",
+      "expected": "The continuous surface remains legible, focus is visible, actions remain reachable, and no text/control clips or overlaps. High Contrast is separate from Dark/Light.",
+      "report": "Report each environment variant separately as PASS, FAIL, BLOCKED, or NOT TESTED and confirm every changed setting was restored.",
+      "status": "NotTested"
+    },
+    {
+      "id": "HISTORY-09",
+      "requiresTestOwnedEntry": false,
+      "setup": "Use only an approved test profile capable of producing a reversible History load/save failure. If none exists, classify this case BLOCKED.",
+      "action": "Trigger the test-owned failure once, verify the safe status, restore the fixture, retry, and close the window during a separate bounded test operation.",
+      "expected": "The status is concise and contains no raw exception or path; cancellation is distinct from failure; retry recovers once; closure leaves no late update or duplicate operation.",
+      "report": "Report only the safe status category, retry/cancellation outcome, and classification. Do not report exception text or paths.",
+      "status": "NotTested"
+    }
+  ]
+}

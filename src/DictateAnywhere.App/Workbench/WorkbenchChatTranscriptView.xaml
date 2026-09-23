@@ -1,0 +1,25 @@
+<UserControl x:Class="DictateAnywhere.App.Workbench.WorkbenchChatTranscriptView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <StackPanel x:Name="Welcome"
+          HorizontalAlignment="Stretch"
+          VerticalAlignment="Center"
+          Margin="0,16,0,8">
+      <TextBlock x:Name="WelcomeMessage" TextWrapping="Wrap" TextAlignment="Center"
+                 HorizontalAlignment="Center"
+                 FontSize="{DynamicResource Font.Size.Display}"
+                 FontWeight="Normal"
+                 Text="Ready when you are." />
+      <TextBlock Margin="0,12,0,0" Text="Ask a question, dictate a thought, or bring a document."
+                 TextAlignment="Center" TextWrapping="Wrap" FontSize="{DynamicResource Font.Size.Lead}"
+                 Foreground="{DynamicResource Brush.Text.Secondary}" />
+    </StackPanel>
+
+    <RichTextBox x:Name="Transcript"
+                 HorizontalAlignment="Stretch"
+                 SizeChanged="OnTranscriptSizeChanged"
+                 Style="{DynamicResource ChatTranscriptStyle}"
+                 AutomationProperties.Name="Chat transcript" />
+  </Grid>
+</UserControl>

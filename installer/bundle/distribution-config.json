@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "bootstrapperStrategy": "wix-burn",
+  "artifacts": {
+    "msiPattern": "KoncusNai-{version}-x64.msi",
+    "smallSetupExePattern": "KoncusNai-Setup-Small-{version}-x64.exe",
+    "artifactManifestPattern": "KoncusNai-{version}-artifact-manifest.json"
+  },
+  "bundle": {
+    "upgradeCode": "{5D6D13B4-66F1-4A2B-9B80-9EAC5B5DE2C1}"
+  }
+}

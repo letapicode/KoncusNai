@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DictateAnywhere.TtsCli</RootNamespace>
+    <AssemblyName>DictateAnywhere.TtsCli</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DictateAnywhere.Core\DictateAnywhere.Core.csproj" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.Inference\DictateAnywhere.Inference.csproj" />
+  </ItemGroup>
+</Project>

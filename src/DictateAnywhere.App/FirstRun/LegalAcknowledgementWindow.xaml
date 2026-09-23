@@ -1,0 +1,50 @@
+<Window x:Class="DictateAnywhere.App.FirstRun.LegalAcknowledgementWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Koncus Nai terms"
+        Width="720" Height="610" MinWidth="620" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Brush.Surface.Canvas}"
+        Foreground="{DynamicResource Brush.Text.Primary}">
+  <Grid Margin="32">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <StackPanel>
+      <TextBlock FontSize="{DynamicResource Font.Size.Hero}" FontWeight="SemiBold" Text="Before you continue" />
+      <TextBlock Margin="0,10,0,20" TextWrapping="Wrap" Foreground="{DynamicResource Brush.Text.Secondary}"
+                 Text="Please review the project license, disclaimer, privacy policy, and third-party terms. This acknowledgement records which document version you accepted; it does not replace third-party terms or guarantee enforceability." />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel>
+        <Border Padding="18" Background="{DynamicResource Brush.Surface.Elevated}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="12">
+          <StackPanel>
+            <TextBlock FontWeight="SemiBold" Text="Key points" />
+            <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" LineHeight="22"
+                       Text="Koncus Nai is source-available under PolyForm Noncommercial 1.0.0 and is not OSI-approved open source. Noncommercial use, modification, and redistribution are permitted under that license. Commercial use requires separate written permission from Ram Adhikari through koncusnai@gmail.com. The software is provided as is and use is at your own risk. AI output can be inaccurate or harmful. You are responsible for consent, content, copyright, privacy, model terms, and applicable laws." />
+          </StackPanel>
+        </Border>
+
+        <TextBlock Margin="0,20,0,10" FontWeight="SemiBold" Text="Open the complete documents" />
+        <WrapPanel>
+          <Button Margin="0,0,8,8" Padding="12,7" Content="License" Tag="LICENSE" Click="OpenDocument_Click" />
+          <Button Margin="0,0,8,8" Padding="12,7" Content="Disclaimer" Tag="DISCLAIMER.md" Click="OpenDocument_Click" />
+          <Button Margin="0,0,8,8" Padding="12,7" Content="Privacy" Tag="PRIVACY.md" Click="OpenDocument_Click" />
+          <Button Margin="0,0,8,8" Padding="12,7" Content="Third-party notices" Tag="THIRD_PARTY_NOTICES.md" Click="OpenDocument_Click" />
+          <Button Margin="0,0,8,8" Padding="12,7" Content="Model licenses" Tag="MODEL_LICENSES.md" Click="OpenDocument_Click" />
+        </WrapPanel>
+        <TextBlock x:Name="DocumentStatusTextBlock" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Brush.Text.Secondary}" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <Grid Grid.Row="2" Margin="0,24,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <Button Grid.Column="1" Margin="0,0,10,0" Padding="18,9" Content="Decline and exit" IsCancel="True" Click="Decline_Click" />
+      <Button Grid.Column="2" Padding="18,9" Content="Accept and continue" IsDefault="True" Click="Accept_Click" />
+    </Grid>
+  </Grid>
+</Window>

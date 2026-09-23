@@ -1,0 +1,140 @@
+<Window x:Class="DictateAnywhere.App.FirstRun.FirstRunWizardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:hotkeys="clr-namespace:DictateAnywhere.App.Hotkeys"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        Title="Koncus Nai Setup"
+        Width="760"
+        Height="600"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        Loaded="OnLoaded">
+  <Grid Margin="{StaticResource Thickness.Window.Margin.Large}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0"
+               TextWrapping="Wrap"
+               FontSize="{DynamicResource Font.Size.Section}"
+               FontWeight="SemiBold"
+               Text="Choose how you want to use Koncus Nai, set a hotkey, and prepare your on-device dictation model." />
+
+    <ScrollViewer Grid.Row="1"
+                  Margin="0,14,0,0"
+                  VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+        <GroupBox Header="1) Experience" Padding="10">
+          <StackPanel>
+            <RadioButton x:Name="DictationOnlyRadioButton"
+                         GroupName="Experience"
+                         Content="Dictation only"
+                         AutomationProperties.Name="Use dictation only" />
+            <TextBlock Margin="24,3,0,10" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Brush.Text.Secondary}"
+                       Text="Runs from the tray and prepares only dictation. You can enable the assistant later in Settings." />
+            <RadioButton x:Name="FullAssistantRadioButton"
+                         GroupName="Experience"
+                         IsChecked="True"
+                         Content="Full assistant"
+                         AutomationProperties.Name="Use the full assistant" />
+            <TextBlock Margin="24,3,0,0" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Brush.Text.Secondary}"
+                       Text="Includes chat and Reading Studio. Their models and speech tools are prepared only when you use them." />
+          </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="2) Hotkey"
+                  Margin="0,14,0,0"
+                  Padding="10">
+          <StackPanel>
+            <TextBlock TextWrapping="Wrap"
+                       Text="Pick a global dictation hotkey. Conflicts are validated against Windows registration rules." />
+            <hotkeys:HotkeyCaptureControl x:Name="HotkeyCaptureControl"
+                                          Margin="0,10,0,0" />
+            <Button HorizontalAlignment="Left"
+                    Margin="0,8,0,0"
+                    Style="{StaticResource AppActionButtonStyle}"
+                    Click="OnHotkeyTestClicked"
+                    Content="Hotkey Test" />
+          </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="3) Dictation Model"
+                  Margin="0,14,0,0"
+                  Padding="10">
+          <StackPanel>
+            <TextBlock TextWrapping="Wrap"
+                       Text="Run a local benchmark and pick the best CPU model. No audio or benchmark data leaves your device." />
+
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,10,0,0">
+              <Button x:Name="RunBenchmarkButton"
+                      Style="{StaticResource AppActionButtonStyle}"
+                      Click="OnRunBenchmarkClicked"
+                      Content="Run Benchmark" />
+              <TextBlock x:Name="BenchmarkStatusTextBlock"
+                         Margin="10,4,0,0"
+                         Style="{StaticResource AppSecondaryTextBlockStyle}"
+                         AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
+
+            <TextBlock x:Name="BenchmarkRecommendationTextBlock"
+                       Margin="0,8,0,0"
+                       FontWeight="SemiBold"
+                       AutomationProperties.LiveSetting="Polite" />
+
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,10,0,0">
+              <TextBlock VerticalAlignment="Center"
+                         Text="Model:"
+                         Width="60" />
+              <ComboBox x:Name="ModelComboBox"
+                        Width="360"
+                        DisplayMemberPath="Label"
+                        AutomationProperties.Name="Select model" />
+              <Button Margin="10,0,0,0"
+                      Style="{StaticResource AppActionButtonStyle}"
+                      Click="OnRefreshModelsClicked"
+                      Content="Refresh" />
+            </StackPanel>
+
+            <TextBlock Margin="0,10,0,0" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Brush.Text.Secondary}"
+                       Text="Setup needs internet to download a missing model. Cohere requires you to accept its model terms and sign in to your own Hugging Face account with 'hf auth login'. CrisperWhisper is an optional research-only model and requires a separate license acknowledgement. Current dictation downloads are about 1.5-3.9 GiB, plus runtime dependencies and temporary storage. Chat and narration may need additional downloads when prepared. Prepared local models can run offline. Cancel stops setup." />
+            <ProgressBar x:Name="DownloadProgressBar"
+                         Margin="0,10,0,0"
+                         Height="10"
+                         Minimum="0"
+                         Maximum="100"
+                         AutomationProperties.Name="Model download progress" />
+            <TextBlock x:Name="ModelActionStatusTextBlock"
+                       Margin="0,8,0,0"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource Brush.Text.Secondary}"
+                       AutomationProperties.LiveSetting="Polite" />
+          </StackPanel>
+        </GroupBox>
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="2"
+                Margin="0,14,0,0"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right">
+      <Button Style="{StaticResource AppActionButtonStyle}"
+              Margin="0,0,8,0"
+              Click="OnCancelClicked"
+              Content="Cancel" />
+      <Button x:Name="FinishButton"
+              Style="{StaticResource AppActionButtonStyle}"
+              Click="OnFinishClicked"
+              Content="Download and Finish" />
+    </StackPanel>
+  </Grid>
+</Window>

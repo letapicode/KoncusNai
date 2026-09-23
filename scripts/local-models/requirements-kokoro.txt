@@ -1,0 +1,14 @@
+torch>=2.5.0
+kokoro==0.9.4
+misaki[en,zh]
+# A prebuilt Windows wheel exposes the pyopenjtalk module Misaki needs for Japanese.
+pyopenjtalk-plus==0.3.4.post7
+fugashi>=1.5.2
+jaconv>=0.5.0
+mojimoji>=0.0.13
+unidic-lite>=1.0.8
+numpy>=1.26.0
+soundfile>=0.13.0
+kala-tts==0.1.4
+rapidocr==3.9.2
+onnxruntime>=1.22.0

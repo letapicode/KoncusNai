@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DictateAnywhere.Core\DictateAnywhere.Core.csproj" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.Hotkeys\DictateAnywhere.Hotkeys.csproj" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.Audio\DictateAnywhere.Audio.csproj" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.Inference\DictateAnywhere.Inference.csproj" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.Insertion\DictateAnywhere.Insertion.csproj" />
+  </ItemGroup>
+
+</Project>

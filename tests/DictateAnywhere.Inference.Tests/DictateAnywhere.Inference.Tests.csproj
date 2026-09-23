@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DictateAnywhere.Inference.Tests</RootNamespace>
+    <AssemblyName>DictateAnywhere.Inference.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DictateAnywhere.Inference\DictateAnywhere.Inference.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\scripts\local-models\**\*.*"
+          Condition="Exists('..\..\scripts\local-models')"
+          LinkBase="local-models"
+          CopyToOutputDirectory="Always" />
+  </ItemGroup>
+</Project>
+
+

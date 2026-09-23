@@ -1,0 +1,90 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using DictateAnywhere.App.Workbench;
+using DictateAnywhere.Core.Contracts;
+using DictateAnywhere.Hotkeys;
+
+namespace DictateAnywhere.App.Tests;
+
+public sealed class WorkbenchHotkeyRegistrationCoordinatorTests
+{
+  [Xunit.Fact]
+  public async Task RegisterWithFallbackAsync_PrimarySuccess_UsesRequestedBinding()
+  {
+    List<HotkeyBinding> attempted = new();
+    WorkbenchHotkeyRegistrationCoordinator coordinator = new((binding, _) =>
+    {
+      attempted.Add(binding);
+      return Task.FromResult(new HotkeyRegistrationResult(true, null));
+    });
+
+    HotkeyBinding requested = WorkbenchSettingsPolicy.PreferredHotkey;
+    WorkbenchHotkeyRegistrationOutcome outcome = await coordinator.RegisterWithFallbackAsync(requested);
+
+    Xunit.Assert.True(outcome.Success);
+    Xunit.Assert.False(outcome.UsedFallbackBinding);
+    Xunit.Assert.Equal(requested, outcome.ActiveBinding);
+    Xunit.Assert.Single(attempted);
+  }
+
+  [Xunit.Fact]
+  public async Task RegisterWithFallbackAsync_AltSpaceConflict_FallsBackToWinAltSpace()
+  {
+    Queue<HotkeyRegistrationResult> results = new();
+    results.Enqueue(new HotkeyRegistrationResult(false, "already registered by another application"));
+    results.Enqueue(new HotkeyRegistrationResult(true, null));
+
+    List<HotkeyBinding> attempted = new();
+    WorkbenchHotkeyRegistrationCoordinator coordinator = new((binding, _) =>
+    {
+      attempted.Add(binding);
+      return Task.FromResult(results.Dequeue());
+    });
+
+    WorkbenchHotkeyRegistrationOutcome outcome = await coordinator.RegisterWithFallbackAsync(WorkbenchSettingsPolicy.PreferredHotkey);
+
+    Xunit.Assert.True(outcome.Success);
+    Xunit.Assert.True(outcome.UsedFallbackBinding);
+    Xunit.Assert.Equal(WorkbenchSettingsPolicy.FallbackHotkey, outcome.ActiveBinding);
+    Xunit.Assert.Equal(2, attempted.Count);
+    Xunit.Assert.Equal(WorkbenchSettingsPolicy.PreferredHotkey, attempted[0]);
+    Xunit.Assert.Equal(WorkbenchSettingsPolicy.FallbackHotkey, attempted[1]);
+    Xunit.Assert.Contains("Fallback active", outcome.StatusMessage);
+  }
+
+  [Xunit.Fact]
+  public async Task RegisterWithFallbackAsync_CustomHotkeyFailure_DoesNotAutoFallback()
+  {
+    List<HotkeyBinding> attempted = new();
+    WorkbenchHotkeyRegistrationCoordinator coordinator = new((binding, _) =>
+    {
+      attempted.Add(binding);
+      return Task.FromResult(new HotkeyRegistrationResult(false, "already registered"));
+    });
+
+    HotkeyBinding customBinding = new(HotkeyModifiers.Control | HotkeyModifiers.Shift, 0x41);
+    WorkbenchHotkeyRegistrationOutcome outcome = await coordinator.RegisterWithFallbackAsync(customBinding);
+
+    Xunit.Assert.False(outcome.Success);
+    Xunit.Assert.False(outcome.UsedFallbackBinding);
+    Xunit.Assert.Equal(customBinding, outcome.ActiveBinding);
+    Xunit.Assert.Single(attempted);
+  }
+
+  [Xunit.Fact]
+  public async Task RegisterWithFallbackAsync_AltSpaceAndFallbackFail_ReturnsFailure()
+  {
+    Queue<HotkeyRegistrationResult> results = new();
+    results.Enqueue(new HotkeyRegistrationResult(false, "already registered"));
+    results.Enqueue(new HotkeyRegistrationResult(false, "windows rejected"));
+
+    WorkbenchHotkeyRegistrationCoordinator coordinator = new((_, _) =>
+      Task.FromResult(results.Dequeue()));
+
+    WorkbenchHotkeyRegistrationOutcome outcome = await coordinator.RegisterWithFallbackAsync(WorkbenchSettingsPolicy.PreferredHotkey, CancellationToken.None);
+
+    Xunit.Assert.False(outcome.Success);
+    Xunit.Assert.Contains("also failed", outcome.StatusMessage);
+  }
+}

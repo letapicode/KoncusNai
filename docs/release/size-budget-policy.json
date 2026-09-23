@@ -1,0 +1,268 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "7787a80fe994a0552f4f01892ec4dc4dc6b5f0c2",
+  "measuredAtUtc": "2026-09-06T22:26:44.2331150Z",
+  "measurementEnvironment": {
+    "os": "Windows x64",
+    "fileSystem": "NTFS",
+    "dotnetSdk": "8.0.418",
+    "wix": "5.0.2",
+    "configuration": "Release",
+    "runtimeIdentifier": "win-x64",
+    "installerVersion": "0.1.0",
+    "signed": false
+  },
+  "trackedBudgets": [
+    {
+      "id": "tracked-repository",
+      "owner": "Git tracked inventory",
+      "method": "git-index-blob-bytes",
+      "allTracked": true,
+      "baselineFiles": 1126,
+      "baselineBytes": 9190329,
+      "minimumFiles": 1000,
+      "minimumBytes": 8271296,
+      "maximumBytes": 10000000,
+      "rationale": "September 22 isolated-index source candidate after removal of 129 generated previews and the unlicensed Cohere fixture. A ten percent lower bound catches incomplete exports; the ten-megabyte cap rejects new bundled binary content."
+    },
+    {
+      "id": "production-source",
+      "owner": "src project owners",
+      "method": "git-index-blob-bytes",
+      "includePrefixes": ["src"],
+      "includeFiles": [],
+      "baselineFiles": 582,
+      "baselineBytes": 4175455,
+      "minimumFiles": 560,
+      "minimumBytes": 3757910,
+      "maximumBytes": 4600000,
+      "rationale": "The preview-free production source candidate is 4,175,455 bytes. Ten percent lower and upper bounds catch missing content or large new assets."
+    },
+    {
+      "id": "developer-tools",
+      "owner": "tools project owners",
+      "method": "git-index-blob-bytes",
+      "includePrefixes": ["tools"],
+      "includeFiles": [],
+      "baselineFiles": 13,
+      "baselineBytes": 78600,
+      "minimumFiles": 12,
+      "minimumBytes": 70000,
+      "maximumBytes": 131072,
+      "rationale": "A fixed 128 KiB cap provides useful headroom for four deliberately small engineering tools without permitting generated output."
+    },
+    {
+      "id": "tests",
+      "owner": "test project owners",
+      "method": "git-index-blob-bytes",
+      "includePrefixes": ["tests"],
+      "includeFiles": [],
+      "baselineFiles": 203,
+      "baselineBytes": 1247869,
+      "minimumFiles": 190,
+      "minimumBytes": 1123082,
+      "maximumBytes": 1650000,
+      "rationale": "September 16 release audit measured 1558353 bytes in the isolated candidate index after the chat, insertion, history and security regression additions. A 1650000-byte cap retains about six percent headroom for test source; generated outputs and model assets remain prohibited. The historical baseline is unchanged."
+    },
+    {
+      "id": "scripts",
+      "owner": "repository automation owners",
+      "method": "git-index-blob-bytes",
+      "includePrefixes": ["scripts"],
+      "includeFiles": [],
+      "baselineFiles": 74,
+      "baselineBytes": 1151989,
+      "minimumFiles": 55,
+      "minimumBytes": 1036790,
+      "maximumBytes": 1600000,
+      "rationale": "The September 22 scripts inventory excludes the retired 352,078-byte Cohere recording. A ten percent lower bound catches missing scripts; the existing upper cap still rejects copied artifacts."
+    },
+    {
+      "id": "installer-inputs",
+      "owner": "installer packaging",
+      "method": "git-index-blob-bytes",
+      "includePrefixes": ["installer"],
+      "includeFiles": [],
+      "baselineFiles": 7,
+      "baselineBytes": 5968,
+      "minimumFiles": 7,
+      "minimumBytes": 5000,
+      "maximumBytes": 131072,
+      "rationale": "Installer definitions remain small text inputs; 128 KiB leaves ample policy headroom without admitting built packages."
+    },
+    {
+      "id": "documentation-planning",
+      "owner": "canonical documentation map",
+      "method": "git-index-blob-bytes",
+      "includePrefixes": ["docs", "planning"],
+      "includeFiles": ["README.md", "CHANGELOG.md"],
+      "baselineFiles": 113,
+      "baselineBytes": 718389,
+      "minimumFiles": 105,
+      "minimumBytes": 646550,
+      "maximumBytes": 1500000,
+      "rationale": "September 16 candidate measurement was 1349625 bytes including the existing rebrand and hardening plans and compiled API baseline. A 1.5-megabyte cap admits the release audit and bounded documentation growth; generated outputs remain excluded."
+    },
+    {
+      "id": "bundled-app-assets",
+      "owner": "DictateAnywhere.App project content",
+      "method": "git-index-blob-bytes",
+      "includePrefixes": ["src/DictateAnywhere.App/Assets"],
+      "includeFiles": [],
+      "baselineFiles": 30,
+      "baselineBytes": 1958424,
+      "minimumFiles": 30,
+      "minimumBytes": 1958424,
+      "maximumBytes": 1958424,
+      "rationale": "September 22 source candidate contains only reviewed brand and font assets. All 129 generated preview WAVs and the old manifest were removed; membership and bytes remain exact with no growth allowance."
+    },
+    {
+      "id": "local-model-scripts",
+      "owner": "local model provisioning",
+      "method": "git-index-blob-bytes",
+      "includePrefixes": ["scripts/local-models"],
+      "includeFiles": [],
+      "baselineFiles": 19,
+      "baselineBytes": 527323,
+      "minimumFiles": 19,
+      "minimumBytes": 500000,
+      "maximumBytes": 600000,
+      "rationale": "September 22 candidate contains no Cohere health-check WAV. Bounded source and lock metadata growth remains allowed while model and audio payloads are rejected."
+    }
+  ],
+  "bundledAssets": {
+    "voicePreviews": {
+      "owner": "Reading Studio on-demand preview cache",
+      "manifestPath": "src/DictateAnywhere.App/Assets/VoicePreviews/manifest.json",
+      "expectedCount": 0,
+      "wavBaselineBytes": 0,
+      "trackedManifestBytes": 0,
+      "publishedManifestBytes": 0,
+      "trackedBaselineBytes": 0,
+      "publishedBaselineBytes": 0,
+      "minimumFileBytes": 0,
+      "medianFileBytes": 0,
+      "p95FileBytes": 0,
+      "maximumFileBytes": 0,
+      "disposition": "generated-on-demand",
+      "rationale": "Generated model output is excluded from source and release payloads. A selected provider creates previews in the signed-in user's bounded local cache."
+    },
+    "fonts": {
+      "owner": "DictateAnywhere.App project content",
+      "count": 7,
+      "baselineBytes": 1850343
+    },
+    "icons": {
+      "owner": "DictateAnywhere.App project content",
+      "count": 1,
+      "baselineBytes": 15242
+    }
+  },
+  "releaseBudgets": [
+    {
+      "id": "app-publish",
+      "owner": "DictateAnywhere.App publish",
+      "reportProperty": "appPublishBytes",
+      "baselineBytes": 326070502,
+      "minimumBytes": 293463452,
+      "maximumBytes": 342374028,
+      "rationale": "Five percent upper headroom; a shrink greater than ten percent is fail-closed because it usually indicates missing self-contained or asset content."
+    },
+    {
+      "id": "uiaccess-standalone-publish",
+      "owner": "DictateAnywhere.UiAccessHelper publish",
+      "reportProperty": "uiAccessStandaloneBytes",
+      "baselineBytes": 541355,
+      "minimumBytes": 487220,
+      "maximumBytes": 600000,
+      "rationale": "The framework-dependent helper is small; roughly eleven percent upper headroom catches an accidental self-contained transition."
+    },
+    {
+      "id": "uiaccess-payload-contribution",
+      "owner": "installer combined staging",
+      "reportProperty": "uiAccessContributionBytes",
+      "baselineBytes": 189507,
+      "minimumBytes": 170556,
+      "maximumBytes": 262144,
+      "rationale": "The net five-file contribution is capped at 256 KiB so shared framework files are not double-counted."
+    },
+    {
+      "id": "validated-installer-payload",
+      "owner": "installer combined staging",
+      "reportProperty": "payloadBytes",
+      "baselineBytes": 326260009,
+      "minimumBytes": 293634009,
+      "maximumBytes": 342573010,
+      "rationale": "Five percent upper headroom applies only after exact App/UIAccess membership validation."
+    },
+    {
+      "id": "unsigned-msi",
+      "owner": "WiX installer build",
+      "reportProperty": "msiBytes",
+      "baselineBytes": 112861561,
+      "minimumBytes": 101575405,
+      "maximumBytes": 118504640,
+      "rationale": "Five percent upper headroom is based on two equal-size unsigned WiX 5.0.2 builds; signing overhead is a separately measured release concern."
+    },
+    {
+      "id": "unsigned-small-burn",
+      "owner": "WiX Burn bundle build",
+      "reportProperty": "burnBytes",
+      "baselineBytes": 113621195,
+      "minimumBytes": 102259075,
+      "maximumBytes": 119302255,
+      "rationale": "The larger of two accepted final measurement-command runs is the baseline because generated bundle metadata differed by 1,988 bytes; five percent upper headroom remains bounded."
+    },
+    {
+      "id": "projected-installed-payload",
+      "owner": "installer packaging",
+      "reportProperty": "projectedInstalledBytes",
+      "baselineBytes": 326260009,
+      "minimumBytes": 293634009,
+      "maximumBytes": 342573010,
+      "rationale": "This is logical validated payload size only, not compressed installer size or filesystem allocation."
+    }
+  ],
+  "releaseEvidence": {
+    "run1": {
+      "payloadFiles": 677,
+      "payloadBytes": 326260009,
+      "msiBytes": 112861561,
+      "burnBytes": 113621195,
+      "elapsedSeconds": 65.105
+    },
+    "run2": {
+      "payloadFiles": 677,
+      "payloadBytes": 326260009,
+      "msiBytes": 112861561,
+      "burnBytes": 113619207,
+      "elapsedSeconds": 64.692
+    },
+    "repeatability": "Payload files, bytes, and hashes were identical; MSI bytes were identical but hashes differed; Burn differed by 1,988 bytes. The variation is retained, not averaged."
+  },
+  "externalFootprints": [
+    { "id": "hf-cohere-transcribe", "owner": "HuggingFaceSnapshotModelManager", "provenanceId": "hf-cohere-transcribe", "required": false, "status": "measured", "downloadBytes": 4134323147, "payloadBytes": 4134323147, "cacheBytes": null, "method": "immutable snapshot file manifest; cache metadata overhead unknown" },
+    { "id": "hf-crisper-turbo", "owner": "HuggingFaceSnapshotModelManager", "provenanceId": "hf-crisper-turbo", "required": false, "status": "measured", "downloadBytes": 1623557946, "payloadBytes": 1623557946, "cacheBytes": null, "method": "immutable snapshot file manifest; cache metadata overhead unknown" },
+    { "id": "hf-crisper-large", "owner": "HuggingFaceSnapshotModelManager", "provenanceId": "hf-crisper-large", "required": false, "status": "measured", "downloadBytes": 3092493315, "payloadBytes": 3092493315, "cacheBytes": null, "method": "immutable snapshot file manifest; cache metadata overhead unknown" },
+    { "id": "hf-indic-parler", "owner": "Hugging Face content-addressed cache", "provenanceId": "hf-indic-parler", "required": false, "status": "blocked", "blocker": "The immutable revision has no canonical exact file-membership/size manifest; no large model download was authorized." },
+    { "id": "hf-flan-t5-large", "owner": "Hugging Face content-addressed cache", "provenanceId": "hf-flan-t5-large", "required": false, "status": "blocked", "blocker": "The immutable revision has no canonical exact file-membership/size manifest; shared versus model-specific cache bytes cannot be separated without materialization." },
+    { "id": "hf-kokoro-82m", "owner": "Hugging Face content-addressed cache", "provenanceId": "hf-kokoro-82m", "required": false, "status": "blocked", "blocker": "The immutable revision has no canonical exact file-membership/size manifest; no large model download was authorized." },
+    { "id": "hf-kala-nepali", "owner": "Hugging Face content-addressed cache", "provenanceId": "hf-kala-nepali", "required": false, "status": "blocked", "blocker": "The immutable revision has no canonical exact file-membership/size manifest; no large model download was authorized." },
+    { "id": "hf-hindi-alignment", "owner": "Hugging Face content-addressed cache", "provenanceId": "hf-hindi-alignment", "required": false, "status": "blocked", "blocker": "The immutable revision has no canonical exact file-membership/size manifest; no large model download was authorized." },
+    { "id": "ollama-gemma4-e4b", "owner": "Ollama managed model store", "provenanceId": "ollama-gemma4-e4b", "required": false, "status": "blocked", "blocker": "The manifest digest is immutable but the canonical inventory does not contain layer sizes or shared-layer attribution." },
+    { "id": "gguf-gemma3-4b", "owner": "LlamaCppProvisioningService", "provenanceId": "gguf-gemma3-4b", "required": false, "status": "measured", "downloadBytes": 2489757856, "payloadBytes": 2489757856, "cacheBytes": null, "method": "2026-09-06 authoritative Content-Length at immutable revision URL; single GGUF payload" },
+    { "id": "gguf-qwen3-1.7b", "owner": "LlamaCppProvisioningService", "provenanceId": "gguf-qwen3-1.7b", "required": false, "status": "measured", "downloadBytes": 1282439264, "payloadBytes": 1282439264, "cacheBytes": null, "method": "2026-09-06 authoritative Content-Length at immutable revision URL; single GGUF payload" },
+    { "id": "gguf-qwen3-4b", "owner": "LlamaCppProvisioningService", "provenanceId": "gguf-qwen3-4b", "required": false, "status": "measured", "downloadBytes": 2497280256, "payloadBytes": 2497280256, "cacheBytes": null, "method": "2026-09-06 authoritative Content-Length at immutable revision URL; single GGUF payload" },
+    { "id": "llama-cpp-win-cpu-x64", "owner": "LlamaCppProvisioningService", "provenanceId": "llama-cpp-win-cpu-x64", "required": false, "status": "measured", "archiveBytes": 18410886, "extractedBytes": null, "method": "2026-09-06 authoritative Content-Length at immutable release asset; extraction not performed" },
+    { "id": "ffmpeg-win-x64", "owner": "ReaderFfmpegRuntime", "provenanceId": "ffmpeg-win-x64", "required": false, "status": "measured", "archiveBytes": 109728040, "extractedBytes": null, "method": "2026-09-06 authoritative Content-Length at versioned archive; extraction not performed" },
+    { "id": "python-indic-parler-base", "owner": "IndicParlerRuntimeProvisioner", "provenanceId": "python-indic-parler-base", "required": false, "status": "measured", "downloadBytes": 26216840, "extractedBytes": null, "method": "2026-09-06 authoritative Content-Length at exact Python installer URL; installation not performed" },
+    { "id": "ollama-windows-installer", "owner": "LocalOllamaRuntimeReadiness", "provenanceId": "ollama-windows-installer", "required": false, "status": "blocked", "blocker": "The signed vendor-current channel is intentionally mutable, so a durable exact download or installed size is not available." },
+    { "id": "python-local-model-runtime", "owner": "setup-local-model-runtime.ps1", "provenanceId": "python-local-model-runtime", "required": false, "status": "blocked", "blocker": "Hashed wheel locks establish integrity but do not encode compressed, extracted, or shared pip-cache sizes." },
+    { "id": "python-indic-parler-runtime", "owner": "setup-indic-parler-runtime.ps1", "provenanceId": "python-indic-parler-runtime", "required": false, "status": "blocked", "blocker": "CPU and CUDA hashed wheel sets are mutually exclusive and the locks do not encode extracted or shared cache sizes; Windows ROCm remains unsupported." },
+    { "id": "python-kokoro-runtime", "owner": "setup-kokoro-runtime.ps1", "provenanceId": "python-kokoro-runtime", "required": false, "status": "blocked", "blocker": "Hashed wheel locks establish integrity but do not encode compressed, extracted, or shared pip-cache sizes." }
+  ],
+  "exceptions": [
+    { "id": "unsigned-installer-baseline", "owner": "release packaging", "scope": "WP-31 WiX 5.0.2 MSI and small Burn evidence", "reason": "Signing and timestamp overhead requires release credentials and is measured by the release gate, not inferred here." },
+    { "id": "external-extracted-size-blockers", "owner": "supply-chain provenance consumers", "scope": "externalFootprints entries explicitly marked blocked", "reason": "Large downloads and installer execution were excluded; unknown values remain null with precise blockers rather than guessed as zero." }
+  ]
+}

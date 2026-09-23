@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DictateAnywhere.ModelBenchmark</RootNamespace>
+    <AssemblyName>DictateAnywhere.ModelBenchmark</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DictateAnywhere.Core\DictateAnywhere.Core.csproj" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.Inference\DictateAnywhere.Inference.csproj" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.Models\DictateAnywhere.Models.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio" />
+  </ItemGroup>
+</Project>

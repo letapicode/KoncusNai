@@ -1,0 +1,94 @@
+# .NET build and package output
+[Bb]in/
+[Oo]bj/
+/artifacts/
+# Generated logo exploration boards; production SVG/ICO assets live under src.
+/output/brand/koncus-nai-concepts/
+TestResults/
+*.nupkg
+*.snupkg
+*.cache
+*.pdb
+
+# IDE and per-user state
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Temporary WPF projects generated during markup compilation
+*_wpftmp.csproj
+
+# Python environments and bytecode
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+/third_party/compat/*/build/
+/third_party/compat/*.egg-info/
+/third_party/compat/*/*.egg-info/
+
+# JavaScript dependencies, when used by local tooling
+node_modules/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.local.json
+*.secrets.json
+*.pem
+*.key
+*.pfx
+*.p12
+*.cer
+*.crt
+*.csr
+*.jks
+*.keystore
+id_rsa*
+.huggingface/
+.hf/
+
+# Runtime scratch files and local data
+/tmp/
+/temp/
+/exports/
+/recordings/
+/models/
+/speech-cache/
+/src/DictateAnywhere.App/Assets/VoicePreviews/*.wav
+/src/DictateAnywhere.App/Assets/VoicePreviews/manifest.json
+/runtime/
+/user-data/
+*.log
+*.tmp
+*.bak
+*.orig
+*.dmp
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Generated validation reports may contain machine-specific paths
+/docs/release/*-report.md
+/docs/release/*-report.json
+
+# Downloaded model weights and machine-local caches
+.cache/
+*.onnx
+*.gguf
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.tflite
+
+# Third-party runtime bundles restored by setup scripts
+/tools/whispercpp/Release/
+/tools/whispercpp/whisper-bin-x64.zip

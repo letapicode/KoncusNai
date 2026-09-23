@@ -1,0 +1,334 @@
+{
+  "schemaVersion": 1,
+  "nuget": {
+    "centralVersions": "Directory.Packages.props",
+    "resolvedInventory": "docs/security/nuget-package-provenance.json",
+    "lockPattern": "{src,tools,tests}/**/packages.lock.json",
+    "expectedProjectLocks": 29,
+    "publishRidLockPattern": "src/**/packages.win-x64.lock.json",
+    "expectedPublishRidLocks": 13,
+    "expectedResolvedPackages": 48,
+    "source": "https://api.nuget.org/v3/index.json"
+  },
+  "python": [
+    {
+      "id": "python-local-model-runtime",
+      "consumers": [
+        "scripts/setup-local-model-runtime.ps1",
+        "src/DictateAnywhere.App/Runtime/LocalPythonRuntimeDependencyProbe.cs"
+      ],
+      "platform": "windows-x64-cpython-3.11",
+      "lock": "scripts/local-models/requirements-lock.txt",
+      "integrity": "pip-require-hashes"
+    },
+    {
+      "id": "python-indic-parler-runtime",
+      "consumers": [
+        "scripts/setup-indic-parler-runtime.ps1",
+        "src/DictateAnywhere.Inference/TextToSpeech/IndicParlerRuntimeProvisioner.cs"
+      ],
+      "platform": "windows-x64-cpython-3.11",
+      "lock": "scripts/local-models/requirements-indic-parler-lock.txt",
+      "backendLocks": [
+        "scripts/local-models/requirements-indic-parler-torch-cpu-lock.txt",
+        "scripts/local-models/requirements-indic-parler-torch-cuda-lock.txt"
+      ],
+      "integrity": "pip-require-hashes",
+      "blockedBackend": "rocm-windows-no-reviewed-wheel"
+    },
+    {
+      "id": "python-kokoro-runtime",
+      "consumers": [
+        "scripts/setup-kokoro-runtime.ps1"
+      ],
+      "platform": "windows-x64-cpython-3.11",
+      "lock": "scripts/local-models/requirements-kokoro-lock.txt",
+      "integrity": "pip-require-hashes"
+    }
+  ],
+  "pythonPackageInventory": {
+    "path": "docs/security/python-package-provenance.json",
+    "expectedPackages": 193
+  },
+  "bundledBinaries": {
+    "manifest": "installer/bundled-binary-manifest.json",
+    "expectedEntries": 0,
+    "disposition": "No standalone third-party binary is checked into the installer payload; runtime downloads and package-provided native assets are inventoried in their owning categories."
+  },
+  "models": [
+    {
+      "id": "hf-cohere-transcribe",
+      "consumer": "src/DictateAnywhere.App/Runtime/LocalTranscriptionProviderRegistry.cs",
+      "repository": "CohereLabs/cohere-transcribe-03-2026",
+      "revision": "32d9e4ba6271d78168c095c2f90bc173eaad97d2",
+      "license": "apache-2.0",
+      "integrity": "scripts/local-models/model-snapshot-provenance.json",
+      "credential": "HF_TOKEN-optional-gated-read"
+    },
+    {
+      "id": "hf-crisper-turbo",
+      "consumer": "src/DictateAnywhere.App/Runtime/LocalTranscriptionProviderRegistry.cs",
+      "repository": "nyralabs/CrisperWhisper2.0_turbo",
+      "revision": "de0369c8a68025b7f6e86387b6eb5a3b369787c8",
+      "license": "other-personal-research-only",
+      "integrity": "scripts/local-models/model-snapshot-provenance.json"
+    },
+    {
+      "id": "hf-crisper-large",
+      "consumer": "src/DictateAnywhere.App/Runtime/LocalTranscriptionProviderRegistry.cs",
+      "repository": "nyralabs/CrisperWhisper2.0_large",
+      "revision": "f4334f6e8193f2691212d49b20fa12d370e13896",
+      "license": "other-personal-research-only",
+      "integrity": "scripts/local-models/model-snapshot-provenance.json"
+    },
+    {
+      "id": "hf-indic-parler",
+      "consumer": "scripts/local-models/indic_parler_tts_worker.py",
+      "repository": "ai4bharat/indic-parler-tts",
+      "revision": "7b527af5ee8ed1f9a28d80b19703ed9bb8ba10ca",
+      "license": "apache-2.0",
+      "integrity": "huggingface-content-addressed-cache"
+    },
+    {
+      "id": "hf-flan-t5-large",
+      "consumer": "scripts/local-models/indic_parler_tts_worker.py",
+      "repository": "google/flan-t5-large",
+      "revision": "0613663d0d48ea86ba8cb3d7a44f0f65dc596a2a",
+      "license": "apache-2.0",
+      "integrity": "huggingface-content-addressed-cache"
+    },
+    {
+      "id": "hf-kokoro-82m",
+      "consumer": "scripts/local-models/kokoro_tts_worker.py",
+      "repository": "hexgrad/Kokoro-82M",
+      "revision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+      "license": "apache-2.0",
+      "integrity": "huggingface-content-addressed-cache"
+    },
+    {
+      "id": "hf-kala-nepali",
+      "consumer": "scripts/local-models/kala_nepali_tts_worker.py",
+      "repository": "ampixa/real-nepali-v0.2-kala",
+      "revision": "90a66e818fbb4e19a8ba9b191da422a70e46a296",
+      "license": "cc-by-sa-4.0",
+      "integrity": "huggingface-content-addressed-cache"
+    },
+    {
+      "id": "hf-hindi-alignment",
+      "consumer": "scripts/local-models/indic_hindi_ctc_align_worker.py",
+      "repository": "Harveenchadha/vakyansh-wav2vec2-hindi-him-4200",
+      "revision": "e2568c3f7868d8aa3aaabcf28fa100d10d54c170",
+      "license": "mit",
+      "integrity": "huggingface-content-addressed-cache"
+    },
+    {
+      "id": "ollama-gemma4-e4b",
+      "consumer": "src/DictateAnywhere.App/Runtime/LocalOllamaRuntimeReadiness.cs",
+      "repository": "registry.ollama.ai/library/gemma4:e4b",
+      "revision": "sha256:c6eb396dbd5992bbe3f5cdb947e8bbc0ee413d7c17e2beaae69f5d569cf982eb",
+      "license": "apache-2.0",
+      "integrity": "ollama-manifest-digest",
+      "modelLayerSize": 9608338848,
+      "licenseLayerDigest": "sha256:7339fa418c9ad3e8e12e74ad0fd26a9cc4be8703f9c110728a992b193be85cb2",
+      "licenseText": "third_party/licenses/Ollama-Gemma4-e4b-LICENSE.txt"
+    },
+    {
+      "id": "gguf-gemma3-4b",
+      "consumer": "src/DictateAnywhere.Inference/Chat/LlamaCppModelCatalog.cs",
+      "source": "https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/d0976223747697cb51e056d85c532013931fe52e/gemma-3-4b-it-Q4_K_M.gguf?download=true",
+      "revision": "d0976223747697cb51e056d85c532013931fe52e",
+      "sha256": "882e8d2db44dc554fb0ea5077cb7e4bc49e7342a1f0da57901c0802ea21a0863",
+      "integrity": "sha256",
+      "license": "gemma"
+    },
+    {
+      "id": "gguf-qwen3-1.7b",
+      "consumer": "src/DictateAnywhere.Inference/Chat/LlamaCppModelCatalog.cs",
+      "source": "https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/daeb8e2d528a760970442092f6bf1e55c3b659eb/Qwen3-1.7B-Q4_K_M.gguf?download=true",
+      "revision": "daeb8e2d528a760970442092f6bf1e55c3b659eb",
+      "sha256": "d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5",
+      "integrity": "sha256",
+      "license": "apache-2.0"
+    },
+    {
+      "id": "gguf-qwen3-4b",
+      "consumer": "src/DictateAnywhere.Inference/Chat/LlamaCppModelCatalog.cs",
+      "source": "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q4_K_M.gguf?download=true",
+      "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+      "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+      "integrity": "sha256",
+      "license": "apache-2.0"
+    }
+  ],
+  "runtimes": [
+    {
+      "id": "llama-cpp-win-cpu-x64",
+      "consumer": "src/DictateAnywhere.Inference/Chat/LlamaCppProvisioningService.cs",
+      "version": "b10823",
+      "source": "https://github.com/ggml-org/llama.cpp/releases/download/b10823/llama-b10823-bin-win-cpu-x64.zip",
+      "sha256": "fa3d7a84302fddfc669e6187aeffc85503a1172372eb86905f0529a83d99e1dc",
+      "integrity": "sha256",
+      "license": "mit"
+    },
+    {
+      "id": "ffmpeg-win-x64",
+      "consumer": "src/DictateAnywhere.App/Workbench/Reading/ReaderFfmpegRuntime.cs",
+      "version": "8.1.2-essentials_build",
+      "source": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip",
+      "sha256": "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec",
+      "integrity": "sha256",
+      "license": "gpl-3.0-or-later"
+    },
+    {
+      "id": "python-indic-parler-base",
+      "consumer": "scripts/setup-indic-parler-runtime.ps1",
+      "version": "3.11.9-win-x64",
+      "source": "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe",
+      "integrity": "authenticode",
+      "publisher": "Python Software Foundation",
+      "license": "psf-2.0"
+    },
+    {
+      "id": "ollama-windows-installer",
+      "consumer": "src/DictateAnywhere.App/Runtime/LocalOllamaRuntimeReadiness.cs",
+      "version": "vendor-current-signed-channel",
+      "source": "https://ollama.com/download/OllamaSetup.exe",
+      "allowedRedirectHosts": [
+        "ollama.com",
+        "release-assets.githubusercontent.com"
+      ],
+      "integrity": "authenticode",
+      "publisher": "Ollama Inc.",
+      "license": "mit"
+    }
+  ],
+  "assets": [
+    {
+      "id": "app-icon-ico",
+      "path": "src/DictateAnywhere.App/Assets/Brand/KoncusNai.ico",
+      "sha256": "2432ce14639f2291ec6aff81dc666da64dfb9fb9a18857463d0a60b970e9a6cf",
+      "license": "project"
+    },
+    {
+      "id": "app-icon-32",
+      "path": "src/DictateAnywhere.App/Assets/Brand/koncus-nai-32.png",
+      "sha256": "af0cac1f2b28b2ff72ac73c8e445495c6d6573272884a226dacac30a35020771",
+      "license": "project"
+    },
+    {
+      "id": "app-icon-256",
+      "path": "src/DictateAnywhere.App/Assets/Brand/koncus-nai-256.png",
+      "sha256": "7cb9a00aeb7986a7eb6ef781052f901add63b205379494a9de1d15bbd42fdc25",
+      "license": "project"
+    },
+    {
+      "id": "font-excalifont",
+      "path": "src/DictateAnywhere.App/Assets/Fonts/Excalifont/Excalifont-Regular.ttf",
+      "sha256": "5685a586d13411f50bf27e76242e4c814764d0fc8deb60e05649ebe85fa3710e",
+      "license": "ofl-1.1"
+    },
+    {
+      "id": "font-kalam-bold",
+      "path": "src/DictateAnywhere.App/Assets/Fonts/Kalam/Kalam-Bold.ttf",
+      "sha256": "2f6576601db015d4f6c08678120277fc8510b98c06e932ce7a6a9cbff4cbdded",
+      "license": "ofl-1.1"
+    },
+    {
+      "id": "font-kalam-regular",
+      "path": "src/DictateAnywhere.App/Assets/Fonts/Kalam/Kalam-Regular.ttf",
+      "sha256": "57cecb63d4608019371954274ae1d8c397764debd5b19d4a33c1efa4dc923c0b",
+      "license": "ofl-1.1"
+    },
+    {
+      "id": "font-noto-serif-devanagari",
+      "path": "src/DictateAnywhere.App/Assets/Fonts/NotoSerifDevanagari/NotoSerifDevanagari.ttf",
+      "sha256": "1191e07bfeb062d80e252eb85b0eafdfbda1e350707a2a60628668e8f677dbbb",
+      "license": "ofl-1.1"
+    },
+    {
+      "id": "crisperwhisper-license-text",
+      "path": "third_party/licenses/CrisperWhisper-2.0-LICENSE.md",
+      "sha256": "42f43bf4dc72ef422f91f6ca143f4514e21a68b353940d99091c1addcd0aee79",
+      "license": "upstream-license-text"
+    },
+    {
+      "id": "indic-compat-source-manifest",
+      "path": "third_party/compat/MANIFEST.sha256",
+      "sha256": "15baf464ac11e00de4276e427828eefa4de18e9509e65b2f073829610e5e3b03",
+      "license": "integrity-manifest"
+    },
+    {
+      "id": "indic-parler-compat-license",
+      "path": "third_party/compat/parler-tts/LICENSE",
+      "sha256": "5ee13882fce0975f0ad3c3d5c2042af4896c2a669be2d6df5b3d256811267c85",
+      "license": "apache-2.0"
+    },
+    {
+      "id": "indic-audiotools-compat-license",
+      "path": "third_party/compat/audiotools/LICENSE",
+      "sha256": "e4075451f4ce5837e89240b4d6761d49e2ee03bdaf776f2f46a6249e65ebafa8",
+      "license": "mit"
+    },
+    {
+      "id": "ollama-gemma4-e4b-license-text",
+      "path": "third_party/licenses/Ollama-Gemma4-e4b-LICENSE.txt",
+      "sha256": "7339fa418c9ad3e8e12e74ad0fd26a9cc4be8703f9c110728a992b193be85cb2",
+      "license": "apache-2.0"
+    },
+    {
+      "id": "descript-audio-codec-compat-license",
+      "path": "third_party/compat/descript-audio-codec/LICENSE",
+      "sha256": "5d7a5f644313f30aad5ef032669ada67efdacefecb2c7d7b875683698bd70e87",
+      "license": "mit"
+    }
+  ],
+  "ciActions": [
+    {
+      "id": "github-action-checkout",
+      "uses": "actions/checkout",
+      "revision": "11d5960a326750d5838078e36cf38b85af677262",
+      "versionLabel": "v4",
+      "license": "mit"
+    },
+    {
+      "id": "github-action-setup-dotnet",
+      "uses": "actions/setup-dotnet",
+      "revision": "67a3573c9a986a3f9c594539f4ab511d57bb3ce9",
+      "versionLabel": "v4",
+      "license": "mit"
+    },
+    {
+      "id": "github-action-upload-artifact",
+      "uses": "actions/upload-artifact",
+      "revision": "ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "versionLabel": "v4",
+      "license": "mit"
+    }
+  ],
+  "credentials": [
+    {
+      "id": "HF_TOKEN-optional-gated-read",
+      "purpose": "read gated Hugging Face model files",
+      "allowedStorage": "Hugging Face user credential store or process environment",
+      "forbidden": "repository, manifests, logs, diagnostics, command-line arguments"
+    },
+    {
+      "id": "oauth-client-material",
+      "purpose": "user-authorized provider OAuth",
+      "allowedStorage": "Windows ProtectedData under the signed-in account",
+      "forbidden": "repository, diagnostics, provenance output"
+    },
+    {
+      "id": "code-signing-material",
+      "purpose": "release signing",
+      "allowedStorage": "CI secret store or operator-owned certificate store",
+      "forbidden": "repository, build logs, provenance output"
+    },
+    {
+      "id": "package-source-credentials",
+      "purpose": "authenticated package source when separately configured",
+      "allowedStorage": "user or CI NuGet credential provider",
+      "forbidden": "repository NuGet configuration, manifests, logs"
+    }
+  ]
+}

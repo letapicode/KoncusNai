@@ -1,0 +1,20 @@
+{
+  "solution": {
+    "path": "DictateAnywhere.sln",
+    "projects": [
+      "src\\DictateAnywhere.App\\DictateAnywhere.App.csproj",
+      "src\\DictateAnywhere.Audio\\DictateAnywhere.Audio.csproj",
+      "src\\DictateAnywhere.Benchmark\\DictateAnywhere.Benchmark.csproj",
+      "src\\DictateAnywhere.Core\\DictateAnywhere.Core.csproj",
+      "src\\DictateAnywhere.Diagnostics\\DictateAnywhere.Diagnostics.csproj",
+      "src\\DictateAnywhere.Hotkeys\\DictateAnywhere.Hotkeys.csproj",
+      "src\\DictateAnywhere.Inference\\DictateAnywhere.Inference.csproj",
+      "src\\DictateAnywhere.Insertion\\DictateAnywhere.Insertion.csproj",
+      "src\\DictateAnywhere.Models\\DictateAnywhere.Models.csproj",
+      "src\\DictateAnywhere.Overlay\\DictateAnywhere.Overlay.csproj",
+      "src\\DictateAnywhere.Platform.Windows\\DictateAnywhere.Platform.Windows.csproj",
+      "src\\DictateAnywhere.Settings\\DictateAnywhere.Settings.csproj",
+      "src\\DictateAnywhere.UiAccessHelper\\DictateAnywhere.UiAccessHelper.csproj"
+    ]
+  }
+}

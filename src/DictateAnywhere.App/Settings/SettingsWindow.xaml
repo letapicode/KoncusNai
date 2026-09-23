@@ -1,0 +1,36 @@
+<Window x:Class="DictateAnywhere.App.Settings.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:settings="clr-namespace:DictateAnywhere.App.Settings"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        Title="Koncus Nai Settings"
+        Width="1040"
+        Height="760"
+        MinWidth="900"
+        MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.Surface.Canvas}">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="44"
+                        ResizeBorderThickness="6"
+                        CornerRadius="16"
+                        GlassFrameThickness="0"
+                        UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+  <Grid>
+    <ContentControl x:Name="SettingsPanelHost" />
+
+    <presentation:WindowCaptionButtons Panel.ZIndex="20"
+                                       ContextTitle="Koncus Nai Settings"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Top" />
+
+    <Border x:Name="HighContrastWindowBoundary"
+            CornerRadius="16"
+            Style="{StaticResource AppHighContrastWindowBoundaryStyle}" />
+  </Grid>
+</Window>

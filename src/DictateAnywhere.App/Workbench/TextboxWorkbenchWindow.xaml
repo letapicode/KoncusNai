@@ -1,0 +1,355 @@
+<Window x:Class="DictateAnywhere.App.Workbench.TextboxWorkbenchWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        FontFamily="Segoe UI" FontSize="{DynamicResource Font.Size.Control}"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        xmlns:workbench="clr-namespace:DictateAnywhere.App.Workbench"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        presentation:WindowWorkAreaConstraintBehavior.IsEnabled="True"
+        Title="Koncus Nai"
+        Width="1320"
+        Height="780"
+        MinWidth="1040"
+        MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.Surface.Canvas}"
+        AllowDrop="True"
+        Drop="OnFilesDropped"
+        DragOver="OnFilesDragOver">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="38"
+                        ResizeBorderThickness="6"
+                        CornerRadius="16"
+                        GlassFrameThickness="0"
+                        UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+  <Window.Resources>
+    <Style x:Key="WorkbenchButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource AppActionButtonStyle}">
+      <Setter Property="Margin" Value="8,0,0,0" />
+    </Style>
+
+    <Style x:Key="WorkbenchPrimaryButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource AppPrimaryActionButtonStyle}">
+      <Setter Property="Margin" Value="8,0,0,0" />
+    </Style>
+
+    <Style x:Key="WorkbenchToolbarButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource AppToolbarIconButtonStyle}">
+      <Setter Property="Margin" Value="6,0,0,0" />
+    </Style>
+
+    <Style x:Key="WorkbenchDangerToolbarButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource AppDangerIconButtonStyle}">
+      <Setter Property="Margin" Value="6,0,0,0" />
+    </Style>
+
+    <Style x:Key="ComposerIconButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource AppToolbarIconButtonStyle}">
+      <Setter Property="Width" Value="36" />
+      <Setter Property="MinWidth" Value="36" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="Chrome"
+                    Width="{TemplateBinding Width}"
+                    Height="{TemplateBinding Height}"
+                    Padding="{TemplateBinding Padding}"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="18"
+                    SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.Muted}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.Pressed}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Chrome" Property="Opacity" Value="0.42" />
+                <Setter Property="Cursor" Value="Arrow" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ComposerSubmitButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource AppToolbarIconButtonStyle}">
+      <Setter Property="Width" Value="36" />
+      <Setter Property="MinWidth" Value="36" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Primary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Control.Primary}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Inverse}" />
+      <Setter Property="Margin" Value="0,0,0,0" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="Chrome"
+                    Width="{TemplateBinding Width}"
+                    Height="{TemplateBinding Height}"
+                    Padding="{TemplateBinding Padding}"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="18"
+                    SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.PrimaryHover}" />
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Brush.Control.PrimaryHover}" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.PrimaryPressed}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Chrome" Property="Opacity" Value="0.42" />
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.InputDisabled}" />
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+                <Setter Property="Cursor" Value="Arrow" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ComposerStopButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource AppActionButtonStyle}">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="MinWidth" Value="58" />
+      <Setter Property="Padding" Value="12,4" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Control.Muted}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.Control}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="ComposerTextBoxStyle"
+           TargetType="{x:Type TextBox}"
+           BasedOn="{StaticResource AppTextBoxStyle}">
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="MaxHeight" Value="150" />
+      <Setter Property="Padding" Value="2,7" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="VerticalContentAlignment" Value="Top" />
+      <Setter Property="AcceptsReturn" Value="True" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+      <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type TextBox}">
+            <ScrollViewer x:Name="PART_ContentHost"
+                          Margin="{TemplateBinding Padding}"
+                          VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}"
+                          HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ChatTranscriptStyle"
+           TargetType="{x:Type RichTextBox}">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="IsReadOnly" Value="True" />
+      <Setter Property="IsDocumentEnabled" Value="True" />
+      <Setter Property="IsReadOnlyCaretVisible" Value="True" />
+      <Setter Property="Focusable" Value="True" />
+      <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+      <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+    </Style>
+
+
+    <Style x:Key="SidebarSectionLabelStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource AppCaptionTextBlockStyle}">
+      <Setter Property="Margin" Value="10,16,10,6" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+    </Style>
+
+    <Style x:Key="SubtleLabelStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource AppCaptionTextBlockStyle}" />
+
+    <Style x:Key="SectionTitleStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource AppSectionTitleTextBlockStyle}" />
+
+  </Window.Resources>
+
+  <Grid>
+  <Grid x:Name="WorkbenchRoot"
+        KeyboardNavigation.TabNavigation="Cycle"
+        ClipToBounds="True">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="{DynamicResource Layout.Workbench.SidebarWidth}" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <Grid x:Name="WorkbenchInteractionSurface"
+          Grid.ColumnSpan="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition x:Name="SidebarColumn"
+                          Width="{DynamicResource Layout.Workbench.SidebarWidth}" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+    <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2" Panel.ZIndex="30"
+                Margin="18,12,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
+      <Image Width="26" Height="26" Margin="0,0,8,0" Style="{DynamicResource AppBrandMarkStyle}" />
+      <TextBlock Text="Koncus Nai" VerticalAlignment="Center" FontWeight="SemiBold"
+                 FontSize="{DynamicResource Font.Size.Section}" Margin="0,0,10,0" />
+      <Button x:Name="SidebarToggleButton" Style="{StaticResource ComposerIconButtonStyle}"
+              ToolTip="Hide sidebar" AutomationProperties.Name="Hide sidebar"
+              Click="OnToggleSidebarClicked" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+        <Path x:Name="SidebarToggleGlyph" Style="{StaticResource AppSidebarToggleIconStyle}" />
+      </Button>
+    </StackPanel>
+
+    <workbench:WorkbenchSidebarView x:Name="SidebarView"
+                                    Grid.Column="0"
+                                    HistorySearchTextChanged="OnHistorySearchTextChanged"
+                                    ChatHistorySelectionChanged="OnChatHistorySelectionChanged"
+                                    ChatHistoryPreviewMouseRightButtonDown="OnChatHistoryPreviewMouseRightButtonDown"
+                                    ChatHistoryPreviewKeyDown="OnChatHistoryPreviewKeyDown"
+                                    RenameChatClicked="OnRenameChatClicked"
+                                    DeleteChatClicked="OnDeleteChatClicked"
+                                    HistorySelectionChanged="OnHistorySelectionChanged"
+                                    HistoryPreviewMouseRightButtonDown="OnHistoryPreviewMouseRightButtonDown"
+                                    HistoryPreviewMouseLeftButtonDown="OnHistoryPreviewMouseLeftButtonDown"
+                                    HistoryPreviewKeyDown="OnHistoryPreviewKeyDown"
+                                    RenameHistoryClicked="OnRenameHistoryClicked"
+                                    DeleteHistoryClicked="OnDeleteHistoryContextMenuClicked"
+                                    SettingsClicked="OnSettingsButtonClicked" />
+
+    <Grid Grid.Column="1"
+          Background="{DynamicResource Brush.Surface.Canvas}">
+      <Grid Margin="0,52,0,18">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <workbench:WorkbenchHeaderView x:Name="HeaderView" Margin="34,0"
+                                        Grid.Row="0"
+                                        NewSessionClicked="OnNewSessionClicked"
+                                        SaveHistoryEditsClicked="OnSaveHistoryEditsClicked"
+                                        DeleteHistorySessionClicked="OnDeleteHistorySessionClicked" />
+
+        <Grid x:Name="ConversationLayout" Grid.Row="1" Grid.RowSpan="2" Margin="0,12,0,0" VerticalAlignment="Center">
+          <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+          <Grid Margin="0,0,0,24">
+          <workbench:WorkbenchChatTranscriptView x:Name="ChatTranscriptView" />
+          <TextBox x:Name="TranscriptTextBox"
+                   Visibility="Collapsed"
+                   TextChanged="OnTranscriptTextChanged" />
+        </Grid>
+
+
+
+        <workbench:WorkbenchComposerView x:Name="ComposerView"
+                                          Grid.Row="1"
+                                          NewChatClicked="OnNewChatClicked"
+                                          AddFileClicked="OnAddFileClicked"
+                                          ReadDocumentClicked="OnReadDocumentClicked"
+                                          ExportChatClicked="OnExportChatClicked"
+                                          StopSpeakingClicked="OnStopSpeakingClicked"
+                                          PromptKeyDown="OnChatPromptKeyDown"
+                                          PromptTextChanged="OnChatPromptTextChanged"
+                                          ExpandPromptClicked="OnExpandPromptClicked"
+                                          RecordClicked="OnRecordClicked"
+                                          StopDictationClicked="OnStopClicked"
+                                          SendClicked="OnSendChatClicked"
+                                          StopChatClicked="OnStopChatClicked"
+                                          RemovePendingFileClicked="OnRemovePendingFileClicked" />
+        </Grid>
+        <workbench:WorkbenchOperationalStatusView x:Name="OperationalStatusView"
+                                                   Grid.Row="3"
+                                                   Margin="0,12,0,0" />
+      </Grid>
+    </Grid>
+
+    <workbench:WorkbenchExpandedPromptView x:Name="ExpandedPromptView"
+                                             Grid.Column="1"
+                                             Panel.ZIndex="18"
+                                             Margin="46,70,46,46"
+                                             CollapseClicked="OnCollapsePromptClicked"
+                                             SubmitClicked="OnExpandedSendChatClicked"
+                                             PromptKeyDown="OnExpandedPromptKeyDown"
+                                             PromptTextChanged="OnExpandedPromptTextChanged" />
+    </Grid>
+
+    <workbench:WorkbenchQuickSettingsView x:Name="QuickSettingsView"
+                                           Grid.ColumnSpan="2"
+                                           Panel.ZIndex="34"
+                                           OverlayMouseDown="OnSettingsMenuOverlayMouseDown"
+                                           SurfaceMouseDown="OnSettingsMenuSurfaceMouseDown"
+                                           DismissRequested="OnSettingsMenuDismissRequested"
+                                           OpenAdvancedClicked="OnOpenFullSettingsClicked"
+                                           ToggleThemeClicked="OnToggleThemeClicked"
+                                           ChatModelSelectionChanged="OnChatModelSelectionChanged"
+                                           DownloadChatModelClicked="OnDownloadChatModelClicked"
+                                           TranscriptionModelSelectionChanged="OnTranscriptionModelSelectionChanged"
+                                           AboutClicked="OnAboutClicked" />
+
+    <workbench:WorkbenchInlineSettingsView x:Name="InlineSettingsView"
+                                            Grid.ColumnSpan="2"
+                                            Panel.ZIndex="35"
+                                            BackRequested="OnInlineSettingsBackRequested"
+                                            SettingsSaved="OnInlineSettingsSaved" />
+
+  </Grid>
+    <presentation:WindowCaptionButtons
+                                       Panel.ZIndex="40"
+                                       ContextTitle="Koncus Nai"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Top" />
+
+    <Border x:Name="HighContrastWindowBoundary"
+            CornerRadius="16"
+            Style="{StaticResource AppHighContrastWindowBoundaryStyle}" />
+  </Grid>
+</Window>

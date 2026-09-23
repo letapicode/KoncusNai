@@ -1,0 +1,11 @@
+{
+  "solution": {
+    "path": "DictateAnywhere.sln",
+    "projects": [
+      "tools\\DictateAnywhere.ModelBenchmark\\DictateAnywhere.ModelBenchmark.csproj",
+      "tools\\DictateAnywhere.Spikes\\DictateAnywhere.Spikes.csproj",
+      "tools\\DictateAnywhere.TtsCli\\DictateAnywhere.TtsCli.csproj",
+      "tools\\DictateAnywhere.VoicePreviewGenerator\\DictateAnywhere.VoicePreviewGenerator.csproj"
+    ]
+  }
+}

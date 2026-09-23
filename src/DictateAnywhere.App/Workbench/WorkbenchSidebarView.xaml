@@ -1,0 +1,172 @@
+<UserControl x:Class="DictateAnywhere.App.Workbench.WorkbenchSidebarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             FontFamily="Segoe UI" FontSize="{DynamicResource Font.Size.Control}"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+  <UserControl.Resources>
+    <Style x:Key="SidebarActionButtonStyle" TargetType="Button">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="Chrome"
+                    Padding="{TemplateBinding Padding}"
+                    Background="{TemplateBinding Background}"
+                    CornerRadius="17"
+                    SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.Muted}" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.Pressed}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Chrome" Property="Opacity" Value="0.48" />
+                <Setter Property="Cursor" Value="Arrow" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="HistoryRowActionStyle" TargetType="Button" BasedOn="{StaticResource SidebarActionButtonStyle}">
+      <Setter Property="Width" Value="28" /><Setter Property="MinWidth" Value="28" />
+      <Setter Property="Height" Value="28" /><Setter Property="MinHeight" Value="28" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Padding" Value="0" /><Setter Property="Visibility" Value="Hidden" />
+      <Setter Property="AutomationProperties.Name" Value="History actions" />
+      <Setter Property="ToolTip" Value="Rename or delete" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+        <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <DataTemplate x:Key="ChatHistorySidebarItemTemplate">
+      <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <TextBlock Text="{Binding Title}" ToolTip="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+        <Button Grid.Column="1" Margin="4,0,0,0" Style="{DynamicResource HistoryRowActionStyle}" Content="&#x2026;" Click="OnRowActionsClicked" />
+      </Grid>
+    </DataTemplate>
+    <DataTemplate x:Key="DictationHistorySidebarItemTemplate">
+      <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="{Binding DateLabel}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"
+                     Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+          <TextBlock Text="{Binding CountLabel}" Margin="0,4,0,0" FontSize="{DynamicResource Font.Size.Caption}"
+                     Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+        </StackPanel>
+        <Button Grid.Column="1" Margin="4,0,0,0" Style="{DynamicResource HistoryRowActionStyle}" Content="&#x2026;" Click="OnRowActionsClicked" />
+      </Grid>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <Border x:Name="SidebarSurface"
+          Background="{DynamicResource Brush.Surface.Sidebar}"
+          BorderBrush="{DynamicResource Brush.Border.Subtle}"
+          BorderThickness="0,0,1,0">
+    <Grid Margin="10">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <Border Grid.Row="0" Height="56" />
+
+      <Grid Grid.Row="1">
+        <TextBox x:Name="HistorySearchTextBox"
+                 MinHeight="36"
+                 Style="{DynamicResource AppSearchTextBoxStyle}"
+                 VerticalContentAlignment="Center"
+                 SnapsToDevicePixels="True"
+                 UseLayoutRounding="True"
+                 ToolTip="Search saved dictation transcripts and chats."
+                 AutomationProperties.Name="Search history" />
+      </Grid>
+
+      <ScrollViewer Grid.Row="2"
+                    Margin="0,10,0,10"
+                    VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+          <TextBlock x:Name="ChatHistoryListBoxHeading" Text="Chats" FontWeight="SemiBold" FontSize="{DynamicResource Font.Size.Caption}"
+                     Foreground="{DynamicResource Brush.Text.Secondary}" Margin="10,16,10,4" />
+          <ListBox x:Name="ChatHistoryListBox" ItemContainerStyle="{DynamicResource AppHistoryListBoxItemStyle}"
+                   Margin="0,8,0,0"
+                   BorderThickness="0"
+                   Background="Transparent"
+                   SelectionMode="Extended"
+                   ToolTip="Use Ctrl-click or Shift-click to select several chats. Right-click or press Delete to remove the selection."
+                   AutomationProperties.Name="Saved chats"
+                   ItemTemplate="{StaticResource ChatHistorySidebarItemTemplate}">
+            <ListBox.ContextMenu>
+              <ContextMenu>
+                <MenuItem x:Name="RenameChatMenuItem" Header="Rename" />
+                <MenuItem x:Name="DeleteSelectedChatsMenuItem" Header="Delete selected" />
+              </ContextMenu>
+            </ListBox.ContextMenu>
+          </ListBox>
+          <TextBlock x:Name="ChatHistoryStatusTextBlock"
+                     Margin="10,8,10,0"
+                     Style="{DynamicResource AppCaptionTextBlockStyle}"
+                     Text="Loading chatsâ€¦"
+                     AutomationProperties.LiveSetting="Polite" />
+
+          <TextBlock x:Name="HistoryListBoxHeading" Text="Dictations" FontWeight="SemiBold" FontSize="{DynamicResource Font.Size.Caption}"
+                     Foreground="{DynamicResource Brush.Text.Secondary}" Margin="10,16,10,4" />
+          <ListBox x:Name="HistoryListBox" ItemContainerStyle="{DynamicResource AppHistoryListBoxItemStyle}"
+                   Margin="0,14,0,0"
+                   BorderThickness="0"
+                   Background="Transparent"
+                   SelectionMode="Extended"
+                   ToolTip="One entry per day. Select a day to review its dictations; right-click or press Delete to remove a day's entries."
+                   AutomationProperties.Name="Dictation history days"
+                   ItemTemplate="{StaticResource DictationHistorySidebarItemTemplate}">
+            <ListBox.ContextMenu>
+              <ContextMenu>
+                <MenuItem x:Name="RenameHistoryMenuItem" Header="Rename" />
+                <MenuItem x:Name="DeleteSelectedHistoryMenuItem" Header="Delete selected" />
+              </ContextMenu>
+            </ListBox.ContextMenu>
+          </ListBox>
+          <TextBlock x:Name="HistorySidebarStatusTextBlock"
+                     Margin="10,8,10,0"
+                     Style="{DynamicResource AppCaptionTextBlockStyle}"
+                     Text="Loading dictationsâ€¦"
+                     AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+      </ScrollViewer>
+
+      <Border Grid.Row="3" Padding="8,6" Background="Transparent">
+        <Button x:Name="SettingsButton"
+                HorizontalAlignment="Left"
+                Style="{StaticResource SidebarActionButtonStyle}"
+                AutomationProperties.Name="Settings">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{DynamicResource AppIconGlyphTextBlockStyle}"
+                       Margin="0,0,10,0"
+                       Text="&#xE713;" />
+            <TextBlock Text="Settings" />
+          </StackPanel>
+        </Button>
+      </Border>
+    </Grid>
+  </Border>
+</UserControl>

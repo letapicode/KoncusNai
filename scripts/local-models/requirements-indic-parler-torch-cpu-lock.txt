@@ -1,0 +1,3 @@
+# Windows CPython 3.11 x64 CPU backend used by Auto and Cpu provisioning.
+torch @ https://download-r2.pytorch.org/whl/cpu/torch-2.13.0%2Bcpu-cp311-cp311-win_amd64.whl \
+    --hash=sha256:10717d8b3b67c45a4788bf7ffc0bab1ea1e5ebbedd24466be6100102d141fac1

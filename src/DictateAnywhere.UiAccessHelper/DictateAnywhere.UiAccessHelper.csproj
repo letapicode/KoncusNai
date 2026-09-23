@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DictateAnywhere.UiAccessHelper</RootNamespace>
+    <AssemblyName>DictateAnywhere.UiAccessHelper</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DictateAnywhere.Core\DictateAnywhere.Core.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Insertion\DictateAnywhere.Insertion.csproj" />
+  </ItemGroup>
+</Project>

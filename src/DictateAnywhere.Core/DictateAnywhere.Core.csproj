@@ -1,0 +1,6 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DictateAnywhere.Core</RootNamespace>
+    <AssemblyName>DictateAnywhere.Core</AssemblyName>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,50 @@
+<Window x:Class="DictateAnywhere.App.Hotkeys.HotkeyTestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        Title="Koncus Nai Hotkey Test"
+        Width="760"
+        Height="500"
+        MinWidth="500"
+        MinHeight="350"
+        PreviewKeyDown="OnPreviewKeyDown"
+        PreviewKeyUp="OnPreviewKeyUp">
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0"
+               TextWrapping="Wrap"
+               Text="Press keys in this window to see exactly what Windows key events are delivered. If Fn does not appear here, your device is handling it in firmware and it cannot be used as a standard global hotkey." />
+
+    <TextBlock Grid.Row="1"
+               Margin="0,10,0,6"
+               FontWeight="SemiBold"
+               Text="Captured Events" />
+
+    <ListBox x:Name="EventsListBox"
+             Grid.Row="2"
+             FontFamily="Consolas"
+             FontSize="{DynamicResource Font.Size.Body}"
+             AutomationProperties.Name="Captured hotkey events"
+             AutomationProperties.LiveSetting="Polite" />
+
+    <StackPanel Grid.Row="3"
+                Margin="0,10,0,0"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right">
+      <Button Margin="0,0,8,0"
+              Padding="10,4"
+              Click="OnClearClicked"
+              Content="Clear" />
+      <Button Padding="10,4"
+              Click="OnCloseClicked"
+              Content="Close" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <NOTYPE_VIDEO_EXPORT_INTEGRATION>1</NOTYPE_VIDEO_EXPORT_INTEGRATION>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

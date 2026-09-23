@@ -1,0 +1,22 @@
+{
+  "generatedAtUtc": "2026-02-18T00:00:00Z",
+  "executor": "REPLACE_WITH_OPERATOR",
+  "machine": "REPLACE_WITH_MACHINE",
+  "results": [
+    {
+      "key": "workbench-record-stop-transcribe-textbox",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_TEXTBOX_TRANSCRIPT_APPEARS_AFTER_RECORD_STOP"
+    },
+    {
+      "key": "workbench-no-global-insertion-side-effects",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_NO_EXTERNAL_APP_INSERTION_DURING_WORKBENCH_SESSION"
+    },
+    {
+      "key": "workbench-overlay-suppressed",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_OVERLAY_REMAINS_HIDDEN_IN_WORKBENCH_MODE"
+    }
+  ]
+}

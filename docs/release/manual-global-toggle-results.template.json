@@ -1,0 +1,52 @@
+{
+  "generatedAtUtc": "2026-03-04T00:00:00Z",
+  "executor": "REPLACE_WITH_OPERATOR",
+  "machine": "REPLACE_WITH_MACHINE",
+  "results": [
+    {
+      "key": "global-toggle-notepad",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_NOTEPAD_INCLUDE_HOTKEY_METHOD_AND_SINGLE_INSERTION_RESULT_EXAMPLE_hotkey=Alt + Space_method=paste_exactly once"
+    },
+    {
+      "key": "global-toggle-sticky-notes",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_STICKY_NOTES_INCLUDE_HOTKEY_METHOD_AND_SINGLE_INSERTION_RESULT_EXAMPLE_hotkey=Alt + Space_method=typing_exactly once"
+    },
+    {
+      "key": "global-toggle-chrome-url-bar",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_CHROME_URL_BAR_INCLUDE_HOTKEY_METHOD_AND_SINGLE_INSERTION_RESULT_EXAMPLE_hotkey=Alt + Space_method=paste_exactly once"
+    },
+    {
+      "key": "global-toggle-microsoft-word",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_MICROSOFT_WORD_INCLUDE_HOTKEY_METHOD_AND_SINGLE_INSERTION_RESULT_EXAMPLE_hotkey=Alt + Space_method=paste_exactly once"
+    },
+    {
+      "key": "global-toggle-vs-code",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_VS_CODE_INCLUDE_HOTKEY_METHOD_AND_SINGLE_INSERTION_RESULT_EXAMPLE_hotkey=Alt + Space_method=paste_exactly once"
+    },
+    {
+      "key": "global-toggle-windsurf-ide",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_WINDSURF_INCLUDE_HOTKEY_METHOD_AND_SINGLE_INSERTION_RESULT_EXAMPLE_hotkey=Alt + Space_method=typing_exactly once"
+    },
+    {
+      "key": "global-toggle-antigravity-ide",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_ANTIGRAVITY_INCLUDE_HOTKEY_METHOD_AND_SINGLE_INSERTION_RESULT_EXAMPLE_hotkey=Alt + Space_method=typing_exactly once"
+    },
+    {
+      "key": "global-toggle-windows-terminal",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_WINDOWS_TERMINAL_INCLUDE_HOTKEY_METHOD_AND_SINGLE_INSERTION_RESULT_EXAMPLE_hotkey=Alt + Space_method=typing_exactly once"
+    },
+    {
+      "key": "global-toggle-slack",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_SLACK_INCLUDE_HOTKEY_METHOD_AND_SINGLE_INSERTION_RESULT_EXAMPLE_hotkey=Alt + Space_method=blocked_exactly once_blocked by secure field"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DictateAnywhere.Hotkeys.Tests</RootNamespace>
+    <AssemblyName>DictateAnywhere.Hotkeys.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DictateAnywhere.Hotkeys\DictateAnywhere.Hotkeys.csproj" />
+  </ItemGroup>
+</Project>
+
+

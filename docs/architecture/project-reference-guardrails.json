@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "guardrails": [
+    {
+      "project": "DictateAnywhere.Core",
+      "role": "foundation",
+      "allowedProjectReferences": []
+    },
+    {
+      "project": "DictateAnywhere.Platform.Windows",
+      "role": "foundation",
+      "allowedProjectReferences": []
+    },
+    {
+      "project": "DictateAnywhere.Audio",
+      "role": "swappable-module",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core",
+        "DictateAnywhere.Platform.Windows"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.Hotkeys",
+      "role": "swappable-module",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core",
+        "DictateAnywhere.Platform.Windows"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.Inference",
+      "role": "swappable-module",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.Insertion",
+      "role": "swappable-module",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core",
+        "DictateAnywhere.Platform.Windows"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.Overlay",
+      "role": "module",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.Settings",
+      "role": "module",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.Models",
+      "role": "module",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.Diagnostics",
+      "role": "module",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.Benchmark",
+      "role": "module",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.ModelBenchmark",
+      "role": "tool",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core",
+        "DictateAnywhere.Inference",
+        "DictateAnywhere.Models"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.TtsCli",
+      "role": "tool",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core",
+        "DictateAnywhere.Inference"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.UiAccessHelper",
+      "role": "host",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Core",
+        "DictateAnywhere.Insertion"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.App",
+      "role": "composition-root",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Audio",
+        "DictateAnywhere.Benchmark",
+        "DictateAnywhere.Core",
+        "DictateAnywhere.Diagnostics",
+        "DictateAnywhere.Hotkeys",
+        "DictateAnywhere.Inference",
+        "DictateAnywhere.Insertion",
+        "DictateAnywhere.Models",
+        "DictateAnywhere.Overlay",
+        "DictateAnywhere.Platform.Windows",
+        "DictateAnywhere.Settings"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.Spikes",
+      "role": "tool",
+      "allowedProjectReferences": [
+        "DictateAnywhere.Audio",
+        "DictateAnywhere.Core",
+        "DictateAnywhere.Hotkeys",
+        "DictateAnywhere.Inference",
+        "DictateAnywhere.Insertion"
+      ]
+    },
+    {
+      "project": "DictateAnywhere.VoicePreviewGenerator",
+      "role": "tool",
+      "allowedProjectReferences": [
+        "DictateAnywhere.App",
+        "DictateAnywhere.Core",
+        "DictateAnywhere.Inference"
+      ]
+    }
+  ]
+}

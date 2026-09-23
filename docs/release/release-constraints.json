@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "releaseConstraints": [
+    {
+      "releaseLine": "1.x",
+      "lastReviewedUtc": "2026-02-15T00:00:00Z",
+      "nonGoals": [
+        "Windows 10 GA support is not part of the 1.x release line.",
+        "Enterprise policy control and silent deployment governance are post-MVP scope.",
+        "Full guaranteed insertion in elevated/admin targets without signed UIAccess setup is out of scope."
+      ],
+      "knownLimitations": [
+        "Fn-key detection depends on OEM firmware and may not be visible to Windows hotkey registration.",
+        "Secure fields and protected input surfaces can block insertion by design.",
+        "Clipboard-based insertion may be denied by target application policy or timing contention."
+      ],
+      "mitigations": [
+        "Provide Hotkey Test page and require user-visible key-event validation.",
+        "Expose secure-field detection toggle, blacklist controls, and clear block messaging.",
+        "Fallback to SendInput Unicode typing when paste insertion fails."
+      ]
+    }
+  ]
+}

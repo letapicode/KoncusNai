@@ -1,0 +1,26 @@
+* text=auto eol=lf
+
+# Binary product assets
+*.bmp binary
+*.gif binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.wav binary
+*.mp3 binary
+*.mp4 binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# Packaged and compiled files, if intentionally versioned
+*.7z binary
+*.zip binary
+*.dll binary
+*.exe binary
+*.nupkg binary
+*.snupkg binary
+*.pdf binary

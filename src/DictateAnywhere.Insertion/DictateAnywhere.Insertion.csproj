@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DictateAnywhere.Insertion</RootNamespace>
+    <AssemblyName>DictateAnywhere.Insertion</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DictateAnywhere.Core\DictateAnywhere.Core.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Platform.Windows\DictateAnywhere.Platform.Windows.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DictateAnywhere.App.Tests</RootNamespace>
+    <AssemblyName>DictateAnywhere.App.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DictateAnywhere.App\DictateAnywhere.App.csproj" />
+  </ItemGroup>
+</Project>
+
+

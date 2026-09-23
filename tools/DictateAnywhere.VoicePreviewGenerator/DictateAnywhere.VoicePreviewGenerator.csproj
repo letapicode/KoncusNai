@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DictateAnywhere.VoicePreviewGenerator</RootNamespace>
+    <AssemblyName>DictateAnywhere.VoicePreviewGenerator</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.App\DictateAnywhere.App.csproj" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.Core\DictateAnywhere.Core.csproj" />
+    <ProjectReference Include="..\..\src\DictateAnywhere.Inference\DictateAnywhere.Inference.csproj" />
+  </ItemGroup>
+</Project>

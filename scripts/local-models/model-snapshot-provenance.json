@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "id": "cohere-transcribe-03-2026",
+      "repository": "CohereLabs/cohere-transcribe-03-2026",
+      "revision": "32d9e4ba6271d78168c095c2f90bc173eaad97d2",
+      "license": "apache-2.0",
+      "files": [
+        { "path": "config.json", "size": 3998, "sha256": "5de7e586cec6d8f51225c8d5fe17a56a3043dda9af8c42f9cb01dd545905eb18" },
+        { "path": "configuration_cohere_asr.py", "size": 1795, "sha256": "8cfd12b210d9e13d4e46acf0600d7c5561a66e7c3ca64d06a3fa62c98e98f769" },
+        { "path": "generation_config.json", "size": 234, "sha256": "a4837377b5696b1d04033536f25a6d0a11d5e613c6d7d75bf20ffc463ae642c6" },
+        { "path": "model.safetensors", "size": 4131862976, "sha256": "987bd3e141c7bfdb5a78f5db11397ee7737308357e6cc0a3f36a4979b158137a" },
+        { "path": "modeling_cohere_asr.py", "size": 64648, "sha256": "ca5a0b67a1cba76e86e54a3bfe350255a17868f27a4b2faa400c2daa520193e0" },
+        { "path": "preprocessor_config.json", "size": 420, "sha256": "9f297d330646ecc8ebb9dc5784f48b7c35b118c913e306a1ccd0192f2c976332" },
+        { "path": "processing_cohere_asr.py", "size": 20572, "sha256": "151f965b721c068897cbf199296aa3d4d652dffaa2387d6edef7f10a9b16fb74" },
+        { "path": "processor_config.json", "size": 131, "sha256": "d5eff85971bab7f42480856f8fb397d8dd966858d67049def99aa8a665aa87d5" },
+        { "path": "special_tokens_map.json", "size": 4091, "sha256": "1814ce01458ff6a72b04a6618e75f18ce627be4dc17619cd3a7cd7f71e137f0f" },
+        { "path": "tokenization_cohere_asr.py", "size": 6623, "sha256": "6b3df3814b6604d0ba9f35e1d058b128937c7d404f6b9dc275d574e013f010b2" },
+        { "path": "tokenizer_config.json", "size": 48138, "sha256": "b462e16e04c9dbae82289b6ef9b080d8dbad331586ece3ebded0bd09996db636" },
+        { "path": "tokenizer.json", "size": 1816694, "sha256": "780ccca2de2ccd289971b1fb7d4f0b5ec2dc908872f6e350181c7eba9db3fa9f" },
+        { "path": "tokenizer.model", "size": 492827, "sha256": "6d21e6a83b2d0d3e1241a7817e4bef8eb63bcb7cfe4a2675af9a35ff3bbf0e14" }
+      ]
+    },
+    {
+      "id": "crisperwhisper-2-turbo",
+      "repository": "nyralabs/CrisperWhisper2.0_turbo",
+      "revision": "de0369c8a68025b7f6e86387b6eb5a3b369787c8",
+      "license": "other-personal-research-only",
+      "files": [
+        { "path": "added_tokens.json", "size": 35319, "sha256": "228ddf33a2c2b94033dc0fad8e7847b554b1c9f7d2054f5455ffd562b6a30dc7" },
+        { "path": "config.json", "size": 1211, "sha256": "9d823d0eacddfc5ee920fac73897abfd29fbecac7d9e49b5d8e7f0bd63a56144" },
+        { "path": "generation_config.json", "size": 3880, "sha256": "e20fb70a44ce2b3cb3b2bbbea852e064638563b072719640a286d2a6865066e1" },
+        { "path": "merges.txt", "size": 493869, "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6" },
+        { "path": "model.safetensors", "size": 1617907538, "sha256": "0121a185b87ada7497f22dfbcd6c86b5f599b69dfcc8676e37f36447caf0b630" },
+        { "path": "normalizer.json", "size": 52666, "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd" },
+        { "path": "preprocessor_config.json", "size": 357, "sha256": "654cf18d3e163b948ceaf9766da56ce0b52de265d58673cf61c9376f126bd499" },
+        { "path": "special_tokens_map.json", "size": 2186, "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74" },
+        { "path": "tokenizer_config.json", "size": 288287, "sha256": "3089ab61ce4745667a41e91620081cd3e7d61a9ae1f79fdf91b1bc8983916f4e" },
+        { "path": "tokenizer.json", "size": 3937105, "sha256": "00e6dce8d06acafefaea8d5d1e57e89c69b3237d08ecbe2bf6eb7124e248bcde" },
+        { "path": "vocab.json", "size": 835528, "sha256": "6788c80b082e9b0d1393147d3a3e62ba19285ac0c82ace8e5ef00f37ead58971" }
+      ]
+    },
+    {
+      "id": "crisperwhisper-2-large",
+      "repository": "nyralabs/CrisperWhisper2.0_large",
+      "revision": "f4334f6e8193f2691212d49b20fa12d370e13896",
+      "license": "other-personal-research-only",
+      "files": [
+        { "path": "added_tokens.json", "size": 35275, "sha256": "54e87fd086baa530e05082c11feacf9df5439453c5fae279611f3099ec844dc5" },
+        { "path": "config.json", "size": 1345, "sha256": "efd226b2b7a57109ef2ecdde8f9ccc95d44ee5f9057847d1478af9315c5834bd" },
+        { "path": "generation_config.json", "size": 3865, "sha256": "07cc1f4e95f03c10f47939f69579efbe19e3ccd1ce901bb01b32600038618a88" },
+        { "path": "merges.txt", "size": 493869, "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6" },
+        { "path": "model.safetensors", "size": 3086843114, "sha256": "f097f853b6992e66fcae802a15770a8242670351198d68dad577db3209fe3fcc" },
+        { "path": "normalizer.json", "size": 52666, "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd" },
+        { "path": "preprocessor_config.json", "size": 356, "sha256": "994838f1fa6462c8b9b3c90edada831f11f3dd8b4664634e18f4694d005c9dbf" },
+        { "path": "special_tokens_map.json", "size": 2194, "sha256": "e67ae3a0aaa99abcd9f187138e12db1f65c16a14761c50ef10eef2c174a7a691" },
+        { "path": "tokenizer_config.json", "size": 288127, "sha256": "5fa089926c8c2535c622d09a5992fb57c63cbc3514e18cf40bc535bee2a23827" },
+        { "path": "tokenizer.json", "size": 3936954, "sha256": "567da8c8a5b7df02555deecfcb3a7f6acd315844dc5e2fde883fe7ced8467317" },
+        { "path": "vocab.json", "size": 835550, "sha256": "8f680bba319e01a653d2e8a5dbc17a9157179e0576e6ce74ce0c06356c6e24f9" }
+      ]
+    }
+  ]
+}

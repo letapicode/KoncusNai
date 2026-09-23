@@ -1,0 +1,32 @@
+{
+  "generatedAtUtc": "2026-03-08T00:00:00Z",
+  "executor": "REPLACE_WITH_OPERATOR",
+  "machine": "REPLACE_WITH_MACHINE",
+  "results": [
+    {
+      "key": "multilingual-global-language-selection",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_GLOBAL_LANGUAGE_SELECTION_PERSISTS_ACROSS_RESTART"
+    },
+    {
+      "key": "multilingual-profile-language-override",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_PROFILE_OVERRIDE_PERSISTS_AND_RESOLVES_EFFECTIVE_LANGUAGE"
+    },
+    {
+      "key": "multilingual-model-language-compatibility",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_UNSUPPORTED_MODEL_LANGUAGE_COMBINATION_BLOCKED_OR_FALLBACK_IS_DETERMINISTIC"
+    },
+    {
+      "key": "multilingual-benchmark-language-scope",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_BENCHMARK_AND_RECOMMENDATION_MATCH_SELECTED_LANGUAGE_SCOPE"
+    },
+    {
+      "key": "multilingual-english-baseline-regression-after-multilingual-flow",
+      "status": "MANUAL_REQUIRED",
+      "evidence": "REPLACE_WITH_EVIDENCE_ENGLISH_BASELINE_REGRESSION_SUITE_REMAINS_PASS_AFTER_MULTILINGUAL_FLOW"
+    }
+  ]
+}

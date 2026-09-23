@@ -1,0 +1,336 @@
+{
+  "schemaVersion": 1,
+  "matrixId": "dictate-anywhere-compatibility-v1",
+  "supportedWindows": [
+    {
+      "id": "windows-11",
+      "status": "supported",
+      "minimumVersion": "Windows 11 22H2",
+      "minimumBuild": "22621",
+      "architectures": [
+        "x64"
+      ],
+      "notes": "Primary target for current release line."
+    },
+    {
+      "id": "windows-10",
+      "status": "planned",
+      "minimumVersion": "Windows 10 22H2",
+      "minimumBuild": "19045",
+      "architectures": [
+        "x64"
+      ],
+      "notes": "Not release-supported yet; platform abstractions keep extension path open."
+    }
+  ],
+  "hardwareClasses": [
+    {
+      "classId": "older-i5",
+      "description": "Older Intel Core i5 class CPU (roughly 8th-10th gen or similar laptop class).",
+      "expectedDefaultModel": "cohere-transcribe-03-2026",
+      "selectionRule": "Use the measured supported provider/model whose warm latency and accuracy fit the release budgets."
+    },
+    {
+      "classId": "modern-i5",
+      "description": "Modern Intel Core i5 class CPU (11th gen+ desktop/laptop class).",
+      "expectedDefaultModel": "cohere-transcribe-03-2026",
+      "selectionRule": "Keep the product default unless the current benchmark recommends another supported provider/model."
+    }
+  ],
+  "globalAppCoveragePolicy": {
+    "runtimeTarget": "Focused text control or window at the caret.",
+    "baselineBehavior": "Dictate Anywhere uses generic insertion paths for normal text surfaces and does not require app-specific integrations for baseline behavior.",
+    "certifiedAppMatrixPolicy": "Maintain a certified app matrix for release gating and evidence even though runtime behavior is generic.",
+    "knownLimitations": [
+      {
+        "id": "admin-integrity-boundary",
+        "description": "Lower-integrity insertion into elevated/admin targets can be blocked by UIPI unless the signed UIAccess path is enabled.",
+        "tierId": "tier-3-unsupported"
+      },
+      {
+        "id": "secure-password-fields",
+        "description": "Secure or password fields are intentionally blocked or treated as unsafe.",
+        "tierId": "tier-3-unsupported"
+      },
+      {
+        "id": "protected-controls",
+        "description": "Some controls do not expose a standard insertion surface and can reject both paste and typing paths.",
+        "tierId": "tier-3-unsupported"
+      }
+    ]
+  },
+  "compatibilityTiers": [
+    {
+      "tierId": "tier-1-certified",
+      "name": "Tier 1",
+      "label": "Certified apps",
+      "releaseBlocking": true,
+      "description": "Certified apps must pass every release in scope and carry attached evidence."
+    },
+    {
+      "tierId": "tier-2-best-effort",
+      "name": "Tier 2",
+      "label": "Best-effort apps",
+      "releaseBlocking": false,
+      "description": "Best-effort apps use the generic runtime path and are tracked, but they are not release-blocking unless promoted."
+    },
+    {
+      "tierId": "tier-3-unsupported",
+      "name": "Tier 3",
+      "label": "Unsupported or blocked contexts",
+      "releaseBlocking": false,
+      "description": "Unsupported or blocked contexts must show deterministic UX messaging rather than implying support."
+    }
+  ],
+  "newAppTriageWorkflow": {
+    "requiredCaptureFields": [
+      "app name/version/process",
+      "Windows build",
+      "target surface description",
+      "insertion outcome: paste|typing|blocked",
+      "integrity level",
+      "secure-field or protected-control signal",
+      "blocked reason or workaround note"
+    ],
+    "decisionOutcomes": [
+      "generic fix",
+      "app-specific workaround",
+      "documented limitation"
+    ]
+  },
+  "appTargets": [
+    {
+      "targetId": "vscode-editor",
+      "category": "ide",
+      "displayName": "VS Code editor",
+      "supportTier": "tier-1-certified",
+      "evidenceSource": {
+        "type": "milestone1-criterion",
+        "criterion": "VS Code insertion"
+      }
+    },
+    {
+      "targetId": "chrome-url-bar",
+      "category": "browser",
+      "displayName": "Chrome URL bar",
+      "supportTier": "tier-1-certified",
+      "evidenceSource": {
+        "type": "milestone1-criterion",
+        "criterion": "Chrome URL bar insertion"
+      }
+    },
+    {
+      "targetId": "word-document",
+      "category": "docs",
+      "displayName": "Microsoft Word document surface",
+      "supportTier": "tier-1-certified",
+      "evidenceSource": {
+        "type": "milestone1-criterion",
+        "criterion": "Word insertion"
+      }
+    },
+    {
+      "targetId": "windows-terminal-non-admin",
+      "category": "terminal",
+      "displayName": "Windows Terminal (non-admin tab)",
+      "supportTier": "tier-1-certified",
+      "evidenceSource": {
+        "type": "manual-matrix",
+        "manualEvidenceKey": "windows-terminal-non-admin"
+      }
+    },
+    {
+      "targetId": "slack-non-admin",
+      "category": "chat",
+      "displayName": "Slack compose box (non-admin)",
+      "supportTier": "tier-1-certified",
+      "evidenceSource": {
+        "type": "milestone1-criterion",
+        "criterion": "Slack insertion (non-admin)"
+      }
+    }
+  ],
+  "globalToggleTargets": [
+    {
+      "key": "global-toggle-notepad",
+      "displayName": "Notepad",
+      "category": "docs",
+      "supportTier": "tier-1-certified"
+    },
+    {
+      "key": "global-toggle-sticky-notes",
+      "displayName": "Sticky Notes",
+      "category": "docs",
+      "supportTier": "tier-1-certified"
+    },
+    {
+      "key": "global-toggle-chrome-url-bar",
+      "displayName": "Chrome URL bar",
+      "category": "browser",
+      "supportTier": "tier-1-certified"
+    },
+    {
+      "key": "global-toggle-microsoft-word",
+      "displayName": "Microsoft Word",
+      "category": "docs",
+      "supportTier": "tier-1-certified"
+    },
+    {
+      "key": "global-toggle-vs-code",
+      "displayName": "VS Code",
+      "category": "ide",
+      "supportTier": "tier-1-certified"
+    },
+    {
+      "key": "global-toggle-windsurf-ide",
+      "displayName": "Windsurf IDE",
+      "category": "ide",
+      "supportTier": "tier-1-certified"
+    },
+    {
+      "key": "global-toggle-antigravity-ide",
+      "displayName": "Antigravity IDE",
+      "category": "ide",
+      "supportTier": "tier-1-certified"
+    },
+    {
+      "key": "global-toggle-windows-terminal",
+      "displayName": "Windows Terminal",
+      "category": "terminal",
+      "supportTier": "tier-1-certified"
+    },
+    {
+      "key": "global-toggle-slack",
+      "displayName": "Slack",
+      "category": "chat",
+      "supportTier": "tier-1-certified"
+    }
+  ],
+  "globalToggleReleaseAcceptanceCriteria": [
+    {
+      "criterion": "Global toggle hotkey strategy remains GO for the release candidate",
+      "evidenceSources": [
+        "artifacts/global-toggle-acceptance/global-toggle-hotkey-validation.json",
+        "docs/release/global-toggle-hotkey-validation-report.md",
+        "artifacts/global-toggle-acceptance/global-toggle-acceptance-results.json",
+        "docs/release/global-toggle-acceptance-report.md"
+      ]
+    },
+    {
+      "criterion": "Global toggle start/stop works reliably in the required app matrix",
+      "evidenceSources": [
+        "artifacts/global-toggle-acceptance/global-toggle-acceptance-results.json",
+        "docs/release/global-toggle-acceptance-report.md"
+      ],
+      "requiredTargetKeys": [
+        "global-toggle-notepad",
+        "global-toggle-sticky-notes",
+        "global-toggle-chrome-url-bar",
+        "global-toggle-microsoft-word",
+        "global-toggle-vs-code",
+        "global-toggle-windsurf-ide",
+        "global-toggle-antigravity-ide",
+        "global-toggle-windows-terminal",
+        "global-toggle-slack"
+      ]
+    },
+    {
+      "criterion": "Transcript insertion is verified (or provides deterministic blocked reason) per app",
+      "evidenceSources": [
+        "artifacts/global-toggle-acceptance/global-toggle-acceptance-results.json",
+        "docs/release/global-toggle-acceptance-report.md"
+      ],
+      "requiredMethodNotes": [
+        "paste",
+        "typing",
+        "blocked"
+      ]
+    },
+    {
+      "criterion": "No regression in Workbench mode",
+      "evidenceSources": [
+        "artifacts/workbench-acceptance/workbench-acceptance-results.json",
+        "docs/release/workbench-acceptance-report.md"
+      ],
+      "requiredWorkbenchCriteria": [
+        "Workbench textbox flow (record -> stop -> transcribe)",
+        "Workbench no global insertion side effect",
+        "Workbench overlay suppressed"
+      ]
+    },
+    {
+      "criterion": "No regression in installer/release orchestration/gating pipeline",
+      "evidenceSources": [
+        "artifacts/compatibility/compatibility-gate-results.json",
+        "docs/release/compatibility-gate-report.md",
+        "artifacts/release-orchestration/release-orchestration-results.json",
+        "docs/release/release-orchestration-report.md"
+      ]
+    }
+  ],
+  "requiredMilestone1Criteria": [
+    "VS Code insertion",
+    "Chrome URL bar insertion",
+    "Word insertion",
+    "Slack insertion (non-admin)",
+    "i5 CPU latency acceptable for short dictations"
+  ],
+  "manualEvidenceRequirements": [
+    {
+      "key": "windows-terminal-non-admin",
+      "description": "Record at least one successful insertion run in a non-admin Windows Terminal session."
+    }
+  ],
+  "releaseGatePolicy": {
+    "requiresMilestone1Evidence": true,
+    "requiresReliabilityEvidence": true,
+    "requiresManualMatrixEvidence": true,
+    "requiresInstallerEvidence": true,
+    "requiredInstallerScenarioIds": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "requiresWorkbenchAcceptanceEvidence": true,
+    "requiresGlobalToggleAcceptanceEvidence": true,
+    "requiresEnglishBaselineRegressionEvidence": true,
+    "requiresMultilingualAcceptanceEvidence": false,
+    "requiredWorkbenchCriteria": [
+      "Workbench textbox flow (record -> stop -> transcribe)",
+      "Workbench no global insertion side effect",
+      "Workbench overlay suppressed"
+    ],
+    "requiredGlobalToggleCriteria": [
+      "Global toggle hotkey strategy decision",
+      "Global toggle: Notepad",
+      "Global toggle: Sticky Notes",
+      "Global toggle: Chrome URL bar",
+      "Global toggle: Microsoft Word",
+      "Global toggle: VS Code",
+      "Global toggle: Windsurf IDE",
+      "Global toggle: Antigravity IDE",
+      "Global toggle: Windows Terminal",
+      "Global toggle: Slack"
+    ],
+    "requiredEnglishBaselineRegressionCriteria": [
+      "English baseline: default model manifest remains English-only",
+      "English baseline: legacy settings migration defaults to English",
+      "English baseline: profile resolver defaults to English",
+      "English baseline: benchmark English scope stays on English candidate set"
+    ],
+    "requiredMultilingualAcceptanceCriteria": [
+      "Multilingual acceptance: global language selection persists",
+      "Multilingual acceptance: profile language override persists and resolves correctly",
+      "Multilingual acceptance: model/language compatibility handling is deterministic",
+      "Multilingual acceptance: benchmark recommendation follows selected language scope",
+      "Multilingual acceptance: English baseline regression remains PASS after multilingual flow"
+    ],
+    "extensibilityRollbackCriteria": [
+      "Rollback immediately if the English baseline regression artifact reports any FAIL result after language/model changes.",
+      "Rollback immediately if Tier 1 global toggle or Workbench acceptance regresses and the failure is attributable to the new language/model path.",
+      "Rollback immediately if a language/model change causes insertion reliability to lose deterministic paste/typing/blocked classification in certified targets.",
+      "Rollback multilingual UI/model exposure and restore the prior English-only path before retrying rollout."
+    ]
+  }
+}

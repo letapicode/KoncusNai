@@ -1,0 +1,233 @@
+<UserControl x:Class="DictateAnywhere.App.Workbench.WorkbenchQuickSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             FontFamily="Segoe UI" FontSize="{DynamicResource Font.Size.Control}"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent"
+             Visibility="Collapsed"
+             PreviewKeyDown="OnPreviewKeyDown">
+  <UserControl.Resources>
+    <Style x:Key="ChatTextSizeSliderStyle" TargetType="Slider">
+      <Setter Property="Height" Value="24" />
+      <Setter Property="Focusable" Value="True" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Slider">
+            <Grid UseLayoutRounding="True">
+              <Border Height="4"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource Brush.Control.Muted}"
+                      CornerRadius="2" />
+              <Track x:Name="PART_Track">
+                <Track.DecreaseRepeatButton>
+                  <RepeatButton Command="{x:Static Slider.DecreaseLarge}" Focusable="False">
+                    <RepeatButton.Template>
+                      <ControlTemplate TargetType="RepeatButton">
+                        <Border Height="4"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource Brush.Control.Primary}"
+                                CornerRadius="2" />
+                      </ControlTemplate>
+                    </RepeatButton.Template>
+                  </RepeatButton>
+                </Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb Width="16" Height="16" Focusable="False">
+                    <Thumb.Template>
+                      <ControlTemplate TargetType="Thumb">
+                        <Ellipse Fill="{DynamicResource Brush.Control.Primary}"
+                                 Stroke="{DynamicResource Brush.Surface.Elevated}"
+                                 StrokeThickness="2" />
+                      </ControlTemplate>
+                    </Thumb.Template>
+                  </Thumb>
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton>
+                  <RepeatButton Command="{x:Static Slider.IncreaseLarge}"
+                                Background="Transparent"
+                                Focusable="False">
+                    <RepeatButton.Template>
+                      <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent" />
+                      </ControlTemplate>
+                    </RepeatButton.Template>
+                  </RepeatButton>
+                </Track.IncreaseRepeatButton>
+              </Track>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="SettingsMenuButtonStyle" TargetType="Button">
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border x:Name="Chrome"
+                    Padding="{TemplateBinding Padding}"
+                    Background="{TemplateBinding Background}"
+                    CornerRadius="8"
+                    SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.Muted}" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.Pressed}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Chrome" Property="Opacity" Value="0.48" />
+                <Setter Property="Cursor" Value="Arrow" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </UserControl.Resources>
+
+  <Grid x:Name="Overlay"
+        Visibility="Collapsed"
+        ClipToBounds="True"
+        Background="Transparent">
+    <Border x:Name="Surface"
+            KeyboardNavigation.TabNavigation="Cycle"
+            KeyboardNavigation.DirectionalNavigation="Contained"
+            Width="{DynamicResource Layout.QuickSettings.Width}"
+            Margin="10,0,0,64"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Bottom"
+            Padding="10"
+            Background="{DynamicResource Brush.Surface.Elevated}"
+            BorderBrush="{DynamicResource Brush.Border.Subtle}"
+            BorderThickness="1"
+            CornerRadius="12">
+      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+      <StackPanel>
+        <TextBlock Text="Quick settings" Margin="12,4,12,12" FontSize="{DynamicResource Font.Size.Section}" FontWeight="SemiBold" Foreground="{DynamicResource Brush.Text.Primary}" />
+        <Button x:Name="AdvancedButton"
+                Style="{DynamicResource SettingsMenuButtonStyle}"
+                AutomationProperties.Name="All settings">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <TextBlock Style="{DynamicResource AppIconGlyphTextBlockStyle}" FontSize="17" Text="&#xE713;" />
+            <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="{DynamicResource Font.Size.Control}" Text="All settings…" />
+          </Grid>
+        </Button>
+
+        <Button x:Name="ThemeButton"
+                Style="{DynamicResource SettingsMenuButtonStyle}"
+                AutomationProperties.Name="Toggle theme">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBlock x:Name="ThemeGlyph" Style="{DynamicResource AppIconGlyphTextBlockStyle}" FontSize="17" Text="&#xE706;" />
+            <TextBlock x:Name="ThemeMode" Grid.Column="1" VerticalAlignment="Center" FontSize="{DynamicResource Font.Size.Control}" Text="Dark Mode" />
+            <TextBlock Grid.Column="2" Style="{DynamicResource AppIconGlyphTextBlockStyle}" FontSize="14" Text="&#xE8AB;" />
+          </Grid>
+        </Button>
+
+        <StackPanel Margin="10,8,4,4">
+          <Grid Margin="0,0,0,4">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBlock Style="{DynamicResource AppIconGlyphTextBlockStyle}" Foreground="{DynamicResource Brush.Text.Primary}" FontSize="16" Text="&#xE8E9;" />
+            <TextBlock Grid.Column="1" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Text Size" />
+            <TextBlock x:Name="TextSizeValue" Grid.Column="2" Margin="8,0,0,0" Style="{DynamicResource AppCaptionTextBlockStyle}" Text="15 px" />
+          </Grid>
+          <Slider x:Name="TextSizeSlider"
+                  Margin="30,0,4,0"
+                  Style="{DynamicResource ChatTextSizeSliderStyle}"
+                  Minimum="12"
+                  Maximum="30"
+                  TickFrequency="1"
+                  IsSnapToTickEnabled="True"
+                  IsMoveToPointEnabled="True"
+                  ToolTip="Adjust chat text size"
+                  AutomationProperties.Name="Chat text size" />
+
+          <Grid Margin="0,14,0,6">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <TextBlock Style="{DynamicResource AppIconGlyphTextBlockStyle}" Foreground="{DynamicResource Brush.Text.Primary}" FontSize="16" Text="&#xE950;" />
+            <TextBlock Grid.Column="1" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Chat Model" />
+          </Grid>
+          <ComboBox x:Name="ChatModel"
+                    Margin="30,0,0,0"
+                    MinHeight="34"
+                    MaxDropDownHeight="240"
+                    ToolTip="Select model"
+                    AutomationProperties.Name="Chat model">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding ShortLabel}" ToolTip="{Binding Description}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button x:Name="DownloadChatModel"
+                  Margin="30,8,0,0"
+                  HorizontalAlignment="Stretch"
+                  Visibility="Collapsed"
+                  Style="{DynamicResource AppActionButtonStyle}"
+                  Content="Download Model"
+                  AutomationProperties.Name="Download chat model" />
+
+          <Grid Margin="0,14,0,6">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <TextBlock Style="{DynamicResource AppIconGlyphTextBlockStyle}" Foreground="{DynamicResource Brush.Text.Primary}" FontSize="16" Text="&#xE720;" />
+            <TextBlock Grid.Column="1" FontSize="{DynamicResource Font.Size.FieldLabel}" Text="Speech" />
+          </Grid>
+          <ComboBox x:Name="TranscriptionModel"
+                    Margin="30,0,0,0"
+                    MinHeight="34"
+                    MaxDropDownHeight="280"
+                    ToolTip="Select speech model"
+                    AutomationProperties.Name="Transcription model">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Label}" ToolTip="{Binding Description}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock x:Name="TranscriptionStatus"
+                     Margin="2,6,0,0"
+                     Visibility="Collapsed"
+                     Style="{DynamicResource AppCaptionTextBlockStyle}"
+                     Text="Loading speech models..."
+                     AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Margin="10,8">
+          <Button Content="−" ToolTip="Zoom out (Ctrl+-)" AutomationProperties.Name="Zoom out"
+                  Width="34" Click="OnZoomOut" />
+          <Button x:Name="ZoomValue" Content="100%" ToolTip="Reset zoom (Ctrl+0)"
+                  AutomationProperties.Name="Reset workbench zoom" MinWidth="64" Click="OnZoomReset" />
+          <Button Content="+" ToolTip="Zoom in (Ctrl++)" AutomationProperties.Name="Zoom in"
+                  Width="34" Click="OnZoomIn" />
+        </StackPanel>
+        <Separator Margin="8,6,8,6" />
+        <Button x:Name="AboutButton"
+                Style="{DynamicResource SettingsMenuButtonStyle}"
+                AutomationProperties.Name="About Koncus Nai">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <TextBlock Style="{DynamicResource AppIconGlyphTextBlockStyle}" FontSize="17" Text="&#xE946;" />
+            <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="{DynamicResource Font.Size.Control}" Text="About" />
+          </Grid>
+        </Button>
+      </StackPanel>
+      </ScrollViewer>
+    </Border>
+  </Grid>
+</UserControl>

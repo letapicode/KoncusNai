@@ -1,0 +1,12 @@
+{
+  "generatedAtUtc": "2026-02-15T00:00:00Z",
+  "executor": "REPLACE_WITH_OPERATOR",
+  "machine": "REPLACE_WITH_MACHINE",
+  "results": [
+    {
+      "key": "windows-terminal-non-admin",
+      "status": "PASS",
+      "evidence": "Inserted test phrase in non-admin Windows Terminal tab at caret."
+    }
+  ]
+}

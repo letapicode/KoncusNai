@@ -1,0 +1,9 @@
+<UserControl x:Class="DictateAnywhere.App.Workbench.WorkbenchChatProgressView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Visibility="Collapsed"
+             IsHitTestVisible="False">
+  <Border Padding="0" Background="Transparent" BorderThickness="0">
+    <StackPanel x:Name="Letters" Orientation="Horizontal" />
+  </Border>
+</UserControl>

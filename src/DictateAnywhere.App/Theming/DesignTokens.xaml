@@ -1,0 +1,66 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+  <SolidColorBrush x:Key="Brush.Text.Primary" Color="#FF111827" />
+  <SolidColorBrush x:Key="Brush.Text.Secondary" Color="#FF6B7280" />
+  <SolidColorBrush x:Key="Brush.Text.Inverse" Color="#FFFFFFFF" />
+  <SolidColorBrush x:Key="Brush.Status.Success" Color="#FF0F5D21" />
+  <SolidColorBrush x:Key="Brush.Status.Warning" Color="#FF5E3E00" />
+  <SolidColorBrush x:Key="Brush.Status.Error" Color="#FF8A2F00" />
+  <SolidColorBrush x:Key="Brush.Surface.Subtle" Color="#FFF5F5F7" />
+  <SolidColorBrush x:Key="Brush.Surface.Canvas" Color="#FFFBF9FC" />
+  <SolidColorBrush x:Key="Brush.Surface.Sidebar" Color="#FFFAF9FB" />
+  <SolidColorBrush x:Key="Brush.Surface.Composer" Color="#FFFFFFFF" />
+  <SolidColorBrush x:Key="Brush.Surface.BlueWash" Color="#FFF6E1D5" />
+  <SolidColorBrush x:Key="Brush.Surface.Base" Color="#FFFFFFFF" />
+  <SolidColorBrush x:Key="Brush.Surface.Elevated" Color="#FFFFFFFF" />
+  <SolidColorBrush x:Key="Brush.Border.Subtle" Color="#FFE5E7EB" />
+  <SolidColorBrush x:Key="Brush.Control.Input" Color="#FFFFFFFF" />
+  <SolidColorBrush x:Key="Brush.Control.InputDisabled" Color="#FFF3F4F6" />
+  <SolidColorBrush x:Key="Brush.Control.Hover" Color="#FFF8FAFC" />
+  <SolidColorBrush x:Key="Brush.Control.Muted" Color="#FFEDEBF0" />
+  <SolidColorBrush x:Key="Brush.Control.Pressed" Color="#FFEFF3F8" />
+  <SolidColorBrush x:Key="Brush.Control.Selection" Color="#FFEFC8B2" />
+  <SolidColorBrush x:Key="Brush.Control.Primary" Color="#FFB74721" />
+  <SolidColorBrush x:Key="Brush.Control.PrimaryHover" Color="#FFA33918" />
+  <SolidColorBrush x:Key="Brush.Control.PrimaryPressed" Color="#FF8C2E13" />
+  <SolidColorBrush x:Key="Brush.Control.Danger" Color="#FFC62828" />
+  <SolidColorBrush x:Key="Brush.Control.DangerHover" Color="#FFB71C1C" />
+  <SolidColorBrush x:Key="Brush.Control.DangerPressed" Color="#FF8E1515" />
+  <SolidColorBrush x:Key="Brush.Progress.Track" Color="#FFE5E7EB" />
+  <SolidColorBrush x:Key="Brush.Progress.Value" Color="#FFB74721" />
+  <SolidColorBrush x:Key="Brush.Scrollbar.Thumb" Color="#FF9CA3AF" />
+  <SolidColorBrush x:Key="Brush.Scrollbar.ThumbHover" Color="#FF6B7280" />
+
+  <Thickness x:Key="Thickness.Window.Margin">14</Thickness>
+  <Thickness x:Key="Thickness.Window.Margin.Large">16</Thickness>
+  <Thickness x:Key="Thickness.Section.Margin">12</Thickness>
+
+  <!-- Updated atomically by AppTextScaleManager from SystemFonts.MessageFontSize. -->
+  <sys:Double x:Key="Font.Scale.WindowsText">1</sys:Double>
+  <sys:Double x:Key="Font.Size.Caption">12</sys:Double>
+  <sys:Double x:Key="Font.Size.FieldLabel">13</sys:Double>
+  <sys:Double x:Key="Font.Size.Body">14</sys:Double>
+  <sys:Double x:Key="Font.Size.BodyComfortable">14</sys:Double>
+  <sys:Double x:Key="Font.Size.Control">14</sys:Double>
+  <sys:Double x:Key="Font.Size.Lead">15</sys:Double>
+  <sys:Double x:Key="Font.Size.Section">16</sys:Double>
+  <sys:Double x:Key="Font.Size.Subheading">20</sys:Double>
+  <sys:Double x:Key="Font.Size.Heading">24</sys:Double>
+  <sys:Double x:Key="Font.Size.Display">28</sys:Double>
+  <sys:Double x:Key="Font.Size.Hero">34</sys:Double>
+  <sys:Double x:Key="Line.Height.Caption">17</sys:Double>
+  <sys:Double x:Key="Line.Height.Body">20</sys:Double>
+  <sys:Double x:Key="Line.Height.Lead">23</sys:Double>
+  <GridLength x:Key="Layout.Workbench.SidebarWidth">292</GridLength>
+  <sys:Double x:Key="Layout.QuickSettings.Width">272</sys:Double>
+  <GridLength x:Key="Layout.Reader.SidebarWidth">320</GridLength>
+  <GridLength x:Key="Layout.Settings.LabelWidth">150</GridLength>
+  <Thickness x:Key="Layout.Settings.ContentIndent">150,0,0,0</Thickness>
+  <Thickness x:Key="Layout.Settings.ContentIndent4">150,4,0,0</Thickness>
+  <Thickness x:Key="Layout.Settings.ContentIndent7">150,7,0,0</Thickness>
+  <Thickness x:Key="Layout.Settings.ContentIndent12">150,12,0,0</Thickness>
+  <Thickness x:Key="Layout.Settings.ContentIndent14">150,14,0,0</Thickness>
+  <GridLength x:Key="Layout.Settings.ValueWidth">360</GridLength>
+  <sys:Int32 x:Key="Layout.Responsive.Columns">2</sys:Int32>
+</ResourceDictionary>

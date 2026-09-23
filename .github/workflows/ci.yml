@@ -1,0 +1,111 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore DictateAnywhere.sln --locked-mode
+
+      - name: Supply-chain Compliance
+        shell: pwsh
+        run: ./scripts/security-compliance.ps1 -OutputPath artifacts/supply-chain-ci/compliance.json
+
+      - name: Documentation Claims
+        shell: pwsh
+        run: ./scripts/validate-documentation-claims.ps1
+
+      - name: Python Dependency Advisories
+        shell: pwsh
+        run: ./scripts/audit-python-advisories.ps1 -OutputPath artifacts/supply-chain-ci/python-advisories.json -FailOnFindings
+
+      - name: Tracked and Bundled Size Budgets
+        shell: pwsh
+        run: ./scripts/validate-size-budgets.ps1
+
+      - name: Build
+        run: dotnet build DictateAnywhere.sln --configuration Release --no-restore
+
+      - name: Validate Production Build Role
+        run: dotnet build DictateAnywhere.Production.slnf --configuration Release --no-restore
+
+      - name: Validate Developer Tool Build Role
+        run: dotnet build DictateAnywhere.DeveloperTools.slnf --configuration Release --no-restore
+
+      - name: Public API and Compiled Dependency Contract
+        shell: pwsh
+        run: ./scripts/validate-public-api.ps1 -NoBuild
+
+      - name: Deterministic Focused Tests
+        shell: pwsh
+        run: ./scripts/run-focused-tests.ps1 -Suite Deterministic -NoBuild
+
+      - name: Deterministic Coverage Threshold Gate
+        shell: pwsh
+        run: ./scripts/run-coverage-gate.ps1 -NoBuild -OutputDirectory artifacts/coverage-ci
+
+      - name: Controlled Fault-Seed Gate
+        shell: pwsh
+        run: ./scripts/run-controlled-fault-seeds.ps1 -OutputDirectory artifacts/controlled-fault-seeds-ci
+
+      - name: Upload Coverage and Fault Evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-and-fault-evidence
+          path: |
+            artifacts/coverage-ci
+            artifacts/controlled-fault-seeds-ci
+            artifacts/supply-chain-ci
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Test
+        run: dotnet test DictateAnywhere.sln --configuration Release --no-build --maxcpucount:1 --logger "trx;LogFileName=test-results.trx"
+
+      - name: Performance Regression Check
+        shell: pwsh
+        run: ./scripts/run-performance-regression.ps1 -OutputDirectory artifacts/performance-ci -ReportPath docs/release/performance-regression-ci-report.md
+
+      - name: Milestone 2 Reliability Regression
+        shell: pwsh
+        run: ./scripts/run-milestone2-reliability.ps1 -SoakIterations 3 -OutputDirectory artifacts/milestone2-ci -ReportPath docs/release/milestone-2-reliability-ci-report.md
+
+      - name: Fault Injection Scenarios
+        shell: pwsh
+        run: ./scripts/run-fault-injection.ps1 -OutputDirectory artifacts/fault-injection-ci -ReportPath docs/release/fault-injection-ci-report.md
+
+      - name: Compatibility Gate Contract Check
+        shell: pwsh
+        run: ./scripts/run-compatibility-gate.ps1 -OutputDirectory artifacts/compatibility-ci -ReportPath docs/release/compatibility-gate-ci-report.md -ReleaseLine 1.x
+
+      - name: Milestone 3 Elevated Static Acceptance
+        shell: pwsh
+        run: ./scripts/run-milestone3-elevated-acceptance.ps1 -OutputDirectory artifacts/milestone3-ci -ReportPath docs/release/milestone-3-elevated-acceptance-ci-report.md
+
+      - name: Packaging Smoke Check
+        shell: pwsh
+        run: ./scripts/packaging-smoke.ps1
+
+      - name: Installer Upgrade Compatibility Check
+        shell: pwsh
+        run: ./scripts/installer-upgrade-compatibility.ps1

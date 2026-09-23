@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible Koncus Nai problem without private data
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not paste tokens, transcripts, recordings, history, OAuth files, or unreviewed diagnostic logs. Use private vulnerability reporting for security issues.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: Commit hash or pre-release version
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Dictation
+        - Chat
+        - Reading Studio
+        - Models and downloads
+        - Installation and run-kn
+        - Settings and history
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Replace private text, filenames, and paths with safe placeholders.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed credentials, transcripts, recordings, history, OAuth data, usernames, and private local paths.
+          required: true

@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="$(var.ProductName)"
+    Manufacturer="$(var.Manufacturer)"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="$(var.UpgradeCode)"
+    Scope="perMachine"
+    Language="1033"
+    InstallerVersion="500">
+
+    <SummaryInformation Description="Koncus Nai local AI assistant." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="KoncusNaiProductIcon" SourceFile="$(var.BrandIcon)" />
+    <Property Id="ARPPRODUCTICON" Value="KoncusNaiProductIcon" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Koncus Nai is already installed." />
+
+    <!-- Fresh installs stay disabled; upgrades/repairs retain the user's Run entry.
+         Explicit STARTUP_ON_LOGIN=0 or =1 always overrides automatic preservation. -->
+    <Property Id="STARTUP_ON_LOGIN" Value="auto" Secure="yes" />
+    <Property Id="NILO_PREVIOUS_STARTUP" Secure="yes">
+      <RegistrySearch Id="ExistingStartupRegistration" Root="HKCU"
+                      Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                      Name="DictateAnywhere" Type="raw" />
+    </Property>
+    <Property Id="ENABLE_UIACCESS" Value="$(var.EnableUiAccess)" Secure="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="DictateAnywhere" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="PROGRAMMENU_DICTATEANYWHERE" Name="Koncus Nai" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="COMMONAPPDATA_DICTATEANYWHERE" Name="DictateAnywhere" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="LOCALAPPDATA_DICTATEANYWHERE" Name="DictateAnywhere" />
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="$(var.ProductName)" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="CommonDataDirectoryComponent" />
+      <ComponentRef Id="LocalDataDirectoryComponent" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+      <ComponentRef Id="StartupOnLoginComponent" />
+      <ComponentRef Id="UiAccessModeComponent" />
+      <ComponentRef Id="RunKnRegistrationComponent" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <Component Id="RunKnRegistrationComponent" Directory="INSTALLFOLDER" Guid="{04E969C0-B50B-4906-BDAE-A551AC69CE6C}">
+      <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\run-kn.exe"
+                     Type="string" Value="[INSTALLFOLDER]DictateAnywhere.App.exe" KeyPath="yes" />
+      <Environment Id="RunKnCommandPath" Name="PATH" Value="[INSTALLFOLDER]Launchers"
+                   Action="set" Part="last" System="yes" Permanent="no" />
+    </Component>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PublishDir)\**" />
+    </ComponentGroup>
+  </Fragment>
+
+  <Fragment>
+    <Component
+      Id="CommonDataDirectoryComponent"
+      Directory="COMMONAPPDATA_DICTATEANYWHERE"
+      Guid="{E48FC174-43A2-4AC1-BB9A-EAA3C45594EC}"
+      Permanent="yes">
+      <CreateFolder />
+      <RegistryValue
+        Root="HKLM"
+        Key="Software\DictateAnywhere"
+        Name="CommonDataPath"
+        Type="string"
+        Value="[COMMONAPPDATA_DICTATEANYWHERE]"
+        KeyPath="yes" />
+    </Component>
+
+    <Component
+      Id="LocalDataDirectoryComponent"
+      Directory="LOCALAPPDATA_DICTATEANYWHERE"
+      Guid="{AC393C37-5FE4-4E71-905C-5E2A24A95FC9}"
+      Permanent="yes">
+      <CreateFolder />
+      <RegistryValue
+        Root="HKCU"
+        Key="Software\DictateAnywhere"
+        Name="LocalDataPath"
+        Type="string"
+        Value="[LOCALAPPDATA_DICTATEANYWHERE]"
+        KeyPath="yes" />
+    </Component>
+
+    <Component
+      Id="StartMenuShortcutComponent"
+      Directory="PROGRAMMENU_DICTATEANYWHERE"
+      Guid="{A872B528-B0E0-4A24-87B7-5D21A7F29148}">
+      <!-- The shortcut has a new physical path. The old component is removed by MajorUpgrade. -->
+      <Shortcut
+        Id="DictateAnywhereStartMenuShortcut"
+        Name="Koncus Nai"
+        Icon="KoncusNaiProductIcon"
+        IconIndex="0"
+        Target="[INSTALLFOLDER]DictateAnywhere.App.exe"
+        WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveProgramMenuFolder" On="uninstall" />
+      <RegistryValue
+        Root="HKCU"
+        Key="Software\DictateAnywhere"
+        Name="KoncusNaiStartMenuShortcut"
+        Type="integer"
+        Value="1"
+        KeyPath="yes" />
+    </Component>
+
+    <Component
+      Id="StartupOnLoginComponent"
+      Directory="INSTALLFOLDER"
+      Guid="{8EFA5FC6-BB70-45FB-993D-8DF940E735B3}"
+      Transitive="yes"
+      Condition="STARTUP_ON_LOGIN=1 OR (STARTUP_ON_LOGIN=&quot;auto&quot; AND (WIX_UPGRADE_DETECTED OR Installed) AND NILO_PREVIOUS_STARTUP)">
+      <RegistryValue
+        Root="HKCU"
+        Key="Software\Microsoft\Windows\CurrentVersion\Run"
+        Name="DictateAnywhere"
+        Type="string"
+        Value="&quot;[INSTALLFOLDER]DictateAnywhere.App.exe&quot; --background"
+        KeyPath="yes" />
+    </Component>
+
+    <Component
+      Id="UiAccessModeComponent"
+      Directory="INSTALLFOLDER"
+      Guid="{D743E0A6-12DA-490E-89FD-37DA0A698D2A}"
+      Condition="ENABLE_UIACCESS=1">
+      <RegistryValue
+        Root="HKLM"
+        Key="Software\DictateAnywhere"
+        Name="UiAccessEnabled"
+        Type="integer"
+        Value="1"
+        KeyPath="yes" />
+      <RegistryValue
+        Root="HKLM"
+        Key="Software\DictateAnywhere"
+        Name="UiAccessHelperExecutable"
+        Type="string"
+        Value="$(var.UiAccessHelperExecutable)" />
+    </Component>
+  </Fragment>
+</Wix>

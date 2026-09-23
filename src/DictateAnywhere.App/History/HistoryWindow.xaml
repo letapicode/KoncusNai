@@ -1,0 +1,144 @@
+<Window x:Class="DictateAnywhere.App.History.HistoryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        FontFamily="Segoe UI" FontSize="{DynamicResource Font.Size.Control}"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        Title="Dictation History"
+        Width="980"
+        Height="650"
+        MinWidth="760"
+        MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.Surface.Canvas}"
+        Foreground="{DynamicResource Brush.Text.Primary}"
+        Loaded="OnLoaded"
+        Closed="OnClosed">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="44"
+                        ResizeBorderThickness="6"
+                        CornerRadius="16"
+                        GlassFrameThickness="0"
+                        UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+
+  <Window.Resources>
+    <Style x:Key="SubtleLabelStyle" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+      <Setter Property="FontSize" Value="{DynamicResource Font.Size.Body}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </Window.Resources>
+
+  <Grid Background="{DynamicResource Brush.Surface.Canvas}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="44" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Grid Grid.Row="0" presentation:WindowDragRegionBehavior.IsEnabled="True">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Margin="20,0,0,0"
+                 VerticalAlignment="Center"
+                 FontSize="{DynamicResource Font.Size.Control}"
+                 FontWeight="SemiBold"
+                 Text="Dictation History" />
+      <presentation:WindowCaptionButtons Grid.Column="1" ContextTitle="Dictation History" />
+    </Grid>
+
+    <Grid Grid.Row="1" Margin="20,12,20,20">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="300" />
+        <ColumnDefinition Width="1" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Grid Grid.Column="0" Margin="0,0,18,0">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBox x:Name="HistorySearchTextBox"
+                 Style="{DynamicResource AppSearchTextBoxStyle}" MinHeight="38"
+                 Margin="0,0,0,12"
+                 Padding="9,4"
+                 TextChanged="OnHistorySearchTextChanged"
+                 ToolTip="Search dictation history"
+                 AutomationProperties.Name="Search dictation history" />
+        <ListBox x:Name="HistoryListBox" ItemContainerStyle="{DynamicResource AppHistoryListBoxItemStyle}"
+                 Grid.Row="1"
+                 BorderThickness="0"
+                 Background="Transparent"
+                 DisplayMemberPath="Title"
+                 SelectionChanged="OnHistorySelectionChanged"
+                 AutomationProperties.Name="Dictation history entries" />
+        <TextBlock x:Name="HistoryStatusTextBlock"
+                   Grid.Row="2"
+                   Margin="2,12,2,0"
+                   Style="{StaticResource SubtleLabelStyle}"
+                   AutomationProperties.LiveSetting="Polite" />
+      </Grid>
+
+      <Border Grid.Column="1" Background="{DynamicResource Brush.Border.Subtle}" />
+
+      <Grid Grid.Column="2" Margin="20,0,0,0" MaxWidth="820">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid Margin="0,0,0,12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock x:Name="ActionStatusTextBlock"
+                     VerticalAlignment="Center"
+                     Style="{StaticResource SubtleLabelStyle}"
+                     Text="Select a saved entry."
+                     AutomationProperties.LiveSetting="Polite" />
+          <StackPanel Grid.Column="1"
+                      Orientation="Horizontal"
+                      HorizontalAlignment="Right">
+            <Button x:Name="CopyButton" Style="{StaticResource AppPrimaryActionButtonStyle}" Content="Copy" Margin="0,0,8,0"
+                    Click="OnCopyClicked" AutomationProperties.Name="Copy dictation text" />
+            <Button x:Name="SaveEditsButton"
+                    Style="{StaticResource AppActionButtonStyle}"
+                    Click="OnSaveEditsClicked"
+                    Content="Save"
+                    AutomationProperties.Name="Save dictation changes" />
+            <Button x:Name="DeleteButton"
+                    Margin="8,0,0,0"
+                    Style="{StaticResource AppActionButtonStyle}"
+                    Click="OnDeleteClicked"
+                    Content="Delete"
+                    AutomationProperties.Name="Delete selected dictation" />
+          </StackPanel>
+        </Grid>
+        <TextBox x:Name="TranscriptTextBox"
+                 Grid.Row="1"
+                 Padding="14"
+                 FontSize="{DynamicResource Font.Size.Lead}"
+                 BorderBrush="{DynamicResource Brush.Border.Subtle}"
+                 Background="{DynamicResource Brush.Surface.Base}"
+                 TextChanged="OnTranscriptTextChanged"
+                 TextWrapping="Wrap"
+                 AcceptsReturn="True"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Disabled"
+                 AutomationProperties.Name="Selected dictation text" />
+      </Grid>
+    </Grid>
+
+    <Border x:Name="HighContrastWindowBoundary"
+            Grid.RowSpan="2"
+            CornerRadius="16"
+            Style="{StaticResource AppHighContrastWindowBoundaryStyle}" />
+  </Grid>
+</Window>

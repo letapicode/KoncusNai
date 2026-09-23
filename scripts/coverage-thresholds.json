@@ -1,0 +1,37 @@
+{
+  "expectedReportCount": 12,
+  "aggregate": {
+    "minimumLinePercent": 62.5,
+    "minimumBranchPercent": 53.0
+  },
+  "criticalTargets": [
+    {
+      "name": "Legacy settings migration",
+      "assembly": "DictateAnywhere.Settings",
+      "path": "DictateAnywhere.Settings/Migrations/LegacySettingsReader.cs",
+      "minimumLinePercent": 89.0,
+      "minimumBranchPercent": 84.0
+    },
+    {
+      "name": "Current settings policy",
+      "assembly": "DictateAnywhere.Core",
+      "path": "DictateAnywhere.Core/Services/CurrentSettingsPolicy.cs",
+      "minimumLinePercent": 100.0,
+      "minimumBranchPercent": 100.0
+    },
+    {
+      "name": "Sensitive diagnostics redaction",
+      "assembly": "DictateAnywhere.Diagnostics",
+      "path": "DictateAnywhere.Diagnostics/SensitiveDiagnosticsRedactor.cs",
+      "minimumLinePercent": 92.0,
+      "minimumBranchPercent": 89.0
+    },
+    {
+      "name": "Model snapshot recovery",
+      "assembly": "DictateAnywhere.Models",
+      "path": "DictateAnywhere.Models/HuggingFaceSnapshotModelManager.cs",
+      "minimumLinePercent": 40.0,
+      "minimumBranchPercent": 42.0
+    }
+  ]
+}

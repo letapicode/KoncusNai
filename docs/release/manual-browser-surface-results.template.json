@@ -1,0 +1,142 @@
+{
+  "generatedAtUtc": "2026-04-26T00:00:00Z",
+  "executor": "REPLACE_WITH_OPERATOR",
+  "machine": "REPLACE_WITH_MACHINE",
+  "results": [
+    {
+      "key": "global-toggle-chrome-url-bar",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-google-search-box",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-chatgpt-search-mode",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-chatgpt-prompt",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-gemini-prompt",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-claude-prompt",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-chrome-browser-chrome",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-edge-url-bar",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-edge-search-field",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-edge-browser-chrome",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-windsurf-ide",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-windsurf-terminal",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-windsurf-command-palette",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-sticky-notes",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    },
+    {
+      "key": "global-toggle-antigravity-ide",
+      "status": "MANUAL_REQUIRED",
+      "hotkeyOutcome": "REPLACE_WITH_started_reserved_leaked_or_focus-drifted",
+      "insertionOutcome": "REPLACE_WITH_paste_typing_blocked_or_not-applicable",
+      "overlayOutcome": "REPLACE_WITH_visible_hidden_wrong-surface_or_not-applicable",
+      "latencyNotes": "REPLACE_WITH_SHORT_LATENCY_NOTE",
+      "evidence": "REPLACE_WITH_EVIDENCE_INCLUDE_VISIBLE_RESULT_OR_DETERMINISTIC_REASON"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+<UserControl x:Class="DictateAnywhere.App.Workbench.WorkbenchInlineSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource Brush.Surface.Canvas}"
+             Visibility="Collapsed">
+  <Grid>
+    <ContentControl x:Name="PanelHost" />
+
+    <Grid x:Name="LoadingState"
+          Background="{DynamicResource Brush.Surface.Canvas}"
+          Focusable="True"
+          AutomationProperties.Name="Settings loading"
+          Visibility="Collapsed">
+      <StackPanel Width="340"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center">
+        <TextBlock Margin="0,0,0,14"
+                   HorizontalAlignment="Center"
+                   Foreground="{DynamicResource Brush.Text.Primary}"
+                   FontSize="{DynamicResource Font.Size.Subheading}"
+                   FontWeight="SemiBold"
+                   Text="Opening settings..." />
+        <ProgressBar x:Name="InlineLoadingProgress"
+                     Width="240"
+                     Height="4"
+                     BorderThickness="0"
+                     Background="{DynamicResource Brush.Control.Muted}"
+                     Foreground="{DynamicResource Brush.Control.Primary}"
+                     IsIndeterminate="True"
+                     AutomationProperties.Name="Loading settings progress" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</UserControl>

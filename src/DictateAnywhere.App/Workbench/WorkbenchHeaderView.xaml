@@ -1,0 +1,69 @@
+<UserControl x:Class="DictateAnywhere.App.Workbench.WorkbenchHeaderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0"
+                Orientation="Horizontal"
+                VerticalAlignment="Center">
+      <TextBox x:Name="ChatTitle"
+               Width="260"
+               MinHeight="32"
+               Padding="9,4"
+               BorderBrush="Transparent"
+               Background="Transparent"
+               FontSize="{DynamicResource Font.Size.Lead}"
+               Visibility="Collapsed"
+               ToolTip="Chat title"
+               AutomationProperties.Name="Chat title" />
+      <Border x:Name="ChatStatus"
+              Margin="10,0,0,0"
+              Style="{DynamicResource AppStatusPillBorderStyle}"
+              Visibility="Collapsed">
+        <TextBlock x:Name="ChatStatusText"
+                   Style="{DynamicResource SubtleLabelStyle}"
+                   Text="Choose or download a model before sending."
+                   AutomationProperties.LiveSetting="Polite" />
+      </Border>
+      <TextBlock x:Name="SelectionMetadata"
+                 Margin="12,0,0,0"
+                 VerticalAlignment="Center"
+                 Style="{DynamicResource SubtleLabelStyle}"
+                 Visibility="Collapsed"
+                 AutomationProperties.LiveSetting="Polite" />
+    </StackPanel>
+
+    <WrapPanel Grid.Column="1"
+               VerticalAlignment="Center"
+               HorizontalAlignment="Right">
+      <Button x:Name="NewSession"
+              Visibility="Collapsed"
+              Style="{DynamicResource WorkbenchToolbarButtonStyle}"
+              ToolTip="New dictation session"
+              AutomationProperties.Name="New dictation session">
+        <TextBlock Style="{DynamicResource AppIconGlyphTextBlockStyle}"
+                   Text="&#xE710;" />
+      </Button>
+      <Button x:Name="SaveHistoryEdits"
+              Visibility="Collapsed"
+              Style="{DynamicResource WorkbenchToolbarButtonStyle}"
+              ToolTip="Save dictation history edits"
+              AutomationProperties.Name="Save dictation history edits">
+        <TextBlock Style="{DynamicResource AppIconGlyphTextBlockStyle}"
+                   Text="&#xE74E;" />
+      </Button>
+      <Button x:Name="DeleteHistorySession"
+              Visibility="Collapsed"
+              Style="{DynamicResource WorkbenchDangerToolbarButtonStyle}"
+              ToolTip="Delete selected dictation"
+              AutomationProperties.Name="Delete selected dictation">
+        <TextBlock Style="{DynamicResource AppIconGlyphTextBlockStyle}"
+                   Text="&#xE74D;" />
+      </Button>
+    </WrapPanel>
+  </Grid>
+</UserControl>

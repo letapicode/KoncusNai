@@ -1,0 +1,110 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>DictateAnywhere.App</RootNamespace>
+    <AssemblyName>DictateAnywhere.App</AssemblyName>
+    <Product>Koncus Nai</Product>
+    <AssemblyTitle>Koncus Nai</AssemblyTitle>
+    <Description>Koncus Nai local AI assistant</Description>
+    <ApplicationIcon>Assets\Brand\KoncusNai.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="Launchers\run-kn.cmd" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\LICENSE"
+             Condition="Exists('..\..\LICENSE')"
+             Link="legal\LICENSE"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\MODEL_LICENSES.md"
+             Link="legal\MODEL_LICENSES.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\THIRD_PARTY_NOTICES.md"
+             Link="legal\THIRD_PARTY_NOTICES.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\PRIVACY.md"
+             Link="legal\PRIVACY.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\DISCLAIMER.md"
+             Link="legal\DISCLAIMER.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\SECURITY.md"
+             Link="legal\SECURITY.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\licenses\CrisperWhisper-2.0-LICENSE.md"
+             Link="legal\third-party\CrisperWhisper-2.0-LICENSE.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\licenses\Ollama-Gemma4-e4b-LICENSE.txt"
+             Link="legal\third-party\Ollama-Gemma4-e4b-LICENSE.txt"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Assets\Brand\KoncusNai.ico" LogicalName="KoncusNai.TrayIcon" />
+    <Resource Include="Assets\Brand\KoncusNai.ico" />
+    <Resource Include="Assets\Brand\koncus-nai-32.png" />
+    <Resource Include="Assets\Brand\koncus-nai-256.png" />
+    <Resource Include="Assets\Fonts\**\*.ttf" />
+    <None Update="Assets\Fonts\**\OFL.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="UglyToad.PdfPig" />
+    <PackageReference Include="Markdig" />
+    <PackageReference Include="PDFtoImage" />
+    <PackageReference Include="Google.Apis.YouTube.v3" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DictateAnywhere.Core\DictateAnywhere.Core.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Hotkeys\DictateAnywhere.Hotkeys.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Audio\DictateAnywhere.Audio.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Inference\DictateAnywhere.Inference.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Insertion\DictateAnywhere.Insertion.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Overlay\DictateAnywhere.Overlay.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Settings\DictateAnywhere.Settings.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Models\DictateAnywhere.Models.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Diagnostics\DictateAnywhere.Diagnostics.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Benchmark\DictateAnywhere.Benchmark.csproj" />
+    <ProjectReference Include="..\DictateAnywhere.Platform.Windows\DictateAnywhere.Platform.Windows.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\scripts\local-models\cohere_transcribe_worker.py;
+                   ..\..\scripts\local-models\crisperwhisper_transcribe_worker.py;
+                   ..\..\scripts\local-models\gemma_chat_worker.py;
+                   ..\..\scripts\local-models\indic_hindi_ctc_align_worker.py;
+                   ..\..\scripts\local-models\indic_parler_tts_worker.py;
+                   ..\..\scripts\local-models\kala_nepali_tts_worker.py;
+                   ..\..\scripts\local-models\kokoro_tts_worker.py;
+                   ..\..\scripts\local-models\rapidocr_worker.py;
+                   ..\..\scripts\local-models\download_snapshot.py;
+                   ..\..\scripts\local-models\model-snapshot-provenance.json;
+                   ..\..\scripts\local-models\requirements.txt;
+                   ..\..\scripts\local-models\requirements-lock.txt;
+                   ..\..\scripts\local-models\requirements-kokoro.txt;
+                   ..\..\scripts\local-models\requirements-kokoro-lock.txt;
+                   ..\..\scripts\local-models\requirements-indic-parler.txt;
+                   ..\..\scripts\local-models\requirements-indic-parler-lock.txt;
+                   ..\..\scripts\local-models\requirements-indic-parler-torch-cpu-lock.txt;
+                   ..\..\scripts\local-models\requirements-indic-parler-torch-cuda-lock.txt"
+          Condition="Exists('..\..\scripts\local-models')"
+          LinkBase="local-models"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\scripts\setup-indic-parler-runtime.ps1"
+          Link="setup-indic-parler-runtime.ps1"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\third_party\compat\**\*"
+          Link="compat\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\scripts\stop-notype.ps1"
+          Link="stop-notype.ps1"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
