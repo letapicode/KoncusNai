@@ -18,6 +18,7 @@ public sealed class CrisperWhisperTranscriptionService : ITranscriptionService, 
 {
   private readonly CrisperWhisperTranscriptionOptions options;
   private readonly IPersistentWorkerClientFactory workerClientFactory;
+  private IDiagnostics? diagnostics;
   private readonly SemaphoreSlim clientSync = new(1, 1);
   private readonly object backgroundWarmUpSync = new();
   private readonly CancellationTokenSource backgroundWarmUpCancellationSource = new();
@@ -28,16 +29,18 @@ public sealed class CrisperWhisperTranscriptionService : ITranscriptionService, 
   private bool disposed;
 
   public CrisperWhisperTranscriptionService(CrisperWhisperTranscriptionOptions options)
-    : this(options, workerClientFactory: null)
+    : this(options, workerClientFactory: null, diagnostics: null)
   {
   }
 
   internal CrisperWhisperTranscriptionService(
     CrisperWhisperTranscriptionOptions options,
-    IPersistentWorkerClientFactory? workerClientFactory)
+    IPersistentWorkerClientFactory? workerClientFactory,
+    IDiagnostics? diagnostics = null)
   {
     this.options = options ?? throw new ArgumentNullException(nameof(options));
     this.workerClientFactory = workerClientFactory ?? new PersistentPythonWorkerClientFactory();
+    this.diagnostics = diagnostics;
   }
 
   public string ProviderId => options.ProviderId;
@@ -49,6 +52,7 @@ public sealed class CrisperWhisperTranscriptionService : ITranscriptionService, 
   public void WarmUpInBackground(string modelId, IDiagnostics? diagnostics = null)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
+    this.diagnostics ??= diagnostics;
     if (string.IsNullOrWhiteSpace(modelId))
     {
       return;
@@ -113,17 +117,37 @@ public sealed class CrisperWhisperTranscriptionService : ITranscriptionService, 
     string normalizedModelId = NormalizeModelId(modelId);
     try
     {
+      Stopwatch totalStopwatch = Stopwatch.StartNew();
+      Stopwatch workerReadyStopwatch = Stopwatch.StartNew();
       IPersistentWorkerClient worker = await GetOrCreateStartedClientAsync(normalizedModelId, cancellationToken)
         .ConfigureAwait(false);
+      workerReadyStopwatch.Stop();
+      Stopwatch audioPreparationStopwatch = Stopwatch.StartNew();
       using CohereAudioRequestFile preparedAudio = CohereAudioRequestFile.Create(
         audio,
         Path.Combine(Path.GetTempPath(), "DictateAnywhere", "crisperwhisper"));
+      audioPreparationStopwatch.Stop();
       Stopwatch stopwatch = Stopwatch.StartNew();
       CrisperWhisperResponse response = await worker.InvokeAsync<CrisperWhisperResponse>(
         new CrisperWhisperRequest(preparedAudio.FilePath, options.Language, options.Mode),
         options.RequestTimeout,
         cancellationToken).ConfigureAwait(false);
       stopwatch.Stop();
+      totalStopwatch.Stop();
+
+      if (diagnostics is IStructuredDiagnostics structuredDiagnostics)
+      {
+        structuredDiagnostics.Info("CrisperWhisper transcription timing completed.",
+          new Dictionary<string, object?>
+          {
+            ["providerId"] = ProviderId,
+            ["modelId"] = normalizedModelId,
+            ["workerReadyMs"] = Math.Round(workerReadyStopwatch.Elapsed.TotalMilliseconds, 2),
+            ["audioPreparationMs"] = Math.Round(audioPreparationStopwatch.Elapsed.TotalMilliseconds, 2),
+            ["invokeMs"] = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 2),
+            ["totalMs"] = Math.Round(totalStopwatch.Elapsed.TotalMilliseconds, 2),
+          });
+      }
 
       return TranscriptionResultNormalizer.Normalize(
         new TranscriptionResult(response.Text, normalizedModelId, stopwatch.Elapsed),
@@ -183,6 +207,7 @@ public sealed class CrisperWhisperTranscriptionService : ITranscriptionService, 
     await clientSync.WaitAsync(cancellationToken).ConfigureAwait(false);
     try
     {
+      bool createdNewClient = false;
       if (client is null || !string.Equals(currentModelPath, modelPath, StringComparison.OrdinalIgnoreCase))
       {
         if (client is not null)
@@ -196,9 +221,23 @@ public sealed class CrisperWhisperTranscriptionService : ITranscriptionService, 
           $"--model-dir \"{modelPath}\"",
           options.WorkerStartupTimeout);
         currentModelPath = modelPath;
+        createdNewClient = true;
       }
 
+      Stopwatch startupStopwatch = Stopwatch.StartNew();
       await client.StartAsync(cancellationToken).ConfigureAwait(false);
+      startupStopwatch.Stop();
+      if (diagnostics is IStructuredDiagnostics structuredDiagnostics)
+      {
+        structuredDiagnostics.Info("CrisperWhisper worker ready.",
+          new Dictionary<string, object?>
+          {
+            ["providerId"] = ProviderId,
+            ["modelId"] = modelId,
+            ["workerColdStart"] = createdNewClient,
+            ["workerStartupMs"] = Math.Round(startupStopwatch.Elapsed.TotalMilliseconds, 2),
+          });
+      }
       return client;
     }
     catch

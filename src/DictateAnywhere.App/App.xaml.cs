@@ -139,7 +139,6 @@ public partial class App : Application
         applicationHost.CurrentReadiness,
         startupRegistrationService.IsEnabled());
       await RefreshTrayModelsAsync().ConfigureAwait(true);
-      await RefreshModelReadinessAsync(settings).ConfigureAwait(true);
       await RestartProductivityHotkeysAsync(settings).ConfigureAwait(true);
       bool runtimeStarted = await StartSelectedExperienceAsync(settings, showWorkbench: !AppLaunchOptions.IsBackgroundLaunch(e.Args)).ConfigureAwait(true);
       ShowPendingRuntimeNotice();
@@ -585,17 +584,6 @@ public partial class App : Application
     IReadOnlyList<ModelInfo> models = await modelManager.GetModelsAsync().ConfigureAwait(true);
     AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
     trayCommandCoordinator.SetModelMenu(models, settings.GetConfiguredTranscriptionSelection());
-  }
-
-  private async Task RefreshModelReadinessAsync(AppSettings settings)
-  {
-    if (applicationHost is null || trayCommandCoordinator is null)
-    {
-      return;
-    }
-
-    await applicationHost.RefreshReadinessAsync(settings).ConfigureAwait(true);
-    trayCommandCoordinator.SetModelReadiness(applicationHost.CurrentReadiness);
   }
 
   private Task RestartProductivityHotkeysAsync(AppSettings settings)

@@ -17,6 +17,7 @@ public sealed class FaultTolerantOverlayService : IOverlayService, IAsyncDisposa
   private readonly IOverlayService inner;
   private readonly IDiagnostics diagnostics;
   private readonly TimeSpan operationTimeout;
+  private readonly TimeProvider timeProvider;
   private readonly object lateOperationSync = new();
   private Task lateOperationObservation = Task.CompletedTask;
   private bool disposed;
@@ -25,10 +26,20 @@ public sealed class FaultTolerantOverlayService : IOverlayService, IAsyncDisposa
     IOverlayService inner,
     IDiagnostics diagnostics,
     TimeSpan? operationTimeout = null)
+    : this(inner, diagnostics, operationTimeout, TimeProvider.System)
+  {
+  }
+
+  internal FaultTolerantOverlayService(
+    IOverlayService inner,
+    IDiagnostics diagnostics,
+    TimeSpan? operationTimeout,
+    TimeProvider timeProvider)
   {
     this.inner = inner ?? throw new ArgumentNullException(nameof(inner));
     this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
     this.operationTimeout = operationTimeout ?? DefaultOperationTimeout;
+    this.timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     if (this.operationTimeout <= TimeSpan.Zero)
     {
       throw new ArgumentOutOfRangeException(nameof(operationTimeout), "Overlay operation timeout must be greater than zero.");
@@ -71,7 +82,7 @@ public sealed class FaultTolerantOverlayService : IOverlayService, IAsyncDisposa
 
     try
     {
-      await pendingLateOperations.WaitAsync(operationTimeout).ConfigureAwait(false);
+      await pendingLateOperations.WaitAsync(operationTimeout, timeProvider).ConfigureAwait(false);
     }
     catch (TimeoutException)
     {
@@ -80,7 +91,16 @@ public sealed class FaultTolerantOverlayService : IOverlayService, IAsyncDisposa
 
     if (inner is IAsyncDisposable asyncDisposable)
     {
-      await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+      Task innerDisposal = asyncDisposable.DisposeAsync().AsTask();
+      try
+      {
+        await innerDisposal.WaitAsync(operationTimeout, timeProvider).ConfigureAwait(false);
+      }
+      catch (TimeoutException)
+      {
+        TrackLateOperation(innerDisposal, "dispose");
+        diagnostics.Warning("Overlay disposal timed out; teardown will continue.");
+      }
     }
     else if (inner is IDisposable disposable)
     {
@@ -98,14 +118,20 @@ public sealed class FaultTolerantOverlayService : IOverlayService, IAsyncDisposa
     CancellationToken cancellationToken)
   {
     cancellationToken.ThrowIfCancellationRequested();
-    using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-    timeoutCts.CancelAfter(operationTimeout);
+    using CancellationTokenSource timeoutSource = new(operationTimeout, timeProvider);
+    using CancellationTokenSource timeoutCts =
+      CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
 
     Task? operation = null;
     try
     {
       operation = operationFactory(timeoutCts.Token);
-      await operation.WaitAsync(operationTimeout, cancellationToken).ConfigureAwait(false);
+      await operation.WaitAsync(operationTimeout, timeProvider, cancellationToken).ConfigureAwait(false);
+    }
+    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+    {
+      TrackLateOperation(operation, operationName);
+      throw;
     }
     catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
     {

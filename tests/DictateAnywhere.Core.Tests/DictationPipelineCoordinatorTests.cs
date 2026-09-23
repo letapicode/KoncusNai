@@ -139,7 +139,13 @@ public sealed class DictationPipelineCoordinatorTests
       entry => entry.Message == "Dictation stop-to-visible timing completed.");
     Xunit.Assert.Equal("cohere-local", timing["providerId"]);
     Xunit.Assert.Equal(nameof(InsertionOutcome.VerifiedInserted), timing["insertionOutcome"]);
+    Xunit.Assert.True((double)timing["transcribingOverlayMs"]! >= 0);
     Xunit.Assert.True((double)timing["stopToVisibleMs"]! >= 0);
+    (string _, IReadOnlyDictionary<string, object?> recording) = Xunit.Assert.Single(
+      diagnostics.StructuredInfo,
+      entry => entry.Message == "Recording started.");
+    Xunit.Assert.True((double)recording["recordingOverlayMs"]! >= 0);
+    Xunit.Assert.True((double)recording["captureStartMs"]! >= 0);
   }
 
   [Xunit.Fact]

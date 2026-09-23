@@ -368,7 +368,9 @@
         "DictateAnywhere.UiAccessHelper",
         "DictateAnywhere.VoicePreviewGenerator"
       ],
-      "friends": [],
+      "friends": [
+        "DictateAnywhere.Core.Tests"
+      ],
       "declaredProjectReferences": [],
       "directPackages": [],
       "compiledReferences": [

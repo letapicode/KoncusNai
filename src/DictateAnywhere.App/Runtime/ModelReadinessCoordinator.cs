@@ -74,12 +74,13 @@ public sealed class ModelReadinessCoordinator : IModelReadinessSession
         .ConfigureAwait(false);
       Publish(new ModelReadinessSnapshot(entries, DateTimeOffset.UtcNow));
 
-      warmupCts = new CancellationTokenSource();
+      CancellationTokenSource sessionWarmupCts = new();
+      warmupCts = sessionWarmupCts;
       List<Task> startedTasks = new();
       foreach (ModelReadinessEntry entry in entries.Where(entry => entry.State == ModelReadinessState.Pending))
       {
         startedTasks.Add(Task.Run(
-          () => WarmModelAsync(entry, warmupCts.Token),
+          () => WarmModelAsync(entry, sessionWarmupCts.Token),
           CancellationToken.None));
       }
 
@@ -196,6 +197,11 @@ public sealed class ModelReadinessCoordinator : IModelReadinessSession
     Justification = "Background readiness failures must update tray state without crashing the app.")]
   private async Task WarmModelAsync(ModelReadinessEntry entry, CancellationToken cancellationToken)
   {
+    if (cancellationToken.IsCancellationRequested)
+    {
+      return;
+    }
+
     UpdateEntry(entry.ProviderId, entry.ModelId, ModelReadinessState.Warming, null, null);
     Stopwatch stopwatch = Stopwatch.StartNew();
 

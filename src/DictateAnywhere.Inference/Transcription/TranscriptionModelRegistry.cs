@@ -65,7 +65,7 @@ public sealed class TranscriptionModelRegistry
     return new TranscriptionModelRegistry(
     [
       new CohereTranscriptionService(cohereOptions, diagnostics),
-      new CrisperWhisperTranscriptionService(crisperWhisperOptions),
+      new CrisperWhisperTranscriptionService(crisperWhisperOptions, workerClientFactory: null, diagnostics),
     ]);
   }
 }

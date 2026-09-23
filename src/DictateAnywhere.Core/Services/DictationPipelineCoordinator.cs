@@ -335,6 +335,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
       diagnostics.Info("Chunked transcription session started.");
     }
 
+    Stopwatch recordingOverlayStopwatch = Stopwatch.StartNew();
     await overlayService
       .ShowStateAsync(
         DictationSessionState.Recording,
@@ -342,10 +343,13 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
         display: OverlayDisplayOptions.AnchoredRecording,
         cancellationToken: GetRuntimeToken())
       .ConfigureAwait(false);
+    recordingOverlayStopwatch.Stop();
 
+    Stopwatch captureStartStopwatch = Stopwatch.StartNew();
     await (audioCaptureService is IChunkedAudioCaptureService chunkedCapture
       ? chunkedCapture.StartChunkedAsync(GetRuntimeToken())
       : audioCaptureService.StartAsync(GetRuntimeToken())).ConfigureAwait(false);
+    captureStartStopwatch.Stop();
     activeOperationId = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
     Dictionary<string, object?> startProperties = new(StringComparer.Ordinal)
     {
@@ -354,6 +358,8 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
       ["outcome"] = "Started",
       ["provider"] = effectiveSettings.GetConfiguredTranscriptionProviderId(),
       ["model"] = effectiveSettings.GetConfiguredTranscriptionModelId(),
+      ["recordingOverlayMs"] = Math.Round(recordingOverlayStopwatch.Elapsed.TotalMilliseconds, 2),
+      ["captureStartMs"] = Math.Round(captureStartStopwatch.Elapsed.TotalMilliseconds, 2),
     };
 
     if (diagnostics is IStructuredDiagnostics structuredDiagnostics)
@@ -382,12 +388,14 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
         throw new InvalidOperationException("Failed to transition to transcribing state.");
       }
 
+      Stopwatch transcribingOverlayStopwatch = Stopwatch.StartNew();
       await overlayService
         .ShowStateAsync(
           DictationSessionState.Transcribing,
           display: OverlayDisplayOptions.AnchoredTranscribing,
           cancellationToken: GetRuntimeToken())
         .ConfigureAwait(false);
+      transcribingOverlayStopwatch.Stop();
 
       AppSettings effectiveSettings = activeSessionSettings ?? settings;
       TranscriptionModelSelection transcriptionSelection = effectiveSettings.GetConfiguredTranscriptionSelection();
@@ -499,6 +507,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
       LogPipelineTiming(
         transcriptionSelection,
         stopOutcome,
+        transcribingOverlayStopwatch.Elapsed,
         transformationStopwatch.Elapsed,
         insertionStopwatch.Elapsed,
         pipelineStopwatch.Elapsed,
@@ -649,6 +658,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
   private void LogPipelineTiming(
     TranscriptionModelSelection selection,
     StopTranscriptionOutcome stopOutcome,
+    TimeSpan transcribingOverlayDuration,
     TimeSpan transformationDuration,
     TimeSpan insertionDuration,
     TimeSpan stopToVisibleDuration,
@@ -665,6 +675,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
       ["modelId"] = stopOutcome.Transcription.ModelId,
       ["model"] = stopOutcome.Transcription.ModelId,
       ["chunked"] = stopOutcome.IsChunked,
+      ["transcribingOverlayMs"] = Math.Round(transcribingOverlayDuration.TotalMilliseconds, 2),
       ["captureFinalizationMs"] = Math.Round(stopOutcome.CaptureFinalizationDuration.TotalMilliseconds, 2),
       ["transcriptionWallMs"] = Math.Round(stopOutcome.TranscriptionWallDuration.TotalMilliseconds, 2),
       ["modelReportedMs"] = Math.Round(stopOutcome.Transcription.Duration.TotalMilliseconds, 2),
@@ -684,7 +695,8 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     diagnostics.Info(
       string.Format(
         CultureInfo.InvariantCulture,
-        "Dictation stop-to-visible timing completed: capture={0:F0} ms, transcription={1:F0} ms, transform={2:F0} ms, insertion={3:F0} ms, total={4:F0} ms.",
+        "Dictation stop-to-visible timing completed: overlay={0:F0} ms, capture={1:F0} ms, transcription={2:F0} ms, transform={3:F0} ms, insertion={4:F0} ms, total={5:F0} ms.",
+        transcribingOverlayDuration.TotalMilliseconds,
         stopOutcome.CaptureFinalizationDuration.TotalMilliseconds,
         stopOutcome.TranscriptionWallDuration.TotalMilliseconds,
         transformationDuration.TotalMilliseconds,
