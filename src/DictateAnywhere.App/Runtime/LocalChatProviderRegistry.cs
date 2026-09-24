@@ -59,7 +59,7 @@ internal sealed class LocalChatProviderRegistry
           "Gemma 4 E4B Q4_K_M through Ollama. Ollama manages the quantized model and keeps it local on this device.",
           [new LocalChatModelDefinition("gemma4:e4b", "Gemma 4 E4B (Ollama Q4_K_M)", "Quantized 8B Gemma 4 E4B model served by your local Ollama installation.")],
           ModelProviderOperationalMetadata.LocalOffline),
-        selection => new OllamaChatService(OllamaChatOptions.ForModel(selection.ModelId))),
+        selection => new OllamaChatService(OllamaChatOptions.ForModel(selection.ModelId), OllamaListenerTrust.IsCurrentTrusted)),
       new LocalChatProviderRegistration(
         new LocalChatProviderDefinition(
           ChatProviderIds.LlamaCppLocal,

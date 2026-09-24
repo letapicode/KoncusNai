@@ -10,6 +10,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 from rapidocr import EngineType, LangDet, LangRec, ModelType, OCRVersion, RapidOCR
+from image_import_limits import check_image
 
 
 _engines: dict[str, RapidOCR] = {}
@@ -55,6 +56,7 @@ def _handle(payload: dict) -> dict:
     image_path = Path(str(payload.get("image_path", ""))).resolve()
     if not image_path.is_file():
         raise FileNotFoundError("The rendered document page could not be found.")
+    check_image(image_path)
 
     # RapidOCR emits model/download diagnostics to stdout. The persistent
     # worker protocol reserves stdout for one JSON envelope per request, so

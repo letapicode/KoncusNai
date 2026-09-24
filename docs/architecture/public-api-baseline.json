@@ -1391,6 +1391,7 @@
         "DictateAnywhere.VoicePreviewGenerator"
       ],
       "friends": [
+        "DictateAnywhere.App",
         "DictateAnywhere.Inference.Tests"
       ],
       "declaredProjectReferences": [

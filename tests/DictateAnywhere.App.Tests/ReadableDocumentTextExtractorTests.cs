@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Globalization;
+using System.Text;
 using DictateAnywhere.App.Workbench;
 using DictateAnywhere.Core.Contracts;
 
@@ -42,6 +44,60 @@ public sealed class ReadableDocumentTextExtractorTests
 
     Xunit.Assert.Contains("OCR is not available", exception.Message, StringComparison.Ordinal);
     Xunit.Assert.False(ocrService.WasCalled);
+  }
+
+  [Xunit.Fact]
+  public async Task OversizedImageIsRejectedBeforeOcrStarts()
+  {
+    using TempFileScope file = new(".png");
+    using (FileStream stream = File.Create(file.Path)) stream.SetLength(DocumentImportBudget.MaximumFileBytes + 1);
+    await using TrackingOcrService ocrService = new();
+    await Xunit.Assert.ThrowsAsync<InvalidDataException>(() =>
+      ReadableDocumentTextExtractor.ExtractStructuredAsync(file.Path, "en", ocrService));
+    Xunit.Assert.False(ocrService.WasCalled);
+  }
+
+  [Xunit.Fact]
+  public async Task HostilePdfPageDimensionsAreRejectedBeforeOcrStarts()
+  {
+    using TempFileScope file = new(".pdf");
+    WriteSmallPdf(file.Path, 1, 50_000, 300, "");
+    await using TrackingOcrService ocrService = new();
+    await Xunit.Assert.ThrowsAsync<InvalidDataException>(() =>
+      ReadableDocumentTextExtractor.ExtractStructuredAsync(file.Path, "en", ocrService));
+    Xunit.Assert.False(ocrService.WasCalled);
+  }
+
+  [Xunit.Fact]
+  public async Task RepresentativeSearchablePdfRetainsItsFullText()
+  {
+    using TempFileScope file = new(".pdf");
+    WriteSmallPdf(file.Path, 2, 300, 300, "A representative searchable page with enough readable text.");
+    await using TrackingOcrService ocrService = new();
+    ReadableDocumentContent result = await ReadableDocumentTextExtractor.ExtractStructuredAsync(file.Path, "en", ocrService);
+    Xunit.Assert.Equal(2, result.Text.Split("representative", StringSplitOptions.None).Length - 1);
+    Xunit.Assert.False(ocrService.WasCalled);
+  }
+
+  [Xunit.Fact]
+  public async Task CancelledScanRemovesRenderedTemporaryPage()
+  {
+    using TempFileScope file = new(".pdf");
+    WriteSmallPdf(file.Path, 2, 300, 300, "");
+    using CancellationTokenSource cancellation = new();
+    string? renderedPath = null;
+    await using CallbackOcrService ocrService = new(request =>
+    {
+      renderedPath = request.ImagePath;
+      cancellation.Cancel();
+      return new DocumentOcrResult([], "test");
+    });
+    await Xunit.Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+      ReadableDocumentTextExtractor.ExtractStructuredAsync(file.Path, "en", ocrService, cancellationToken: cancellation.Token));
+    Xunit.Assert.Equal(1, ocrService.Calls);
+    Xunit.Assert.NotNull(renderedPath);
+    Xunit.Assert.False(File.Exists(renderedPath));
+    Xunit.Assert.False(Directory.Exists(Path.GetDirectoryName(renderedPath)));
   }
 
   [Xunit.Fact]
@@ -207,6 +263,32 @@ public sealed class ReadableDocumentTextExtractorTests
     writer.Write(content);
   }
 
+  private static void WriteSmallPdf(string path, int pageCount, int width, int height, string text)
+  {
+    int contentObject = pageCount + 3;
+    int fontObject = contentObject + 1;
+    string[] objects = new string[fontObject];
+    objects[0] = "<< /Type /Catalog /Pages 2 0 R >>";
+    objects[1] = $"<< /Type /Pages /Count {pageCount} /Kids [{string.Join(' ', Enumerable.Range(3, pageCount).Select(number => $"{number} 0 R"))}] >>";
+    for (int i = 0; i < pageCount; i++)
+      objects[i + 2] = $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] /Resources << /Font << /F1 {fontObject} 0 R >> >> /Contents {contentObject} 0 R >>";
+    string instructions = text.Length == 0 ? string.Empty : $"BT /F1 12 Tf 10 100 Td ({text}) Tj ET";
+    objects[contentObject - 1] = $"<< /Length {instructions.Length} >>\nstream\n{instructions}\nendstream";
+    objects[fontObject - 1] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+    StringBuilder pdf = new("%PDF-1.4\n");
+    List<int> offsets = [0];
+    for (int i = 0; i < objects.Length; i++)
+    {
+      offsets.Add(pdf.Length);
+      pdf.Append(CultureInfo.InvariantCulture, $"{i + 1} 0 obj\n{objects[i]}\nendobj\n");
+    }
+    int xref = pdf.Length;
+    pdf.Append(CultureInfo.InvariantCulture, $"xref\n0 {objects.Length + 1}\n0000000000 65535 f \n");
+    foreach (int offset in offsets.Skip(1)) pdf.Append(CultureInfo.InvariantCulture, $"{offset:D10} 00000 n \n");
+    pdf.Append(CultureInfo.InvariantCulture, $"trailer\n<< /Size {objects.Length + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n");
+    File.WriteAllBytes(path, Encoding.ASCII.GetBytes(pdf.ToString()));
+  }
+
   private sealed class TempFileScope : IDisposable
   {
     public TempFileScope(string extension) => Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"DictateAnywhere-{Guid.NewGuid():N}{extension}");
@@ -234,6 +316,17 @@ public sealed class ReadableDocumentTextExtractorTests
     {
       WasCalled = true;
       return Task.FromResult(new DocumentOcrResult([], "test"));
+    }
+  }
+
+  private sealed class CallbackOcrService(Func<DocumentOcrRequest, DocumentOcrResult> recognize) : IDocumentOcrService
+  {
+    public int Calls { get; private set; }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public Task<DocumentOcrResult> RecognizeAsync(DocumentOcrRequest request, CancellationToken cancellationToken = default)
+    {
+      Calls++;
+      return Task.FromResult(recognize(request));
     }
   }
 }

@@ -79,6 +79,7 @@
                    ..\..\scripts\local-models\indic_parler_tts_worker.py;
                    ..\..\scripts\local-models\kala_nepali_tts_worker.py;
                    ..\..\scripts\local-models\kokoro_tts_worker.py;
+                   ..\..\scripts\local-models\image_import_limits.py;
                    ..\..\scripts\local-models\rapidocr_worker.py;
                    ..\..\scripts\local-models\download_snapshot.py;
                    ..\..\scripts\local-models\model-snapshot-provenance.json;

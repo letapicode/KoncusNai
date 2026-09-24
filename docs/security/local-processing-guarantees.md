@@ -3,10 +3,10 @@
 ## Product Guarantees
 - **Local Audio Capture & Processing**: Dictation audio is captured and processed locally on the device.
 - **Offline Transcription**: Speech-to-text transcription is executed exclusively by selected local CrisperWhisper or Cohere workers.
-- **Offline Chat & Rewriting**: Chat and text rewriting features run exclusively on local inference backends (Ollama or llama.cpp over localhost loopback).
+- **Offline Chat & Rewriting**: Koncus Nai sends chat and rewriting requests to local inference backends (Ollama or llama.cpp over localhost loopback).
 - **Offline Reading Studio**: TTS synthesis is executed locally through the Kokoro or Indic Parler worker selected for the narration profile.
 - **Zero Telemetry**: No telemetry, analytics, or background crash reporting beacons are included or transmitted.
-- **Zero Cloud Leakage**: Dictation audio, transcript text, prompts, and completions are never uploaded to any remote or cloud service.
+- **Zero Cloud Leakage from Koncus Nai**: The app does not upload dictation audio, transcript text, prompts, or completions to a remote or cloud service. An approved external Ollama process is outside the app's control; see the trust limits below.
 - **Offline Reliability**: Dictation, chat, and editing sessions do not require internet access and function fully offline once models are downloaded.
 
 ## History Storage Guarantees
@@ -35,7 +35,7 @@ Network activity is strictly restricted to user-initiated flows on an explicit a
    - Communicates with Google OAuth (`oauth2.googleapis.com`) and YouTube Data API v3 (`www.googleapis.com`).
 6. **Localhost Loopback HTTP (`127.0.0.1`)**:
    - Inter-process communication with Ollama daemon (`http://127.0.0.1:11434/`) and llama.cpp server (`http://127.0.0.1:8090/`).
-   - Bound strictly to the loopback interface (`127.0.0.1`); no external network exposure.
+   - Koncus Nai connects to the literal loopback endpoint. Ollama chat disables HTTP redirects and proxies, and requires review of an externally started listener before private chat text is sent. A locally running process may have its own networking behavior; see `docs/security/threat-model.md` for the process-identity race and approval limits.
 
 ## Logging & Diagnostic Bundle Guarantees
 - **Local Logging Only**: Diagnostic logs are written to `%LOCALAPPDATA%\DictateAnywhere\logs\` and are never transmitted automatically.

@@ -14,15 +14,23 @@ namespace DictateAnywhere.Inference;
 public sealed class OllamaChatService : IChatCompletionService
 {
   // Local CPU inference can legitimately take longer than HttpClient's 100-second default.
-  private static readonly HttpClient SharedHttpClient = new()
-  {
-    Timeout = TimeSpan.FromMinutes(10),
-  };
+  private static readonly HttpClient SharedHttpClient = OllamaLocalHttp.CreateClient();
   private readonly OllamaChatOptions options;
+  private readonly Func<bool> isListenerTrusted;
+  private readonly HttpClient httpClient;
 
   public OllamaChatService(OllamaChatOptions options)
+    : this(options, () => false, SharedHttpClient) { }
+
+  internal OllamaChatService(OllamaChatOptions options, Func<bool> isListenerTrusted)
+    : this(options, isListenerTrusted, SharedHttpClient) { }
+
+  internal OllamaChatService(OllamaChatOptions options, Func<bool> isListenerTrusted, HttpClient httpClient)
   {
     this.options = options ?? throw new ArgumentNullException(nameof(options));
+    this.options.Validate();
+    this.isListenerTrusted = isListenerTrusted ?? throw new ArgumentNullException(nameof(isListenerTrusted));
+    this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
   }
 
   public async Task<ChatCompletionResult> CompleteAsync(
@@ -35,6 +43,8 @@ public sealed class OllamaChatService : IChatCompletionService
     {
       throw new InvalidOperationException("Chat requests must include at least one user message.");
     }
+    if (!isListenerTrusted())
+      throw new InvalidOperationException("The local Ollama listener changed or has not been trusted. Review its identity before sending private chat content.");
 
     Uri requestUri = new(options.Endpoint, "api/chat");
     var payload = new
@@ -57,12 +67,12 @@ public sealed class OllamaChatService : IChatCompletionService
     Stopwatch stopwatch = Stopwatch.StartNew();
     try
     {
-      using HttpResponseMessage response = await SharedHttpClient.SendAsync(message, cancellationToken).ConfigureAwait(false);
-      string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+      using HttpResponseMessage response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
       if (!response.IsSuccessStatusCode)
       {
-        throw new InvalidOperationException($"Ollama could not complete this chat: {ExtractError(body)}");
+        throw new InvalidOperationException($"Ollama could not complete this chat (HTTP {(int)response.StatusCode}). The local service may need attention.");
       }
+      string body = await OllamaLocalHttp.ReadBoundedAsync(response.Content, cancellationToken).ConfigureAwait(false);
 
       using JsonDocument document = JsonDocument.Parse(body);
       string text = document.RootElement.TryGetProperty("message", out JsonElement responseMessage)
@@ -83,18 +93,4 @@ public sealed class OllamaChatService : IChatCompletionService
     }
   }
 
-  private static string ExtractError(string body)
-  {
-    try
-    {
-      using JsonDocument document = JsonDocument.Parse(body);
-      return document.RootElement.TryGetProperty("error", out JsonElement error)
-        ? error.GetString() ?? "unknown Ollama error"
-        : body;
-    }
-    catch (JsonException)
-    {
-      return string.IsNullOrWhiteSpace(body) ? "unknown Ollama error" : body;
-    }
-  }
 }

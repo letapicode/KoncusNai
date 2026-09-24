@@ -52,11 +52,18 @@
   - Clipboard text contents are never logged or stored in diagnostics files.
 
 ### 4. Local Inference Loopback Communication
-- **Risk**: Cross-origin or local network eavesdropping on local model daemons.
+- **Risk**: A proxy, redirect, or different process listening on the local Ollama port could receive private chat and imported document text.
 - **Controls**:
-  - Local HTTP communication is restricted to the local loopback interface (`http://127.0.0.1:11434` for Ollama and `http://127.0.0.1:8090` for llama.cpp).
-  - Loopback services do not listen on public network interfaces.
-  - Prompts and audio remain entirely on the local device.
+  - Ollama chat accepts only `http://127.0.0.1:11434/`; its HTTP client disables proxy use and redirects. Responses are limited to 16 MiB, and failed-response bodies are excluded from error messages.
+  - Before sending chat, Koncus Nai checks the Windows owner of the IPv4 loopback listener. A process started directly by the app is approved for that process lifetime. An already running Ollama process requires an explicit, session-scoped approval showing its executable path and process ID. A model digest returned by `/api/tags` is model metadata, not proof of process identity.
+  - Listener ownership is checked immediately before each chat request. There remains a check-to-connect race: a sufficiently privileged local process could replace the listener between the ownership check and the TCP connection. Approval of an external process does not authenticate its binary or control what that process does with text it receives.
+  - The app's llama.cpp server uses `http://127.0.0.1:8090/`; review its separate process and transport controls before extending the Ollama trust claim to it.
+
+### 4a. Document Import and OCR
+- **Risk**: Tiny malformed PDFs or compressed images can cause excessive parsing, rendering, memory use, or persistent temporary files.
+- **Controls**:
+  - Input files are limited to 64 MiB before parsing or OCR. PDFs are limited to 2,000 pages, 2,000-point page dimensions, 5,000 words and 100,000 extracted characters per page, and 8 Mi characters of total extracted text. Exceeding a limit fails the import with an explicit error; Reading Studio does not silently shorten the document.
+  - The OCR worker checks image headers for a 40-megapixel ceiling before raster decoding or model initialization. PDF extraction checks cancellation between pages and during word extraction, and removes rendered page files after OCR, failure, or cancellation.
 
 ### 5. Diagnostics & Support Bundling
 - **Risk**: Transcript, prompt, audio sample, or credential leakage in diagnostic logs or export bundles.

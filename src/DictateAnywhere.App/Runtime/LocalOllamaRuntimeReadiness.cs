@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DictateAnywhere.Inference;
 
 namespace DictateAnywhere.App.Runtime;
 
@@ -22,19 +23,22 @@ internal static class LocalOllamaRuntimeReadiness
     "release-assets.githubusercontent.com",
   };
   internal const string Gemma4E4BDigest = "c6eb396dbd5992bbe3f5cdb947e8bbc0ee413d7c17e2beaae69f5d569cf982eb";
-  private static readonly HttpClient HttpClient = new() { BaseAddress = new Uri("http://127.0.0.1:11434/") };
+  private static readonly HttpClient LocalClient = OllamaLocalHttp.CreateClient();
+  private static readonly HttpClient DownloadClient = new() { Timeout = TimeSpan.FromMinutes(30) };
+  private static readonly Uri LocalEndpoint = new("http://127.0.0.1:11434/");
 
   public static async Task<LocalChatRuntimeReadiness> CheckAsync(string modelId, CancellationToken cancellationToken = default)
   {
     try
     {
-      using HttpResponseMessage response = await HttpClient.GetAsync("api/tags", cancellationToken).ConfigureAwait(false);
+      using HttpRequestMessage request = new(HttpMethod.Get, new Uri(LocalEndpoint, "api/tags"));
+      using HttpResponseMessage response = await LocalClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
       if (!response.IsSuccessStatusCode)
       {
         return Unavailable("Ollama is running but did not return its installed models.");
       }
 
-      using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+      using JsonDocument document = JsonDocument.Parse(await OllamaLocalHttp.ReadBoundedAsync(response.Content, cancellationToken).ConfigureAwait(false));
       bool installed = IsPinnedModelPresent(document.RootElement, modelId);
       return installed
         ? LocalChatRuntimeReadiness.Ready with { StatusMessage = $"Ollama is ready with {modelId}." }
@@ -70,13 +74,16 @@ internal static class LocalOllamaRuntimeReadiness
     {
       await EnsureInstalledAndRunningAsync(progress, cancellationToken).ConfigureAwait(false);
       progress?.Report(0.25);
-      using StringContent content = new(JsonSerializer.Serialize(new { model = modelId, stream = false }), Encoding.UTF8, "application/json");
-      using HttpResponseMessage response = await HttpClient.PostAsync("api/pull", content, cancellationToken).ConfigureAwait(false);
-      string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+      using HttpRequestMessage request = new(HttpMethod.Post, new Uri(LocalEndpoint, "api/pull"))
+      {
+        Content = new StringContent(JsonSerializer.Serialize(new { model = modelId, stream = false }), Encoding.UTF8, "application/json"),
+      };
+      using HttpResponseMessage response = await LocalClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
       if (!response.IsSuccessStatusCode)
       {
-        throw new InvalidOperationException($"Ollama could not pull {modelId}: {ReadError(body)}");
+        throw new InvalidOperationException($"Ollama could not pull {modelId} (HTTP {(int)response.StatusCode}).");
       }
+      _ = await OllamaLocalHttp.ReadBoundedAsync(response.Content, cancellationToken).ConfigureAwait(false);
 
       progress?.Report(1);
       return await CheckAsync(modelId, cancellationToken).ConfigureAwait(false);
@@ -181,7 +188,7 @@ internal static class LocalOllamaRuntimeReadiness
     IProgress<double>? progress,
     CancellationToken cancellationToken)
   {
-    using HttpResponseMessage response = await HttpClient.GetAsync(
+    using HttpResponseMessage response = await DownloadClient.GetAsync(
       InstallerUrl,
       HttpCompletionOption.ResponseHeadersRead,
       cancellationToken).ConfigureAwait(false);
@@ -346,6 +353,7 @@ internal static class LocalOllamaRuntimeReadiness
     Process process = Process.Start(startInfo)
       ?? throw new InvalidOperationException("Could not start the Ollama local service.");
     OllamaProcessOwnership.Track(process);
+    OllamaListenerTrust.ApproveManaged(process);
   }
 
   private static async Task<bool> WaitForApiAsync(TimeSpan timeout, CancellationToken cancellationToken)
@@ -368,7 +376,8 @@ internal static class LocalOllamaRuntimeReadiness
   {
     try
     {
-      using HttpResponseMessage response = await HttpClient.GetAsync("api/tags", cancellationToken).ConfigureAwait(false);
+      using HttpRequestMessage request = new(HttpMethod.Get, new Uri(LocalEndpoint, "api/tags"));
+      using HttpResponseMessage response = await LocalClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
       return response.IsSuccessStatusCode;
     }
     catch (HttpRequestException)
@@ -379,18 +388,4 @@ internal static class LocalOllamaRuntimeReadiness
 
   private static LocalChatRuntimeReadiness Unavailable(string message) => new(false, message, [], []);
 
-  private static string ReadError(string body)
-  {
-    try
-    {
-      using JsonDocument document = JsonDocument.Parse(body);
-      return document.RootElement.TryGetProperty("error", out JsonElement error)
-        ? error.GetString() ?? "unknown error"
-        : body;
-    }
-    catch (JsonException)
-    {
-      return string.IsNullOrWhiteSpace(body) ? "unknown error" : body;
-    }
-  }
 }

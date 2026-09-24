@@ -13,6 +13,10 @@ internal sealed class DocumentImportBudget(CancellationToken cancellationToken)
 {
   internal const int MaximumCharacters = 8 * 1024 * 1024;
   internal const long MaximumFileBytes = 64 * 1024 * 1024;
+  internal const int MaximumPdfPages = 2_000;
+  internal const int MaximumPdfWordsPerPage = 5_000;
+  internal const int MaximumPdfCharactersPerPage = 100_000;
+  internal const double MaximumPdfPagePoints = 2_000;
   private int remaining = MaximumCharacters;
 
   public void CheckCancellation() => cancellationToken.ThrowIfCancellationRequested();
@@ -22,6 +26,23 @@ internal sealed class DocumentImportBudget(CancellationToken cancellationToken)
     CheckCancellation();
     if (new FileInfo(path).Length > MaximumFileBytes)
       throw new InvalidDataException("The document exceeds the 64 MiB import limit. Split it into smaller documents.");
+  }
+
+  public void ConsumeCharacters(int count)
+  {
+    CheckCancellation();
+    if (count < 0 || count > remaining) throw LimitExceeded();
+    remaining -= count;
+  }
+
+  public void CheckPdfPage(int pageNumber, double width, double height)
+  {
+    CheckCancellation();
+    if (pageNumber > MaximumPdfPages)
+      throw new InvalidDataException($"The PDF exceeds the {MaximumPdfPages:N0}-page import limit. Split it into smaller documents.");
+    if (!double.IsFinite(width) || !double.IsFinite(height) || width <= 0 || height <= 0
+        || width > MaximumPdfPagePoints || height > MaximumPdfPagePoints)
+      throw new InvalidDataException("A PDF page exceeds the supported page dimensions. Resize or split the document before importing it.");
   }
 
   public string ReadFile(string path)

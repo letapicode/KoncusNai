@@ -14,6 +14,7 @@ using DictateAnywhere.App.Workbench.Reading;
 using DictateAnywhere.App.Workbench.Publishing;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Threading;
 using DictateAnywhere.Benchmark;
 using DictateAnywhere.Core.Contracts;
@@ -181,7 +182,13 @@ internal sealed class ApplicationComposition
     WorkbenchChatModelController chatModelController = new(
       ChatModelManager,
       ChatRuntimeReadinessProbe,
-      Diagnostics);
+      Diagnostics,
+      identity => MessageBox.Show(
+          $"An Ollama service is running on this device. Private chat and attached document text will be sent to this process:\n\n{identity.ExecutablePath}\nProcess ID: {identity.ProcessId}\n\nTrust this process for this app session? If it changes, approval is required again.",
+        "Trust external Ollama service?",
+        MessageBoxButton.YesNo,
+        MessageBoxImage.Warning,
+        MessageBoxResult.No) == MessageBoxResult.Yes);
     WorkbenchHistoryController historyController = CreateWorkbenchHistoryController();
     WorkbenchOperationSession operationSession = new();
     WorkbenchDictationHistoryRecorder dictationHistoryRecorder = new(

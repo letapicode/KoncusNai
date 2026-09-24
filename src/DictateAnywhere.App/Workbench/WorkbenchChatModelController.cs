@@ -33,15 +33,18 @@ internal sealed class WorkbenchChatModelController
   private readonly IModelManager modelManager;
   private readonly IChatRuntimeReadinessProbe runtimeReadinessProbe;
   private readonly IDiagnostics diagnostics;
+  private readonly Func<OllamaListenerIdentity, bool> approveExternalOllama;
 
   public WorkbenchChatModelController(
     IModelManager modelManager,
     IChatRuntimeReadinessProbe runtimeReadinessProbe,
-    IDiagnostics diagnostics)
+    IDiagnostics diagnostics,
+    Func<OllamaListenerIdentity, bool>? approveExternalOllama = null)
   {
     this.modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
     this.runtimeReadinessProbe = runtimeReadinessProbe ?? throw new ArgumentNullException(nameof(runtimeReadinessProbe));
     this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.approveExternalOllama = approveExternalOllama ?? (_ => false);
   }
 
   public async Task<WorkbenchChatModelSetupResult> SetupAsync(
@@ -97,6 +100,10 @@ internal sealed class WorkbenchChatModelController
         LocalChatRuntimeReadiness readiness = await LocalOllamaRuntimeReadiness
           .CheckAsync(normalized.ModelId, cancellationToken)
           .ConfigureAwait(true);
+        if (readiness.IsReady && !OllamaListenerTrust.IsCurrentTrusted())
+          return new WorkbenchChatModelReadinessState(false, false, 0,
+            "Ollama listener needs review.",
+            "Review the running Ollama service from model setup before sending private chat content.");
         return FromProviderReadiness(readiness, "Ready in Ollama.", "Start Ollama or pull Gemma 4.");
       }
 
@@ -166,6 +173,18 @@ internal sealed class WorkbenchChatModelController
     LocalChatRuntimeReadiness readiness = await LocalOllamaRuntimeReadiness
       .StartAsync(selection.ModelId, transferProgress, cancellationToken)
       .ConfigureAwait(true);
+    if (!OllamaListenerTrust.IsCurrentTrusted())
+    {
+      if (!OllamaListenerTrust.TryCapture(out OllamaListenerIdentity? identity) || identity is null)
+        return new WorkbenchChatModelSetupResult(
+          "Could not verify the process serving Ollama on this device. Close it and retry.", RefreshReadiness: false);
+      if (!approveExternalOllama(identity))
+        return new WorkbenchChatModelSetupResult(
+          "The external Ollama listener was not trusted. No private chat content was sent.", RefreshReadiness: false);
+      if (!OllamaListenerTrust.ApproveExternal(identity))
+        return new WorkbenchChatModelSetupResult(
+          "The Ollama listener changed during review. Retry model setup.", RefreshReadiness: false);
+    }
     if (!readiness.IsReady)
     {
       progress?.Report(new WorkbenchChatModelSetupProgress("Downloading the selected Ollama model. This is only needed once."));

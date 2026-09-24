@@ -57,4 +57,15 @@ public sealed class DocumentImportBudgetTests
     DocumentImportBudget budget = new(default);
     Xunit.Assert.Throws<XmlException>(() => budget.ReadXml(archive.GetEntry("document.xml")!));
   }
+
+  [Xunit.Fact]
+  public void PdfPageAndExpandedTextLimitsRejectBeforeFurtherWork()
+  {
+    DocumentImportBudget budget = new(default);
+    budget.CheckPdfPage(1, 612, 792);
+    Xunit.Assert.Throws<InvalidDataException>(() => budget.CheckPdfPage(2_001, 612, 792));
+    Xunit.Assert.Throws<InvalidDataException>(() => budget.CheckPdfPage(1, 50_000, 792));
+    budget.ConsumeCharacters(DocumentImportBudget.MaximumCharacters);
+    Xunit.Assert.Throws<InvalidDataException>(() => budget.ConsumeCharacters(1));
+  }
 }

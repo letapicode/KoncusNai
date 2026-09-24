@@ -40,7 +40,7 @@ internal static class ReadableDocumentTextExtractor
     budget.CheckFile(path);
     ReadableDocumentContent content = Path.GetExtension(path).ToLowerInvariant() switch
     {
-      ".pdf" => ExtractPdfDocument(path),
+      ".pdf" => ExtractPdfDocument(path, budget),
       ".epub" => ReadableDocumentContent.FromPlainText(ExtractEpub(path, budget)),
       ".docx" => ExtractDocxDocument(path, budget),
       ".rtf" => ReadableDocumentContent.FromPlainText(ExtractRtf(budget.ReadFile(path))),
@@ -97,12 +97,15 @@ internal static class ReadableDocumentTextExtractor
       throw new FileNotFoundException("The selected document was not found.", path);
     }
 
+    DocumentImportBudget budget = new(cancellationToken);
+    budget.CheckFile(path);
     string extension = Path.GetExtension(path).ToLowerInvariant();
     if (ImageExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
     {
       EnsureOcrAvailable(allowOcr);
       progress?.Report(new DocumentImportProgress("Reading image text", 0.1d, "Recognizing text locally with RapidOCR."));
       DocumentOcrResult result = await ocrService.RecognizeAsync(new DocumentOcrRequest(path, language), cancellationToken).ConfigureAwait(false);
+      budget.ConsumeCharacters(result.Text.Length);
       if (string.IsNullOrWhiteSpace(result.Text))
       {
         throw new InvalidOperationException("No readable text was found in that image.");
@@ -121,7 +124,7 @@ internal static class ReadableDocumentTextExtractor
       return content;
     }
 
-    return await ExtractPdfWithOcrFallbackAsync(path, language, ocrService, allowOcr, progress, cancellationToken).ConfigureAwait(false);
+    return await ExtractPdfWithOcrFallbackAsync(path, language, ocrService, allowOcr, progress, budget, cancellationToken).ConfigureAwait(false);
   }
 
   internal static bool NeedsOcr(string text)
@@ -143,12 +146,13 @@ internal static class ReadableDocumentTextExtractor
     IDocumentOcrService ocrService,
     bool allowOcr,
     IProgress<DocumentImportProgress>? progress,
+    DocumentImportBudget budget,
     CancellationToken cancellationToken)
   {
     PdfPageExtraction[] nativePages = await Task.Run(() =>
     {
       using PdfDocument pdf = PdfDocument.Open(path);
-      return pdf.GetPages().Select(ExtractPdfPage).ToArray();
+      return ExtractPdfPages(pdf, budget);
     }, cancellationToken).ConfigureAwait(false);
 
     if (nativePages.Length == 0)
@@ -159,9 +163,9 @@ internal static class ReadableDocumentTextExtractor
     List<string> pages = new(nativePages.Length);
     List<ReadableDocumentElement> elements = [];
     string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"notype-ocr-{Guid.NewGuid():N}");
-    Directory.CreateDirectory(temporaryDirectory);
     try
     {
+      Directory.CreateDirectory(temporaryDirectory);
       using FileStream pdfStream = File.OpenRead(path);
       for (int pageIndex = 0; pageIndex < nativePages.Length; pageIndex++)
       {
@@ -179,10 +183,22 @@ internal static class ReadableDocumentTextExtractor
             $"Recognizing page {pageIndex + 1:N0} of {nativePages.Length:N0} locally."));
           string imagePath = Path.Combine(temporaryDirectory, $"page-{pageIndex + 1:D6}.png");
           pdfStream.Position = 0;
-          await Task.Run(() => Conversion.SavePng(imagePath, pdfStream, pageIndex), cancellationToken).ConfigureAwait(false);
-          DocumentOcrResult ocr = await ocrService.RecognizeAsync(
-            new DocumentOcrRequest(imagePath, language),
-            cancellationToken).ConfigureAwait(false);
+          DocumentOcrResult ocr;
+          try
+          {
+            await Task.Run(() => Conversion.SavePng(imagePath, pdfStream, pageIndex), cancellationToken).ConfigureAwait(false);
+            budget.CheckFile(imagePath);
+            cancellationToken.ThrowIfCancellationRequested();
+            ocr = await ocrService.RecognizeAsync(
+              new DocumentOcrRequest(imagePath, language),
+              cancellationToken).ConfigureAwait(false);
+          }
+          finally
+          {
+            if (File.Exists(imagePath)) File.Delete(imagePath);
+          }
+          if (ocr.Text.Length > DocumentImportBudget.MaximumPdfCharactersPerPage)
+            throw new InvalidDataException("A PDF page exceeds the extracted-text limit. Split the document before importing it.");
           if (!string.IsNullOrWhiteSpace(ocr.Text))
           {
             if (pageElements.Any(element => ContainsUnreadableGlyphs(element.Text)))
@@ -207,6 +223,9 @@ internal static class ReadableDocumentTextExtractor
 
         if (!string.IsNullOrWhiteSpace(pageText))
         {
+          if (pageText.Length > DocumentImportBudget.MaximumPdfCharactersPerPage)
+            throw new InvalidDataException("A PDF page exceeds the extracted-text limit. Split the document before importing it.");
+          budget.ConsumeCharacters(pageText.Length);
           pages.Add(pageText.Trim());
           elements.AddRange(pageElements);
         }
@@ -249,13 +268,31 @@ internal static class ReadableDocumentTextExtractor
     catch (UnauthorizedAccessException) { }
   }
 
-  private static ReadableDocumentContent ExtractPdfDocument(string path)
+  private static ReadableDocumentContent ExtractPdfDocument(string path, DocumentImportBudget budget)
   {
     using PdfDocument document = PdfDocument.Open(path);
-    PdfPageExtraction[] pages = document.GetPages().Select(ExtractPdfPage).ToArray();
+    PdfPageExtraction[] pages = ExtractPdfPages(document, budget);
     return ReadableDocumentContent.FromElements(
       string.Join(Environment.NewLine + Environment.NewLine, pages.Select(page => page.Text)),
       pages.SelectMany(page => page.Elements));
+  }
+
+  private static PdfPageExtraction[] ExtractPdfPages(PdfDocument document, DocumentImportBudget budget)
+  {
+    if (document.NumberOfPages > DocumentImportBudget.MaximumPdfPages)
+      throw new InvalidDataException($"The PDF exceeds the {DocumentImportBudget.MaximumPdfPages:N0}-page import limit. Split it into smaller documents.");
+    List<PdfPageExtraction> pages = new(document.NumberOfPages);
+    int totalCharacters = 0;
+    foreach (Page page in document.GetPages())
+    {
+      budget.CheckPdfPage(pages.Count + 1, page.Width, page.Height);
+      PdfPageExtraction extracted = ExtractPdfPage(page, budget);
+      totalCharacters = checked(totalCharacters + extracted.Text.Length);
+      if (totalCharacters > DocumentImportBudget.MaximumCharacters)
+        throw new InvalidDataException("The PDF exceeds the expanded text import limit. Split it into smaller documents.");
+      pages.Add(extracted);
+    }
+    return pages.ToArray();
   }
 
   /// <summary>
@@ -265,19 +302,40 @@ internal static class ReadableDocumentTextExtractor
   private static string ExtractPdfPageText(UglyToad.PdfPig.Content.Page page)
     => ExtractPdfPage(page).Text;
 
-  private static PdfPageExtraction ExtractPdfPage(UglyToad.PdfPig.Content.Page page)
+  private static PdfPageExtraction ExtractPdfPage(UglyToad.PdfPig.Content.Page page, DocumentImportBudget? budget = null)
   {
     string nativeText = NormalizePdfText(page.Text);
-    PdfWordPosition[] words = page.GetWords()
-      .Where(word => !string.IsNullOrWhiteSpace(word.Text))
-      .Select(word => new PdfWordPosition(
-        NormalizePdfText(word.Text),
+    if (nativeText.Length > DocumentImportBudget.MaximumPdfCharactersPerPage)
+      throw new InvalidDataException("A PDF page exceeds the extracted-text limit. Split the document before importing it.");
+    List<PdfWordPosition> collectedWords = [];
+    int wordCharacters = 0;
+    int normalizedWordCharacters = 0;
+    foreach (var word in page.GetWords())
+    {
+      if (string.IsNullOrWhiteSpace(word.Text)) continue;
+      if (collectedWords.Count >= DocumentImportBudget.MaximumPdfWordsPerPage)
+        throw new InvalidDataException("A PDF page contains too many words to process safely. Split the document before importing it.");
+      wordCharacters = checked(wordCharacters + word.Text.Length);
+      if (wordCharacters > DocumentImportBudget.MaximumPdfCharactersPerPage)
+        throw new InvalidDataException("A PDF page exceeds the extracted-text limit. Split the document before importing it.");
+      string text = NormalizePdfText(word.Text);
+      if (text.Length > DocumentImportBudget.MaximumPdfCharactersPerPage - normalizedWordCharacters)
+        throw new InvalidDataException("A PDF page exceeds the extracted-text limit. Split the document before importing it.");
+      normalizedWordCharacters += text.Length;
+      collectedWords.Add(new PdfWordPosition(
+        text,
         word.BoundingBox.Left,
         word.BoundingBox.Bottom,
-        Math.Max(1d, word.BoundingBox.Height),
-        word.FontName))
-      .ToArray();
+        double.IsFinite(word.BoundingBox.Height)
+          ? Math.Clamp(word.BoundingBox.Height, 1d, DocumentImportBudget.MaximumPdfPagePoints) : 1d,
+        word.FontName));
+      if (collectedWords.Count % 128 == 0) budget?.CheckCancellation();
+    }
+    PdfWordPosition[] words = collectedWords.ToArray();
+    budget?.CheckCancellation();
     string geometricWordText = ReconstructPdfText(words);
+    if (geometricWordText.Length > DocumentImportBudget.MaximumPdfCharactersPerPage)
+      throw new InvalidDataException("A PDF page exceeds the extracted-text limit. Split the document before importing it.");
     return new PdfPageExtraction(
       SelectReadablePdfText(nativeText, geometricWordText),
       ReconstructPdfElements(words));
@@ -402,22 +460,45 @@ internal static class ReadableDocumentTextExtractor
   }
 
   private static double GetMedianWordHeight(IReadOnlyList<PdfWordPosition> words)
-    => words.Select(word => word.Height).Order().ElementAt(words.Count / 2);
+  {
+    double[] heights = words.Where(word => double.IsFinite(word.Height) && word.Height > 0)
+      .Select(word => word.Height).Order().ToArray();
+    return heights.Length == 0 ? 10d : heights[heights.Length / 2];
+  }
 
   private static IReadOnlyList<PdfTextLine> BuildPdfLines(IReadOnlyList<PdfWordPosition> words, double medianHeight)
   {
     double baselineTolerance = Math.Max(1.5d, medianHeight * 0.45d);
     List<PdfTextLine> lines = [];
+    Dictionary<long, List<PdfTextLine>> nearbyLines = [];
     foreach (PdfWordPosition word in words.OrderByDescending(word => word.Baseline).ThenBy(word => word.Left))
     {
-      PdfTextLine? line = lines
-        .Where(candidate => Math.Abs(candidate.Baseline - word.Baseline) <= baselineTolerance)
-        .OrderBy(candidate => Math.Abs(candidate.Baseline - word.Baseline))
-        .FirstOrDefault();
+      if (!double.IsFinite(word.Baseline) || !double.IsFinite(word.Left)
+          || Math.Abs(word.Baseline) > 1_000_000 || Math.Abs(word.Left) > 1_000_000)
+        continue;
+      long bucket = (long)Math.Floor(word.Baseline / baselineTolerance);
+      PdfTextLine? line = null;
+      double nearest = double.MaxValue;
+      for (long candidateBucket = bucket - 1; candidateBucket <= bucket + 1; candidateBucket++)
+      {
+        if (!nearbyLines.TryGetValue(candidateBucket, out List<PdfTextLine>? candidates)) continue;
+        foreach (PdfTextLine candidate in candidates)
+        {
+          double gap = Math.Abs(candidate.Baseline - word.Baseline);
+          if (gap <= baselineTolerance && gap < nearest)
+          {
+            line = candidate;
+            nearest = gap;
+          }
+        }
+      }
       if (line is null)
       {
         line = new PdfTextLine(word.Baseline);
         lines.Add(line);
+        if (!nearbyLines.TryGetValue(bucket, out List<PdfTextLine>? bucketLines))
+          nearbyLines[bucket] = bucketLines = [];
+        bucketLines.Add(line);
       }
       line.Add(word);
     }

@@ -23,6 +23,8 @@ public sealed class RapidOcrDocumentService : IDocumentOcrService
     {
       throw new FileNotFoundException("The image selected for text recognition was not found.", normalized.ImagePath);
     }
+    if (new FileInfo(normalized.ImagePath).Length > 64L * 1024 * 1024)
+      throw new InvalidDataException("The image exceeds the 64 MiB import limit.");
 
     IPersistentWorkerClient worker = await GetOrCreateClientAsync(cancellationToken).ConfigureAwait(false);
     RapidOcrWorkerResponse response = await worker.InvokeAsync<RapidOcrWorkerResponse>(
