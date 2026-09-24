@@ -1,6 +1,6 @@
 # Koncus Nai
 
-> **Pre-release source project:** the private source baseline at `d1b532f` passed GitHub CI on September 24, 2026. Koncus Nai is work-in-progress source, not a supported `v1` release; do not redistribute an installer built from this checkout as an official Koncus Nai release. Later commits require their own validation.
+> **Public work-in-progress source:** commit `26af366` passed GitHub CI on September 24, 2026. Koncus Nai has no supported `v1` installer; do not redistribute an installer built from this checkout as an official release. Later commits require their own validation.
 
 Koncus Nai was previously named Nilo and Notype (and originally Dictate Anywhere). The burnt-orange KN monogram
 is the current application mark. Existing data paths, executable names and installer
@@ -18,7 +18,7 @@ Koncus Nai is a Windows 11 local-first application for global dictation, local c
 
 ## Start here
 
-The `d1b532f` private source baseline passed its automated CI gates. The owner is preparing public work-in-progress source visibility while AI4Bharat, Nyra, Ampixa, and optional-runtime rights questions remain open; this is not a claim of third-party permission. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md), [the owner decision record](docs/release/public-source-owner-decision-record.md), [the runtime rights review packet](docs/release/public-source-rights-review-packet.md), [the release checklist](docs/release/release-checklist.md), and [TODO.md](TODO.md) for tested changes, remaining decisions, and installation limitations. Local audit installers are not approved public releases.
+The public source is a work in progress. The last pre-publication commit, `26af366`, passed its automated CI gates. The owner published the source while AI4Bharat, Nyra, Ampixa, and optional GPL/LGPL/FFmpeg runtime rights questions remain open; public visibility is not a claim of third-party permission. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md), [the owner decision record](docs/release/public-source-owner-decision-record.md), [the runtime rights review packet](docs/release/public-source-rights-review-packet.md), [the release checklist](docs/release/release-checklist.md), and [TODO.md](TODO.md) for tested changes, remaining decisions, and installation limitations. Local audit installers are not approved public releases.
 
 Koncus Nai is **source-available** under [PolyForm Noncommercial 1.0.0](LICENSE); it is not OSI-approved open source. The license permits noncommercial use, modification, and redistribution. Commercial use requires separate written permission from Ram Adhikari through [koncusnai@gmail.com](mailto:koncusnai@gmail.com). Third-party code, models, and assets remain under their own licenses.
 

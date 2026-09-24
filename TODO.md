@@ -2,7 +2,7 @@
 
 Current plan: [Chat polish and production readiness](planning/production-readiness-plan-2026-09-15.md).
 
-Current assessment: the private source baseline `d1b532f` passed GitHub CI on September 24, 2026. The owner wants to pursue public work-in-progress source visibility while provider replies and qualified runtime-rights review remain pending. This direction does not clear those rights; a supported version 1 installer is not ready. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md), [owner decision record](docs/release/public-source-owner-decision-record.md), and [runtime rights review packet](docs/release/public-source-rights-review-packet.md).
+Current assessment: the source repository is public as a work in progress. Pre-publication commit `26af366` passed GitHub CI on September 24, 2026. The owner published while provider replies and qualified runtime-rights review remain pending. Public visibility does not clear those rights; a supported version 1 installer is not ready. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md), [owner decision record](docs/release/public-source-owner-decision-record.md), and [runtime rights review packet](docs/release/public-source-rights-review-packet.md).
 
 This is the user-facing checklist for the September 15 request. The [engineering hardening backlog](planning/codebase-hardening-backlog.md) remains the record for previous hardening work. Unchecked items below are planned, not implemented or verified.
 
@@ -17,21 +17,22 @@ This is the user-facing checklist for the September 15 request. The [engineering
 - [x] Make `run-kn` the only supported command; migrate owned old aliases and shortcuts safely.
 - [x] Make installed `run-kn` work in Windows Run, CMD and PowerShell without source files or an SDK.
 
-## Blockers before making the repository public
+## Public source status and remaining rights work
 
-Release status: checked items include the successful private `d1b532f` CI baseline, not approval to change visibility. Revalidate the final candidate after any new commit.
+Release status: the owner changed `letapicode/KoncusNai` to public after the successful private `26af366` CI run. The source is noncommercial and work in progress; no installer or third-party rights clearance is implied. Revalidate each later commit.
 
 - [x] Add the official PolyForm Noncommercial 1.0.0 root license, Ram Adhikari's 2026 required notice, source-available wording, disclaimer, and commercial-contact route. Contributor-rights policy still needs an owner decision before accepting outside code.
-- [x] Publish `koncusnai@gmail.com` in `SECURITY.md` with a seven-calendar-day initial-response target. Immediately after the repository becomes public, enable GitHub private vulnerability reporting and add the real Security Advisory route.
+- [x] Publish `koncusnai@gmail.com` in `SECURITY.md` with a seven-calendar-day initial-response target. GitHub private vulnerability reporting is active; `SECURITY.md` links its real advisory route and retains the email fallback.
 - [x] Review the 1,129-file committed tree and 11 reachable commits through `d1b532f` for generated audio, models, caches, user data, build output and high-signal credential patterns. The September 24 source-boundary scan found zero forbidden paths and zero high-signal secret-hit files across reachable commits; repeat on the final candidate. The original 1,126-file manifest describes the fresh root commit, not this later tree.
 - [x] Start fresh Git history in KoncusNai: root commit `851bf46` has no parent, and the old Notype commit `2946ad2` is not reachable from `main`. Keep the old repository private as a rollback copy and never import its audio-bearing history.
 - [x] Replace the affected Indic graph with compatibility-patched, source-manifested Parler-TTS 0.2.2, AudioTools 0.7.4, and Descript Audio Codec 1.0.0 on Transformers 5.17.0, protobuf 7.36.2, and PyTorch 2.13.0. The September 23 CI query checked the exact 193-package inventory with zero OSV matches; rerun at release time.
-- [x] Record the owner's direction to pursue source-only visibility while Indic Parler, CrisperWhisper, Kala speaker, and optional GPL/LGPL/FFmpeg questions remain open. The owner has sent upstream inquiries and is not waiting for qualified review before preparing the source candidate. Keep every model option available. User notices do not settle publisher obligations; model weights and third-party Python wheels remain outside the public source tree.
-- [ ] Resolve the outstanding provider/runtime rights questions or record an explicit final owner decision to proceed with those uncertainties after the final private CI and exposure review. Neither choice may be described as a third-party permission grant without supporting evidence.
+- [x] Record the owner's decision to publish source-only while Indic Parler, CrisperWhisper, Kala speaker, and optional GPL/LGPL/FFmpeg questions remain open. Keep every model option available. User notices do not settle publisher obligations; model weights and third-party Python wheels remain outside the public source tree.
+- [ ] Follow up on provider replies and qualified GPL/LGPL/FFmpeg review. Do not describe ordinary model use, generated outputs, commercial use, or a future bundled installer as cleared without supporting evidence.
 - [x] Remove the undocumented Cohere health-check WAV from source and payload. Startup checks the loaded model through IPC; an isolated installed-model warm-up passed. This does not establish transcription accuracy; the benchmark accepts only operator-supplied, authorized audio.
 - [x] Pass the private `d1b532f` GitHub CI source gates: locked build, documentation, supply chain, security, size, focused and full tests, coverage, fault seeds, Milestone 2 reliability, compatibility contracts and static packaging checks. The full suite retained six opt-in or environment skips. No real-model latency or installed-installer claim follows from these results.
-- [ ] After the final documentation commit, obtain a green private CI run and review its exact committed tree before a visibility change.
-- [ ] Review all private GitHub Actions run logs and retained artifacts that would become visible with the repository; the local GitHub CLI is unauthenticated, so this needs an owner-side review.
+- [x] Obtain a green private CI run for final pre-publication commit `26af366`; the attached run checked out that exact SHA and passed.
+- [x] The owner reports reviewing retained private GitHub Actions logs and artifacts for private material before changing visibility. This owner-side review was not independently audited here.
+- [x] The owner chose to keep Pull requests enabled for public suggestions. GitHub's public API reports creation policy `all`. The owner reports no collaborators; opening a PR does not grant merge permission. Review proposals before merging and set branch protection or rulesets if additional controls are desired.
 
 ## Blockers before a supported v1 installer
 

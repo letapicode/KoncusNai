@@ -1,12 +1,20 @@
 # Public source rights review packet — September 24, 2026
 
-This packet describes the current Koncus Nai **source-only** candidate for a
+This packet describes the reviewed Koncus Nai **source-only** tree for a
 qualified license reviewer. It records distribution and code behavior; it is
 not a legal conclusion or permission from a model, speaker, or software owner.
 The owner wants every existing model option and feature retained. A supported
 installer and commercial product are separate decisions.
 
 ## Reviewed candidate and source boundary
+
+Publication update: the owner made `letapicode/KoncusNai` public after the
+successful private CI run on `26af366c2458db5112ee76b5afdb9ea2f85f970a`.
+The provider and GPL/LGPL/FFmpeg questions below remain open. Public source
+visibility does not establish permission for ordinary model use, generated
+outputs, commercial use, or a future bundled installer. The details below
+describe the earlier `d1b532f` rights review and should be refreshed when
+runtime pins or packaging change.
 
 - Reviewed private commit: `d1b532fbb93e21c2d43df649a20dab73d235549f`.
   The owner-supplied September 24 `build-test` log checked out that exact SHA
@@ -105,13 +113,11 @@ the executable.
 ## Decision status
 
 Technically, the reviewed private source and static packaging baseline passed
-CI. The owner has directed preparation of public work-in-progress source while
-upstream replies and qualified review remain pending; that direction does not
-resolve the rights questions above. Making the source visible would still
-require a green private CI run on any new documentation commit, review of that
-exact tree and history, review of private Actions logs and retained artifacts,
-and the owner's explicit final approval. Qualified advice remains recommended
-but unperformed. No opinion here declares the source or future installer
-legally cleared. A supported installer additionally needs manual compatibility,
-real-model, clean-install/upgrade, signing, and release validation under
-`docs/release/release-checklist.md`.
+CI, followed by a successful final pre-publication CI run on `26af366`. The
+owner reports reviewing retained private Actions logs and artifacts and then
+made the repository public while upstream replies and qualified review remain
+pending. Those actions do not resolve the rights questions above. Qualified
+advice remains recommended but unperformed. No opinion here declares the source
+or future installer legally cleared. A supported installer additionally needs
+manual compatibility, real-model, clean-install/upgrade, signing, and release
+validation under `docs/release/release-checklist.md`.

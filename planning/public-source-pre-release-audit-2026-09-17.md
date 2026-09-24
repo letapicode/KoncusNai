@@ -1,10 +1,13 @@
 # Public source pre-release audit — 2026-09-17
 
-Last updated with the latest passing private GitHub CI baseline: **2026-09-24**.
+Current status as of **2026-09-24**: the repository is public work-in-progress
+source after the successful private CI run on `26af366`. See the
+post-publication status appendix at the end for current decisions and open
+rights questions.
 
 The dated sections below preserve the September 21 evidence baseline. Their
-outdated blocker lists and gate results are superseded by the September 23
-current-state addendum and September 24 update at the end of this report. References below to the old
+outdated blocker lists and gate results are superseded by the September 24
+post-publication update at the end of this report. References below to the old
 repository and commit `2946ad2` describe the private Notype rollback copy, not
 the new `KoncusNai` Git history.
 
@@ -711,3 +714,26 @@ documentation commit requires its own passing private CI run, followed by
 review of its exact tree/history and the private Actions exposure above. The
 owner must then make an explicit final visibility decision with these rights
 questions still recorded as open if no new evidence has arrived.
+
+## September 24 post-publication status
+
+This appendix supersedes earlier visibility-status statements in this dated
+audit; earlier sections remain historical evidence of the preparation stages.
+The owner-supplied private `build-test` log for
+`26af366c2458db5112ee76b5afdb9ea2f85f970a` checked out that exact commit
+and passed. The owner reports reviewing retained Actions logs and artifacts,
+then changed `letapicode/KoncusNai` to Public and enabled private vulnerability
+reporting. A read-only public GitHub query confirmed public visibility and
+`main` at `26af366`; the local `main` and `origin/main` matched. `SECURITY.md`
+now links the private advisory form. The owner reports no collaborators and
+chooses to leave public PR submissions enabled; submission does not grant merge
+access. The owner's Actions exposure review and collaborator list were not
+independently audited here.
+
+This is public **source-available, noncommercial, work-in-progress** code under
+PolyForm Noncommercial 1.0.0, with no supported version 1 installer. The
+AI4Bharat, Nyra, Ampixa, and optional GPL/LGPL/FFmpeg rights questions remain
+open. An unanswered inquiry or user notice is not permission. Ordinary model
+use, generated outputs, commercial use, and future bundled or signed installer
+distribution require separate assessment. Every existing model option remains
+available. Subsequent commits require their own validation.
