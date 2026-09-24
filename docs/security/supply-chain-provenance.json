@@ -286,22 +286,22 @@
     {
       "id": "github-action-checkout",
       "uses": "actions/checkout",
-      "revision": "11d5960a326750d5838078e36cf38b85af677262",
-      "versionLabel": "v4",
+      "revision": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "versionLabel": "v7.0.1",
       "license": "mit"
     },
     {
       "id": "github-action-setup-dotnet",
       "uses": "actions/setup-dotnet",
-      "revision": "67a3573c9a986a3f9c594539f4ab511d57bb3ce9",
-      "versionLabel": "v4",
+      "revision": "a98b56852c35b8e3190ac28c8c2271da59106c68",
+      "versionLabel": "v6.0.0",
       "license": "mit"
     },
     {
       "id": "github-action-upload-artifact",
       "uses": "actions/upload-artifact",
-      "revision": "ea165f8d65b6e75b540449e92b4886f43607fa02",
-      "versionLabel": "v4",
+      "revision": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "versionLabel": "v7.0.1",
       "license": "mit"
     }
   ],
