@@ -8,27 +8,27 @@ installer and commercial product are separate decisions.
 
 ## Reviewed candidate and source boundary
 
-- Reviewed private commit: `f9a238c64db477141bdece6e2ad047fad971296b`.
+- Reviewed private commit: `d1b532fbb93e21c2d43df649a20dab73d235549f`.
   The owner-supplied September 24 `build-test` log checked out that exact SHA
   and reports success, including source, test, reliability, and static
   packaging gates. Six full-suite tests remained opt-in or environment skips;
   no installed/signed installer or manual compatibility result was established.
-- The committed tree has 1,128 regular files, all mode `100644`. Ten commits
+- The committed tree has 1,129 regular files, all mode `100644`. Eleven commits
   are reachable from the parentless root
-  `851bf463183775e38db0909d5b00faaeae6a0d4f`. All ten commits locally
+  `851bf463183775e38db0909d5b00faaeae6a0d4f`. All eleven commits locally
   identify `Ram Adhikari <koncusnai@gmail.com>` as author. GitHub account
   attribution and repository settings were not independently queried because
   the GitHub CLI was not authenticated. The local branch and its `origin/main`
   tracking ref matched at review time.
 - The exact file list is saved only in ignored local evidence at
-  `artifacts/release-audit/public-source-2026-09-24/committed-file-list-f9a238c.txt`;
+  `artifacts/release-audit/public-source-2026-09-24-final/committed-file-list-d1b532f.txt`;
   its SHA-256 is
-  `804a28ea607bcb2623c7353d46e704e459d0e3841725ad70a79896880289ca33`.
+  `971a277078700e4c01c9c70f3722f2acccfa7d9e0b686e5b0368ecec7ca9a299`.
   The original 1,126-file manifest describes the fresh root commit, not this
   later tree.
 - Current-tree and reachable-history path scans found no audio, model weights,
   user data, generated build output, runtime environment, cache, or credential
-  files. A high-signal private-key/token search found no hit across the ten
+  files. A high-signal private-key/token search found no hit across the eleven
   reachable commits. Pattern scans cannot prove absence of every secret.
   The old Notype Git history was neither opened nor imported.
 
@@ -105,11 +105,13 @@ the executable.
 ## Decision status
 
 Technically, the reviewed private source and static packaging baseline passed
-CI. Making the source visible would still require a green private CI run on any
-new documentation commit, review of that exact tree and history, a recorded
-owner decision informed by qualified advice about the rights above, and
-explicit approval to change visibility. The pending upstream correspondence
-can continue during this preparation. No opinion here declares the source or
-future installer legally cleared. A supported installer additionally needs
-manual compatibility, real-model, clean-install/upgrade, signing, and release
-validation under `docs/release/release-checklist.md`.
+CI. The owner has directed preparation of public work-in-progress source while
+upstream replies and qualified review remain pending; that direction does not
+resolve the rights questions above. Making the source visible would still
+require a green private CI run on any new documentation commit, review of that
+exact tree and history, review of private Actions logs and retained artifacts,
+and the owner's explicit final approval. Qualified advice remains recommended
+but unperformed. No opinion here declares the source or future installer
+legally cleared. A supported installer additionally needs manual compatibility,
+real-model, clean-install/upgrade, signing, and release validation under
+`docs/release/release-checklist.md`.

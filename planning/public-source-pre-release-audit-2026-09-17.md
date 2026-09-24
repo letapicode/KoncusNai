@@ -662,3 +662,52 @@ Source-only visibility remains a distinct owner decision informed by qualified
 review; retaining every model option does not turn an integration notice into
 a license. The next documentation commit requires its own green private CI
 run and exact-tree review before an explicit visibility approval.
+
+## September 24 `d1b532f` private source and publication-direction update
+
+The later owner-supplied private `build-test` log checked out exactly
+`d1b532fbb93e21c2d43df649a20dab73d235549f` and reported success in
+14 minutes 12 seconds. It includes locked restore, documentation,
+security/supply-chain, the 193-package Python advisory query with zero matches,
+the Git-index gate (1,129 files; 9,261,773 indexed bytes), Release builds,
+public API contracts, deterministic tests and coverage, fault seeds, the full
+suite with six opt-in/environment skips, three Milestone 2 soak iterations,
+compatibility contracts, and static packaging checks. It did not establish
+real-model performance, enforced manual compatibility, a signed installer, or
+clean-machine installation and upgrade.
+
+The local `main` and `origin/main` refs matched `d1b532f` at this review. Its
+1,129 regular files are all mode `100644`; eleven commits are reachable from
+the parentless KoncusNai root `851bf463183775e38db0909d5b00faaeae6a0d4f`.
+Each local commit identifies Ram Adhikari as author. The exact tree listing is
+retained only in ignored local evidence at
+`artifacts/release-audit/public-source-2026-09-24-final/committed-file-list-d1b532f.txt`
+(SHA-256 `971a277078700e4c01c9c70f3722f2acccfa7d9e0b686e5b0368ecec7ca9a299`).
+Current-tree and reachable-history path scans found zero audio, weights,
+credentials, user data, downloaded runtimes, caches, or generated output.
+High-signal private-key and token scans found zero hit files across the eleven
+commits. Pattern scans have limits. No old Notype history was accessed or
+imported.
+
+The CI workflow uploads `coverage-and-fault-evidence` from coverage, controlled
+fault-seed, and supply-chain report directories for 14 days. The supplied
+`d1b532f` text log had no high-signal secret-pattern matches. Local `gh auth
+status` reported no GitHub authentication, so all private Actions runs, their
+downloadable artifacts, repository settings, and GitHub account attribution
+could not be independently inspected. Before changing visibility, the owner
+must review every retained private Actions run and artifact, especially earlier
+failed runs, for secrets, personal paths or data, recordings, model weights,
+private text, and material that should not become public. The reviewed text
+attachment is one run log, not this complete exposure review.
+
+The owner has directed preparation of public work-in-progress **source-only**
+visibility without waiting for AI4Bharat, Nyra, and Ampixa replies or qualified
+GPL/LGPL/FFmpeg review. This is a decision to pursue publication, not evidence
+of third-party permission or final approval to change visibility. Keep every
+existing model option and feature, and state their known limits accurately.
+Source visibility, ordinary model use, generated outputs, commercial use, and
+a future bundled or supported installer remain distinct. The current
+documentation commit requires its own passing private CI run, followed by
+review of its exact tree/history and the private Actions exposure above. The
+owner must then make an explicit final visibility decision with these rights
+questions still recorded as open if no new evidence has arrived.

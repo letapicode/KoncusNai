@@ -6,14 +6,16 @@ Before changing repository visibility, even without publishing an installer:
 
 - [x] Add the owner-selected standard root `LICENSE`; complete `docs/licensing-decision.md`.
 - [x] Put a monitored private security contact and response window in `SECURITY.md`; immediately after public visibility is enabled, turn on GitHub private vulnerability reporting and add the real advisory route.
-- [x] Confirm no model weights, Hugging Face credentials, OAuth files, user history/audio, logs, caches, or build output paths exist in the 1,128-file `f9a238c` tree or its ten reachable commits. The high-signal history secret scan found zero matches. Repeat this check for the final public candidate.
+- [x] Confirm no model weights, Hugging Face credentials, OAuth files, user history/audio, logs, caches, or build output paths exist in the 1,129-file `d1b532f` tree or its 11 reachable commits. The high-signal history secret scan found zero hit files. Repeat this check for the final public candidate.
 - [x] Review `MODEL_LICENSES.md`, `THIRD_PARTY_NOTICES.md`, archived license texts, and dependency inventories against the pinned revisions; record unresolved model and runtime rights below. Repeat when pins change.
 - [x] Keep CrisperWhisper optional and research-only; verify acknowledgement gates both dictation and Reading Studio alignment.
 - [x] Resolve all failing dependency-advisory gates or record narrowly scoped, owner-approved reachability exceptions with expiry dates. The September 23 CI scan checked 193 locked packages with zero OSV matches; rerun it against the final candidate.
 - [x] Build and test the fresh 1,126-file root checkout and the later 1,127-file `7d3dfd0` baseline. The current tree and history contain no reachable Notype commits.
-- [x] Obtain passing private GitHub CI runs on `ac2e6df`, `7d3dfd0`, `76f2f8e`, and `f9a238c` for source and static packaging checks. The owner-supplied `f9a238c` log checked out that exact SHA and reported success.
+- [x] Obtain passing private GitHub CI runs on `ac2e6df`, `7d3dfd0`, `76f2f8e`, `f9a238c`, and `d1b532f` for source and static packaging checks. The owner-supplied `d1b532f` log checked out that exact SHA and reported success.
 - [ ] Obtain a passing private GitHub CI run on the final public-source candidate after subsequent commits.
-- [ ] Complete the [owner decision record](public-source-owner-decision-record.md) using the [rights review packet](public-source-rights-review-packet.md): assess the pending AI4Bharat, Nyra, and Ampixa inquiries and obtain qualified review of the optional GPL/LGPL runtime provisioning boundary for source-only visibility. Keep existing model options available; a user notice does not resolve publisher obligations.
+- [x] Record the owner's direction in the [owner decision record](public-source-owner-decision-record.md) using the [rights review packet](public-source-rights-review-packet.md): pursue source-only visibility while AI4Bharat, Nyra, and Ampixa replies and qualified GPL/LGPL/FFmpeg review remain pending. Keep existing model options available. No notice or unanswered inquiry resolves publisher obligations.
+- [ ] Before the visibility switch, record the owner's explicit final decision whether to proceed despite the unresolved rights questions. Qualified review remains recommended and unperformed; risk acceptance is not third-party permission.
+- [ ] Review every private GitHub Actions run log and retained artifact that will become visible. The local GitHub CLI is unauthenticated; the owner must review Actions history and artifact downloads in the private repository.
 - [ ] Review the final private GitHub diff and exact history, then obtain explicit approval before changing visibility.
 
 The September 23 committed-checkout evidence is in the ignored
@@ -35,7 +37,9 @@ remaining model and optional-runtime rights decisions.
 
 The owner-supplied September 24 log checked out `f9a238c64db477141bdece6e2ad047fad971296b`, reported a successful `build-test` run in 13 minutes 42 seconds, and used the updated checkout, setup-dotnet, and upload-artifact pins. Its Git-index gate measured 1,128 files and 9,249,036 indexed bytes. A new local preflight found ten reachable commits and zero forbidden path or high-signal history secret matches. This rights-packet documentation update requires its own private CI run after it is committed and pushed.
 
-Passing this gate permits a clearly labeled source pre-release only. It does not approve a `v1` installer.
+The later owner-supplied `d1b532fbb93e21c2d43df649a20dab73d235549f` log reported a successful `build-test` run in 14 minutes 12 seconds, with 1,129 indexed files and 9,261,773 indexed bytes. Local review of its 11 reachable commits found zero forbidden paths and zero high-signal secret-hit files. The exact file list is retained in ignored local evidence. GitHub Actions uploads `coverage-and-fault-evidence` from `artifacts/coverage-ci`, `artifacts/controlled-fault-seeds-ci`, and `artifacts/supply-chain-ci` with 14-day retention. The supplied log showed no high-signal secret patterns, but unauthenticated local access could not verify all private runs or download their artifacts. Those items need owner review before visibility changes. This new documentation commit needs its own private CI run.
+
+Passing the technical source gate supports a clearly labeled source pre-release decision only. It does not grant third-party rights or approve a `v1` installer.
 
 ## Scope
 Use this checklist before publishing any `1.x` release artifact.
