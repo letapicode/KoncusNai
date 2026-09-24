@@ -81,7 +81,7 @@ The measured 2026-09-05 baseline is 6,939/10,936 lines (63.45%) and 2,489/4,598 
 | Sensitive diagnostics redaction | 93.64% / 90.48% | 92.0% / 89.0% | Protect sensitive marker, JSON, bearer, and binary decisions. |
 | Model snapshot recovery | 40.68% / 43.83% | 40.0% / 42.0% | Hold the measured recovery floor without pretending network/process paths were exercised. |
 
-Thresholds are floors anchored to the measured baseline, not quality scores. A missing critical file fails even when the aggregate remains above its floor. `-SelfTest` proves that missing, malformed, empty, vanished-critical, and threshold-regressed evidence is rejected. CI runs the threshold step and uploads the raw XML/TRX plus JSON summary; artifact upload is diagnostic publication, not the threshold decision.
+Thresholds are floors anchored to the measured baseline, not quality scores. A missing critical file fails even when the aggregate remains above its floor. `-SelfTest` proves that missing, malformed, empty, vanished-critical, and threshold-regressed evidence is rejected. CI runs the threshold step using raw XML/TRX in ignored runner artifacts, then uploads only the checked JSON coverage, fault-seed, and supply-chain summaries. `scripts/prepare-ci-evidence.ps1` validates a strict public artifact allowlist; its self-test rejects copied workspaces, binaries, media, models, credentials, and user paths. Artifact upload is diagnostic publication, not the threshold decision.
 
 ## Controlled fault evidence
 

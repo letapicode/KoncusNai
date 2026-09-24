@@ -43,13 +43,23 @@ remaining model and optional-runtime rights decisions.
 
 Historical September 24 evidence: the owner-supplied log checked out `f9a238c64db477141bdece6e2ad047fad971296b`, reported a successful `build-test` run in 13 minutes 42 seconds, and used the updated checkout, setup-dotnet, and upload-artifact pins. Its Git-index gate measured 1,128 files and 9,249,036 indexed bytes. A local preflight found ten reachable commits and zero forbidden path or high-signal history secret matches. The subsequent documentation commit received its own passing CI run.
 
-The later owner-supplied `d1b532fbb93e21c2d43df649a20dab73d235549f` log reported a successful `build-test` run in 14 minutes 12 seconds, with 1,129 indexed files and 9,261,773 indexed bytes. Local review of its 11 reachable commits found zero forbidden paths and zero high-signal secret-hit files. The exact file list is retained in ignored local evidence. GitHub Actions uploads `coverage-and-fault-evidence` from `artifacts/coverage-ci`, `artifacts/controlled-fault-seeds-ci`, and `artifacts/supply-chain-ci` with 14-day retention. The supplied log showed no high-signal secret patterns. The owner later reviewed retained runs and artifacts before publication; that review was not independently audited here. The subsequent documentation commit received its own passing CI run.
+The later owner-supplied `d1b532fbb93e21c2d43df649a20dab73d235549f` log reported a successful `build-test` run in 14 minutes 12 seconds, with 1,129 indexed files and 9,261,773 indexed bytes. Local review of its 11 reachable commits found zero forbidden paths and zero high-signal secret-hit files. The exact file list is retained in ignored local evidence. At that time, GitHub Actions uploaded `coverage-and-fault-evidence` from entire coverage, controlled-fault-seed, and supply-chain directories with 14-day retention. The supplied log showed no high-signal secret patterns. The owner later reviewed retained runs and artifacts before publication; that review was not independently audited here. The subsequent documentation commit received its own passing CI run.
 
 The final private `26af366` `build-test` run passed before the owner made the
-repository public. The current documentation update needs its own CI result
-after push. Passing the technical source gate supports a clearly labeled
+repository public. The subsequent public documentation commit `741d8ba`
+also passed CI. Passing the technical source gate supports a clearly labeled
 source work in progress only. It does not grant third-party rights or approve
 a `v1` installer.
+
+The first public `741d8ba` `build-test` run passed, but its broad evidence
+upload contained 2,394 files and occupied 437,494,523 bytes. The fault-seed
+gate keeps a tracked-source workspace and build output under its ignored local
+artifact directory; uploading that whole directory caused the excess. The
+current workflow stages only coverage, fault-seed, compliance, and Python
+advisory JSON summaries plus a hash manifest for the 14-day public artifact.
+The raw fault workspace stays available in the runner during the test; it is
+not in the staged upload. Confirm the reduced artifact on the next public CI
+run. Earlier uploaded artifacts are unaffected by this source change.
 
 ## Scope
 Use this checklist before publishing any `1.x` release artifact.

@@ -27,6 +27,7 @@ jobs:
         run: dotnet restore DictateAnywhere.sln --locked-mode
 
       - name: Supply-chain Compliance
+        id: supply_chain
         shell: pwsh
         run: ./scripts/security-compliance.ps1 -OutputPath artifacts/supply-chain-ci/compliance.json
 
@@ -34,7 +35,12 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-documentation-claims.ps1
 
+      - name: Public CI Evidence Safeguard Self-Test
+        shell: pwsh
+        run: ./scripts/test-ci-evidence-preparation.ps1
+
       - name: Python Dependency Advisories
+        id: python_advisories
         shell: pwsh
         run: ./scripts/audit-python-advisories.ps1 -OutputPath artifacts/supply-chain-ci/python-advisories.json -FailOnFindings
 
@@ -60,22 +66,29 @@ jobs:
         run: ./scripts/run-focused-tests.ps1 -Suite Deterministic -NoBuild
 
       - name: Deterministic Coverage Threshold Gate
+        id: coverage
         shell: pwsh
         run: ./scripts/run-coverage-gate.ps1 -NoBuild -OutputDirectory artifacts/coverage-ci
 
       - name: Controlled Fault-Seed Gate
+        id: fault_seeds
         shell: pwsh
         run: ./scripts/run-controlled-fault-seeds.ps1 -OutputDirectory artifacts/controlled-fault-seeds-ci
 
-      - name: Upload Coverage and Fault Evidence
+      - name: Prepare public CI evidence
+        id: prepare_evidence
         if: always()
+        shell: pwsh
+        run: |
+          $complete = '${{ steps.supply_chain.outcome }}' -eq 'success' -and '${{ steps.python_advisories.outcome }}' -eq 'success' -and '${{ steps.coverage.outcome }}' -eq 'success' -and '${{ steps.fault_seeds.outcome }}' -eq 'success'
+          ./scripts/prepare-ci-evidence.ps1 -RequireComplete:$complete
+
+      - name: Upload Coverage and Fault Evidence
+        if: ${{ always() && steps.prepare_evidence.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-and-fault-evidence
-          path: |
-            artifacts/coverage-ci
-            artifacts/controlled-fault-seeds-ci
-            artifacts/supply-chain-ci
+          path: artifacts/ci-evidence-upload
           if-no-files-found: error
           retention-days: 14
 
