@@ -6,14 +6,14 @@ Before changing repository visibility, even without publishing an installer:
 
 - [x] Add the owner-selected standard root `LICENSE`; complete `docs/licensing-decision.md`.
 - [x] Put a monitored private security contact and response window in `SECURITY.md`; immediately after public visibility is enabled, turn on GitHub private vulnerability reporting and add the real advisory route.
-- [x] Confirm no model weights, Hugging Face credentials, OAuth files, user history/audio, logs, caches, build output, or machine-specific data exist in the 1,127-file `7d3dfd0` tree or its seven reachable commits. Repeat this check for the final public candidate.
+- [x] Confirm no model weights, Hugging Face credentials, OAuth files, user history/audio, logs, caches, build output, or machine-specific data exist in the 1,128-file `76f2f8e` tree or its nine reachable commits. Repeat this check for the final public candidate.
 - [x] Review `MODEL_LICENSES.md`, `THIRD_PARTY_NOTICES.md`, archived license texts, and dependency inventories against the pinned revisions; record unresolved model and runtime rights below. Repeat when pins change.
 - [x] Keep CrisperWhisper optional and research-only; verify acknowledgement gates both dictation and Reading Studio alignment.
 - [x] Resolve all failing dependency-advisory gates or record narrowly scoped, owner-approved reachability exceptions with expiry dates. The September 23 CI scan checked 193 locked packages with zero OSV matches; rerun it against the final candidate.
 - [x] Build and test the fresh 1,126-file root checkout and the later 1,127-file `7d3dfd0` baseline. The current tree and history contain no reachable Notype commits.
-- [x] Obtain passing private GitHub CI runs on `ac2e6df` and `7d3dfd0` for source and static packaging checks.
+- [x] Obtain passing private GitHub CI runs on `ac2e6df`, `7d3dfd0`, and `76f2f8e` for source and static packaging checks. The owner-supplied `76f2f8e` log reports a successful run with Node 24 action pins.
 - [ ] Obtain a passing private GitHub CI run on the final public-source candidate after subsequent commits.
-- [ ] Complete the [owner decision record](public-source-owner-decision-record.md): resolve or obtain qualified review of the Indic Parler named-voice, training-data, gated-access, and generated-output questions and the optional GPL/LGPL runtime provisioning boundary. Keep existing model options available; a user notice does not resolve publisher obligations.
+- [ ] Complete the [owner decision record](public-source-owner-decision-record.md): review answers to the owner's AI4Bharat, Nyra, and Ampixa inquiries and obtain qualified review of the optional GPL/LGPL runtime provisioning boundary. Keep existing model options available; a user notice does not resolve publisher obligations.
 - [ ] Review the final private GitHub diff and exact history, then obtain explicit approval before changing visibility.
 
 The September 23 committed-checkout evidence is in the ignored
@@ -32,6 +32,8 @@ install/upgrade, or clean-machine validation has passed. The repository is
 PolyForm Noncommercial source-available work in progress, not a supported
 version 1 installer. User-facing model notices do not resolve the owner's
 remaining model and optional-runtime rights decisions.
+
+The owner-supplied September 24 log checked out `76f2f8e27b4bb507704929adb9e1cbdd77af4851`, reported a successful `build-test` run in 13 minutes 42 seconds, and used the updated checkout, setup-dotnet, and upload-artifact pins. A local September 24 preflight found 1,128 tracked files, nine reachable commits, zero forbidden path or high-signal secret matches, and passing documentation, security/supply-chain, and Git-index size gates (9,243,170 indexed bytes). This new documentation update requires its own private CI run after it is committed and pushed.
 
 Passing this gate permits a clearly labeled source pre-release only. It does not approve a `v1` installer.
 

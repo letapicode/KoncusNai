@@ -1,11 +1,11 @@
 # Public work-in-progress source: owner decision record
 
-Status: **open** as of September 23, 2026. This record concerns making the existing source repository public. It does not approve a version 1 installer, commercial distribution, or any change to model availability.
+Status: **open** as of September 24, 2026. This record concerns making the existing source repository public. It does not approve a version 1 installer, commercial distribution, or any change to model availability. The owner reports sending inquiries to AI4Bharat, Nyra, and Ampixa; no reply or grant has been recorded. Sent-message copies and recipient delivery have not been independently verified.
 
 ## Reviewed source baseline
 
-- Private `main` and `origin/main`: `7d3dfd02e3fe3cd71809a0f4f19ab678fac91171` before this documentation update. The [private build-test run](https://github.com/letapicode/KoncusNai/actions/runs/35932874142) checked out that commit and succeeded in 15 minutes 17 seconds.
-- Seven commits are reachable from the parentless KoncusNai root `851bf463183775e38db0909d5b00faaeae6a0d4f`. The committed tree has 1,127 regular files. The old Notype audio-bearing history is not reachable.
+- Private `main` and `origin/main`: `76f2f8e27b4bb507704929adb9e1cbdd77af4851` before this documentation update. The owner-supplied successful `build-test` log checked out that exact commit, ran the updated Node 24 action pins, and reported success in 13 minutes 42 seconds. The full log is held outside Git in the owner's Codex attachment; GitHub CLI authentication was unavailable during this review.
+- Nine commits are reachable from the parentless KoncusNai root `851bf463183775e38db0909d5b00faaeae6a0d4f`. The committed tree has 1,128 regular files. The old Notype audio-bearing history is not reachable. The September 24 path/history and high-signal secret scans found zero matches; documentation, security/supply-chain, and Git-index size gates passed locally (1,128 files; 9,243,170 indexed bytes).
 - Current source and static packaging gates passed. Six full-suite tests were skipped: four need installed models, a real runtime, or GPU; two video/export tests require explicit opt-in. Real-model latency, manual compatibility, and an installed or signed installer were not validated by this run.
 
 ## Decision 1: Indic Parler-TTS integration
@@ -22,13 +22,31 @@ Status: **open** as of September 23, 2026. This record concerns making the exist
 
 **Owner decision needed:** After reviewing an upstream reply or qualified advice, decide whether to make this source-only, clearly labeled work-in-progress repository public with the existing optional Indic Parler integration and accurately recorded limitations. Record the evidence and decision here. A notice telling users to review terms does not itself resolve the publisher's rights questions.
 
-### Draft message for the upstream model discussion
+**Outreach status:** The owner reports sending an email asking about the voices, GLOBE `CC V1`, gated per-user downloads, and generated audio. No reply has been recorded. Keep the integration and existing options available while this is reviewed.
+
+### Message scope retained for reference
 
 > Hello AI4Bharat team. I maintain Koncus Nai, a Windows desktop application that offers your `ai4bharat/indic-parler-tts` checkpoint as an optional local narration choice. Each user accepts the Hugging Face gate and downloads the weights with their own account; our source and installer do not bundle the weights or generated previews. We are preparing a public work-in-progress source repository and want to describe the terms accurately. Could you point us to the authoritative license or conditions for the named voices and the training data (including the GLOBE entry marked `CC V1`), and clarify whether the gated terms allow this per-user third-party integration? Are generated audio or previews, including output using a named voice, subject to additional restrictions for commercial or other use? Links to the governing terms would help. Thank you.
 
-The prior audit records the Hugging Face discussion linked above as an upstream channel. **No AI4Bharat email address was verified from the local evidence.** Verify a current official contact before emailing; do not infer an address from unrelated Parler-TTS code or authors.
+The prior audit records the Hugging Face discussion linked above as an upstream channel. The owner's actual email recipient was not verified from local evidence; do not infer an address from unrelated Parler-TTS code or authors.
 
-## Decision 2: Optional GPL/LGPL Python runtimes
+## Decision 2: CrisperWhisper ordinary use and commercial licensing
+
+**Current implementation:** Turbo and Large are optional local dictation and Reading Studio alignment models. The app requires versioned acknowledgement of the archived Nyra Health Non-Commercial Research License before use. No weights are bundled. The license covers model weights and outputs, including transcripts and timestamps; its separate MIT grant applies to inference software only.
+
+**Specific upstream questions sent:** Does ordinary unpaid personal dictation or reading alignment outside research count as excluded operational deployment? If a future commercial Koncus Nai distribution contains only integration code and each user obtains weights separately, what written license must the developer and/or users obtain? The owner reports sending these questions to Nyra at the licensing address in its [pinned license](https://huggingface.co/nyralabs/CrisperWhisper2.0_large/blob/f4334f6e8193f2691212d49b20fa12d370e13896/LICENSE.md). No reply or signed license has been recorded.
+
+**Owner decision needed:** Keep the current research-only acknowledgement and claims while awaiting clarification. Do not describe ordinary operational or commercial use as licensed unless the applicable terms or a signed grant support it. The option stays available.
+
+## Decision 3: Kala Nepali generated-voice rights
+
+**Current implementation:** `ampixa/real-nepali-v0.2-kala` is an optional per-user download for local Nepali narration. Its [pinned model card](https://huggingface.co/ampixa/real-nepali-v0.2-kala/blob/90a66e818fbb4e19a8ba9b191da422a70e46a296/README.md) labels the materials CC-BY-SA-4.0 and identifies human and corpus speaker recordings. The card recommends `kala` for production but does not expressly document every speaker's separate voice/personality consent for downstream synthetic speech.
+
+**Specific upstream questions sent:** Have `kala`, `barsha`, and the included OpenSLR speaker recordings and identities been cleared for downstream generated speech, including commercial use? Do speaker-specific consent, attribution, or output conditions apply beyond the published material license? The owner reports emailing Ampixa at its published contact address. No reply has been recorded.
+
+**Owner decision needed:** Review any answer and qualified advice before making broad commercial voice-right claims. Keep the optional model and existing speaker functionality available.
+
+## Decision 4: Optional GPL/LGPL Python runtimes
 
 **Current implementation:** The public source contains setup scripts and pinned requirements. It does not contain downloaded Python wheels. Optional per-user runtime setup can obtain `phonemizer-fork` (recorded GPL-3.0-or-later), `num2words` (recorded LGPL), and `soxr` (recorded LGPL-2.1-or-later). See [third-party notices](../../THIRD_PARTY_NOTICES.md) and the [model inventory](../../MODEL_LICENSES.md).
 
@@ -36,6 +54,6 @@ The prior audit records the Hugging Face discussion linked above as an upstream 
 
 **Owner decision needed:** Obtain and record qualified advice for public source distribution and decide whether to proceed under the identified obligations. Review future installer/prebuilt-runtime distribution separately. No legal conclusion is asserted here.
 
-## Decision 3: Visibility
+## Decision 5: Visibility
 
 After the rights decisions above, review the final committed file list and reachable fresh history, obtain a passing private CI run for the final documentation commit, and explicitly approve changing `letapicode/KoncusNai` from private to public as **source-available, noncommercial, work in progress**. Immediately after visibility changes, enable GitHub private vulnerability reporting and update `SECURITY.md` with the real advisory route. No tag, installer, release artifact, or version 1 claim is part of this decision.

@@ -1,6 +1,6 @@
 # Koncus Nai
 
-> **Pre-release source project:** the private source baseline at `7d3dfd0` passed GitHub CI on September 23, 2026. Public visibility still requires the owner's rights and publication decisions. This is not a supported `v1` release; do not redistribute an installer built from this checkout as an official Koncus Nai release.
+> **Pre-release source project:** the private source baseline at `76f2f8e` passed GitHub CI on September 24, 2026. Public visibility still requires the owner's rights and publication decisions. This is not a supported `v1` release; do not redistribute an installer built from this checkout as an official Koncus Nai release.
 
 Koncus Nai was previously named Nilo and Notype (and originally Dictate Anywhere). The burnt-orange KN monogram
 is the current application mark. Existing data paths, executable names and installer

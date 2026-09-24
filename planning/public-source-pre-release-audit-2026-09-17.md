@@ -1,10 +1,10 @@
 # Public source pre-release audit — 2026-09-17
 
-Last updated with the latest passing private GitHub CI baseline: **2026-09-23**.
+Last updated with the latest passing private GitHub CI baseline: **2026-09-24**.
 
 The dated sections below preserve the September 21 evidence baseline. Their
 outdated blocker lists and gate results are superseded by the September 23
-current-state addendum at the end of this report. References below to the old
+current-state addendum and September 24 update at the end of this report. References below to the old
 repository and commit `2946ad2` describe the private Notype rollback copy, not
 the new `KoncusNai` Git history.
 
@@ -594,3 +594,35 @@ verified from the local evidence in this preflight.
 The version 1 installer remains a separate gate. No signed installer,
 clean-machine installation, upgrade validation, CUDA matrix, or release
 artifact is approved by this source review.
+
+## September 24 private source update
+
+The owner-supplied `build-test` log reports success in 13 minutes 42 seconds
+after checking out `76f2f8e27b4bb507704929adb9e1cbdd77af4851`. It shows
+the updated Node 24-compatible checkout, setup-dotnet, and upload-artifact
+pins running, and does not show the earlier Node 20 deprecation warning. The
+log passed the CI source, test, reliability, and static packaging stages; the
+earlier limits on real-model, manual compatibility, and installer evidence
+remain. GitHub CLI authentication was unavailable during this local review,
+so the log attachment was the CI evidence rather than a fresh API query.
+
+Local `main` and `origin/main` both point to `76f2f8e` before this
+documentation update. Its 1,128 committed files and nine reachable commits
+begin at the parentless KoncusNai root `851bf46`. A September 24 scan found
+zero forbidden audio, model, cache, credential, user-data, or build-output
+paths in the tree or reachable history, and zero high-signal secret-hit files
+in current tracked text. Documentation, security/supply-chain, and Git-index
+size checks passed locally; the size gate measured 9,243,170 indexed bytes.
+The first-commit 1,126-file manifest remains a historical root snapshot.
+
+The owner reports emailing AI4Bharat, Nyra, and Ampixa about the specific
+questions in the [owner decision record](../docs/release/public-source-owner-decision-record.md).
+No answers, permission grants, or signed commercial license have been
+recorded. Correspondence can continue while source preparation proceeds;
+an unanswered email does not itself settle model, output, or speaker rights.
+The optional GPL/LGPL runtime provisioning boundary still needs qualified
+review. Every model option and feature remains available under its existing
+gate and notice. The remaining public-visibility steps are the rights and
+runtime decisions, a green private CI run on the final documentation commit,
+review of that exact tree and history, and explicit owner approval to switch
+visibility. A supported version 1 installer has separate release gates.
