@@ -22,16 +22,6 @@ function Assert-Condition {
   }
 }
 
-function Assert-MsiVersion {
-  param([Parameter(Mandatory = $true)][string]$ProductVersion)
-
-  Assert-Condition -Condition ($ProductVersion -match "^\d+\.\d+\.\d+$") -Message "defaultVersion must be in Major.Minor.Build format."
-  foreach ($segment in $ProductVersion.Split(".")) {
-    $numericSegment = [int]$segment
-    Assert-Condition -Condition ($numericSegment -ge 0 -and $numericSegment -le 255) -Message "defaultVersion segment '$numericSegment' must be between 0 and 255."
-  }
-}
-
 function Resolve-RepoRoot {
   $scriptsRoot = $script:PSScriptRoot
   if ([string]::IsNullOrWhiteSpace($scriptsRoot)) {
@@ -93,7 +83,7 @@ Assert-Condition -Condition ([bool]$config.selfContained) -Message "MVP installe
 Assert-Condition -Condition ([bool]$config.preserveDataOnUninstall) -Message "MVP installer must preserve data directories on uninstall."
 Assert-Condition -Condition (-not [string]::IsNullOrWhiteSpace([string]$config.uiAccessHelperExecutable)) -Message "installer-config.json must define uiAccessHelperExecutable."
 Assert-Condition -Condition ([bool]$config.requireSignedBinariesForUiAccess) -Message "requireSignedBinariesForUiAccess must remain true."
-Assert-MsiVersion -ProductVersion ([string]$config.defaultVersion)
+Assert-Condition -Condition ($null -eq $config.PSObject.Properties["defaultVersion"]) -Message "Installer config must not select an implicit version."
 
 $distributionConfigPath = "installer/bundle/distribution-config.json"
 $distributionConfig = Get-Content -Path $distributionConfigPath -Raw | ConvertFrom-Json

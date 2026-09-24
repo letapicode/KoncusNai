@@ -16,10 +16,11 @@ Prerequisites:
 
 Command:
 ```powershell
-.\scripts\build-installer.ps1 -Version 1.0.0 -DistributionMode small
+.\scripts\build-installer.ps1 -Version $selectedVersion -DistributionMode small
 ```
 
 Notes:
+- Set `$selectedVersion` only after completing the installed-version inventory in the [versioning strategy](versioning-and-branching-strategy.md). `-Version` is required. Builds at or below the documented `1.4.2` development-artifact version fail before publishing or WiX runs.
 - `build-installer.ps1` publishes both `DictateAnywhere.App` and `DictateAnywhere.UiAccessHelper` into the installer payload.
 - Both win-x64 publishes use locked restore and explicitly select each source project's `packages.win-x64.lock.json`. Separate RID locks prevent installer measurement or packaging from silently rewriting the 29 normal solution locks.
 - ModelBenchmark, TtsCli, Spikes, and VoicePreviewGenerator are engineering tools under `tools` and are not publish inputs. Before refreshing the App staging leaf, `build-installer.ps1` uses `validate-installer-staging-path.ps1` to require the exact `<OutputRoot>/publish/DictateAnywhere.App` target, reject broad output roots, and reject a reparse point anywhere in the existing ancestor chain. `validate-installer-payload.ps1` then requires one root App executable and one root UIAccess helper while rejecting developer-tool residue, nested duplicates, and payload reparse points. `scripts/packaging-smoke.ps1` exercises the positive and fail-closed cases; see `planning/executable-ownership-and-distribution-audit.md`.
@@ -34,12 +35,12 @@ Notes:
 
 UIAccess packaging mode (requires signed host + helper binaries in publish output):
 ```powershell
-.\scripts\build-installer.ps1 -Version 1.0.0 -EnableUiAccess
+.\scripts\build-installer.ps1 -Version $selectedVersion -EnableUiAccess
 ```
 
 Signed release build (recommended):
 ```powershell
-.\scripts\build-installer.ps1 -Version 1.0.0 -DistributionMode small -SignInstallerArtifacts -SigningCertificateThumbprint <thumbprint> -VerifyArtifactSignatures
+.\scripts\build-installer.ps1 -Version $selectedVersion -DistributionMode small -SignInstallerArtifacts -SigningCertificateThumbprint <thumbprint> -VerifyArtifactSignatures
 ```
 
 ## Static Validation Gates
@@ -78,7 +79,7 @@ Static-only mode:
 
 Dynamic MSI execution mode (requires elevated PowerShell):
 ```powershell
-.\scripts\installer-scenario-validation.ps1 -RunDynamicScenarios -BaseInstallerPath .\artifacts\installer\KoncusNai-1.0.0-x64.msi
+.\scripts\installer-scenario-validation.ps1 -RunDynamicScenarios -BaseInstallerPath ".\artifacts\installer\KoncusNai-$selectedVersion-x64.msi"
 ```
 
 Validation logs are written to:

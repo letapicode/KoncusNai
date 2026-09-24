@@ -274,6 +274,7 @@ $repoRoot = Resolve-RepoRoot
 Set-Location $repoRoot
 
 $configPath = Join-Path -Path $repoRoot -ChildPath "installer/wix/installer-config.json"
+$upgradePolicyPath = Join-Path -Path $repoRoot -ChildPath "installer/wix/upgrade-policy.json"
 $distributionConfigPath = Join-Path -Path $repoRoot -ChildPath "installer/bundle/distribution-config.json"
 
 if (-not (Test-Path -Path $configPath)) {
@@ -281,6 +282,7 @@ if (-not (Test-Path -Path $configPath)) {
 }
 
 $requiredPaths = @(
+  $upgradePolicyPath,
   $distributionConfigPath,
   (Join-Path -Path $repoRoot -ChildPath "installer/bundle/DictateAnywhere.Small.Bundle.wxs")
 )
@@ -292,9 +294,21 @@ foreach ($requiredPath in $requiredPaths) {
 }
 
 $config = Get-Content -Path $configPath -Raw | ConvertFrom-Json
+$upgradePolicy = Get-Content -Path $upgradePolicyPath -Raw | ConvertFrom-Json
 $distributionConfig = Get-Content -Path $distributionConfigPath -Raw | ConvertFrom-Json
-$productVersion = if ([string]::IsNullOrWhiteSpace($Version)) { [string]$config.defaultVersion } else { $Version }
+if ([string]::IsNullOrWhiteSpace($Version)) {
+  throw "Explicit -Version is required. Confirm the installed-version inventory before selecting a release version."
+}
+$productVersion = $Version
 Assert-MsiVersion -ProductVersion $productVersion
+Assert-MsiVersion -ProductVersion ([string]$upgradePolicy.highestKnownDevelopmentArtifactVersion)
+Assert-MsiVersion -ProductVersion ([string]$upgradePolicy.minimumSupportedVersion)
+if ([version]$productVersion -lt [version]([string]$upgradePolicy.minimumSupportedVersion)) {
+  throw "Installer version must be at least $($upgradePolicy.minimumSupportedVersion)."
+}
+if ([version]$productVersion -le [version]([string]$upgradePolicy.highestKnownDevelopmentArtifactVersion)) {
+  throw "Installer version must exceed the highest documented development artifact version $($upgradePolicy.highestKnownDevelopmentArtifactVersion). Confirm the installed-version inventory before selecting a release version."
+}
 
 $productName = [string]$config.productName
 $manufacturer = [string]$config.manufacturer

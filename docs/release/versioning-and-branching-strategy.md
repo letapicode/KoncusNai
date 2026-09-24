@@ -45,3 +45,6 @@ Tagging:
 - Never reuse a version number once published.
 - Keep installer `UpgradeCode` stable for in-place upgrade continuity across `1.x`.
 - Do not bypass compatibility and quality gates for GA builds.
+- Specify the numeric MSI/Burn version explicitly for every installer build and size measurement. The checked-in installer has no default version.
+- The highest documented local development installer artifact is `1.4.2` (see `planning/production-readiness-implementation-2026-09-15.md`). The builder rejects versions at or below it. This floor prevents a known downgrade; it does not prove that a higher version upgrades every installed copy.
+- Before selecting a release version, the owner must inventory versions of any distributed or installed DictateAnywhere, Nilo, and Koncus Nai MSI/Burn packages, including ProductVersion, MSI UpgradeCode, Burn UpgradeCode, distribution channel, and whether each is still supported. Check published releases and tags as well as retained installer artifacts. Choose a previously unused version higher than every install intended for in-place upgrade, and validate upgrade paths on an isolated machine. If an unknown or higher-version population exists, resolve it explicitly before publication.

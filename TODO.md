@@ -41,7 +41,7 @@ Release status: the owner changed `letapicode/KoncusNai` to public after the suc
 - [x] Record exact model revisions, access requirements, approximate sizes and upstream terms; archive the reviewed CrisperWhisper license and preserve required license files in downloads.
 - [x] Require versioned CrisperWhisper acknowledgement before dictation selection or Reading Studio alignment. Keep the integration and model weights optional.
 - [x] Make Cohere and Indic Parler use the current user's standard Hugging Face authentication without persisting tokens in application settings.
-- [ ] Select a release version compatible with existing installs: installer default 1.0.0 is older than local development artifacts numbered 1.4.2.
+- [ ] Select a release version compatible with existing installs: the implicit 1.0.0 installer default has been removed and builds at or below the documented 1.4.2 development artifact are blocked. Owner inventory of installed/distributed MSI and Burn versions is still required before choosing a version.
 - [ ] Build fresh signed release artifacts containing the Gemma fix and subsequent changes.
 - [ ] Validate clean install, upgrade, repair, uninstall, startup, `run-kn`, offline recovery and non-admin behavior.
 - [ ] Complete the existing release checklist with real evidence and documented limitations.

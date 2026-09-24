@@ -3,5 +3,6 @@
   "productLine": "Koncus Nai",
   "upgradeCode": "{E4A2E0C8-7DA9-4A86-9A53-9A56BE2BD011}",
   "minimumSupportedVersion": "1.0.0",
+  "highestKnownDevelopmentArtifactVersion": "1.4.2",
   "allowDowngrades": false
 }

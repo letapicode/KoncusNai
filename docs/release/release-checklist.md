@@ -87,6 +87,7 @@ All required files for the release scope must contain real evidence values with 
 ## 1. Code and Branch Readiness
 - [ ] Branch follows strategy in `docs/release/versioning-and-branching-strategy.md`.
 - [ ] Release version selected and not previously published.
+- [ ] Owner installed/distributed-version inventory reviewed against the MSI and Burn upgrade families; candidate is higher than every intended upgrade source, including any development installers. Record exceptions and test each supported upgrade path. The `1.4.2` local artifact floor is only a known lower bound, not evidence of installed versions.
 - [ ] `CHANGELOG.md` updated for the target version.
 - [ ] Release notes created from `docs/release/release-notes-template.md`.
 

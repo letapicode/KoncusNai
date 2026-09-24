@@ -65,15 +65,16 @@ Write-Step "Checking static upgrade policy"
 Assert-Condition -Condition ([int]$policy.schemaVersion -ge 1) -Message "upgrade-policy.json schemaVersion must be >= 1."
 Assert-Condition -Condition ([string]$policy.upgradeCode -match "^\{[0-9A-Fa-f-]{36}\}$") -Message "upgrade-policy.json must contain a GUID-formatted upgradeCode."
 Assert-MsiVersion -ProductVersion ([string]$policy.minimumSupportedVersion)
+Assert-MsiVersion -ProductVersion ([string]$policy.highestKnownDevelopmentArtifactVersion)
 
 Write-Step "Checking installer config against upgrade policy"
-Assert-MsiVersion -ProductVersion ([string]$config.defaultVersion)
+Assert-Condition -Condition ($null -eq $config.PSObject.Properties["defaultVersion"]) -Message "installer-config.json must not supply an implicit installer version."
 Assert-Condition -Condition ([string]::Equals([string]$config.upgradeCode, [string]$policy.upgradeCode, [StringComparison]::OrdinalIgnoreCase)) -Message "installer-config.json upgradeCode must remain identical to upgrade-policy.json upgradeCode."
 Assert-Condition -Condition (-not [bool]$policy.allowDowngrades) -Message "MVP policy must disallow downgrades."
 
-$currentVersion = [version]([string]$config.defaultVersion)
+$knownVersion = [version]([string]$policy.highestKnownDevelopmentArtifactVersion)
 $minimumVersion = [version]([string]$policy.minimumSupportedVersion)
-Assert-Condition -Condition ($currentVersion -ge $minimumVersion) -Message "installer-config.json defaultVersion must be >= policy minimumSupportedVersion."
+Assert-Condition -Condition ($knownVersion -ge $minimumVersion) -Message "Known development artifact version must be >= policy minimumSupportedVersion."
 
 Write-Step "Checking WiX upgrade authoring"
 $packageNode = $wixXml.SelectSingleNode("/w:Wix/w:Package", $namespaceManager)

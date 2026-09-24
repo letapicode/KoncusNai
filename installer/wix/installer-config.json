@@ -1,7 +1,6 @@
 {
   "productName": "Koncus Nai",
   "manufacturer": "Dictate Anywhere",
-  "defaultVersion": "1.0.0",
   "upgradeCode": "{E4A2E0C8-7DA9-4A86-9A53-9A56BE2BD011}",
   "architecture": "x64",
   "runtimeIdentifier": "win-x64",

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][string]$OutputRoot,
-  [string]$Version = "1.0.0",
+  [string]$Version,
   [string]$ExpectedWixVersion = "5.0.2"
 )
 
@@ -44,6 +44,7 @@ function Get-DirectorySummary {
 }
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path -Path $PSScriptRoot -ChildPath ".."))
+if ([string]::IsNullOrWhiteSpace($Version)) { throw "Explicit -Version is required for installer size measurement." }
 $artifactsRoot = [IO.Path]::GetFullPath((Join-Path -Path $repoRoot -ChildPath "artifacts"))
 $resolvedOutputRoot = if ([IO.Path]::IsPathRooted($OutputRoot)) { [IO.Path]::GetFullPath($OutputRoot) } else { [IO.Path]::GetFullPath((Join-Path $repoRoot $OutputRoot)) }
 $artifactsPrefix = $artifactsRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
