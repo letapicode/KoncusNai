@@ -36,7 +36,7 @@ This page summarizes third-party license roles. Exact resolved machine-readable 
 ## Packaging Tooling
 - `WiX Toolset` - Microsoft Reciprocal License (MS-RL).
 - `llama.cpp` - MIT License; pinned Windows CPU archive.
-- `FFmpeg essentials build` - GPL-3.0-or-later distribution; downloaded on explicit video-export use and not bundled in the installer.
+- `FFmpeg essentials build` - distributor describes the build as GPLv3; an "or later" option for the exact archive is unverified. Downloaded on first video-export use and not bundled in the installer.
 - `Ollama` - MIT License; vendor-signed installer channel.
 - Bundled Excalifont, Kalam, and Noto Serif Devanagari fonts - SIL Open Font License 1.1.
 

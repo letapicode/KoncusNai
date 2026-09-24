@@ -23,7 +23,7 @@ beyond its upstream terms.
 | Indic narration | [`ai4bharat/indic-parler-tts`](https://huggingface.co/ai4bharat/indic-parler-tts) `7b527af5ee8ed1f9a28d80b19703ed9bb8ba10ca` | 3.50 GiB repository | Gated; user accepts terms and signs in | Checkpoint is labeled Apache-2.0. Gated access conditions and named-voice, training-data, and output-rights questions remain unresolved; attribution alone does not resolve them | Direct user download only; not bundled |
 | Indic narration description encoder | [`google/flan-t5-large`](https://huggingface.co/google/flan-t5-large) `0613663d0d48ea86ba8cb3d7a44f0f65dc596a2a` | Up to 11.92 GiB across all upstream formats; Transformers normally selects a subset | Public | Apache-2.0 | Downloaded as an auxiliary model; not bundled |
 | English/local narration | [`hexgrad/Kokoro-82M`](https://huggingface.co/hexgrad/Kokoro-82M) `f3ff3571791e39611d31c381e3a41a3af07b4987` | 0.34 GiB repository | Public | Apache-2.0 | Direct user download only; not bundled |
-| Nepali narration | [`ampixa/real-nepali-v0.2-kala`](https://huggingface.co/ampixa/real-nepali-v0.2-kala) `90a66e818fbb4e19a8ba9b191da422a70e46a296` | 0.94 GiB repository | Public | Model/G2P materials are labeled CC-BY-SA-4.0; attribution and ShareAlike obligations apply to covered adaptations | Direct user download only; not bundled |
+| Nepali narration | [`ampixa/real-nepali-v0.2-kala`](https://huggingface.co/ampixa/real-nepali-v0.2-kala) `90a66e818fbb4e19a8ba9b191da422a70e46a296` | 0.94 GiB repository | Public | Model/G2P materials are labeled CC-BY-SA-4.0; attribution and ShareAlike obligations apply to covered adaptations. Separate downstream speaker/voice clearance for generated speech is under inquiry | Direct user download only; not bundled |
 | Hindi word alignment | [`Harveenchadha/vakyansh-wav2vec2-hindi-him-4200`](https://huggingface.co/Harveenchadha/vakyansh-wav2vec2-hindi-him-4200) `e2568c3f7868d8aa3aaabcf28fa100d10d54c170` | 2.23 GiB repository | Public | MIT | Direct user download only; not bundled |
 | Local chat | [`gemma-3-4b-it-Q4_K_M.gguf`](https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF) `d0976223747697cb51e056d85c532013931fe52e` | 2.32 GiB | Public | [Gemma Terms](https://ai.google.dev/gemma/terms) and prohibited-use policy; required redistribution notices must be preserved | Direct pinned-file download; not bundled |
 | Local chat | [`Qwen3-1.7B-Q4_K_M.gguf`](https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF) `daeb8e2d528a760970442092f6bf1e55c3b659eb` | 1.19 GiB | Public | Apache-2.0 | Direct pinned-file download; not bundled |
@@ -59,5 +59,7 @@ lines, logs, diagnostics, source files, or release artifacts.
   questions before publication or paid/broad production claims. Each user must
   accept upstream conditions and authenticate with their own Hugging Face account;
   neither attribution nor the checkpoint label establishes complete clearance.
+- Review Ampixa's answer about the Kala model's human and corpus speaker voices
+  before making broad generated-speech or commercial voice-right claims.
 - Recheck the exact Ollama manifest and license-layer digests whenever the tag pin changes.
 - Recheck every upstream license and revision when a model pin changes.

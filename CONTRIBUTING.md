@@ -24,16 +24,16 @@ dotnet test DictateAnywhere.sln -c Release --no-build --maxcpucount:1
 .\scripts\validate-documentation-claims.ps1
 ```
 
-The September 22, 2026 Python advisory scan found no OSV matches in the exact
-193-package inventory. This result expires as advisories and locks change, so
-rerun the gate for every publication candidate and do not describe a pull
-request as release-ready if it fails.
+The private September 24, 2026 `f9a238c` CI run passed its Python advisory
+gate. Advisory results expire as advisories and locks change, so rerun the
+gate for every publication candidate and do not describe a pull request as
+release-ready if it fails.
 
 ## Contributions and commercial licensing
 
 Noncommercial use, modification, and redistribution are permitted by the root
 license. Commercial use requires separate written permission from Ram Adhikari
 through koncusnai@gmail.com. A contribution does not change the license of
-third-party code, models, or assets. Until a contributor-rights policy is
-adopted, maintainers must record the contributor's permission before merging
-outside contributions.
+third-party code, models, or assets. External code contributions will not be
+merged until the owner adopts and publishes a contributor-rights policy;
+issues and suggestions can still be submitted.

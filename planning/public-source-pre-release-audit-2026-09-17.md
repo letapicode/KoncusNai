@@ -476,8 +476,7 @@ third_party/compat/PROVENANCE.md
 
 ## September 23 private GitHub staging and public-source gate
 
-This section is the current disposition for the new source workspace at
-`C:\Users\RA\Desktop\Code\KoncusNai`. The earlier Notype Git history remains a
+This section records the new `KoncusNai` source workspace. The earlier Notype Git history remains a
 private rollback copy and was not imported. At the reviewed baseline, `main`
 and local `origin/main` both point to `7d3dfd02e3fe3cd71809a0f4f19ab678fac91171`.
 There are seven reachable commits from the fresh root
@@ -626,3 +625,40 @@ gate and notice. The remaining public-visibility steps are the rights and
 runtime decisions, a green private CI run on the final documentation commit,
 review of that exact tree and history, and explicit owner approval to switch
 visibility. A supported version 1 installer has separate release gates.
+
+## September 24 final source decision packet
+
+The owner-supplied private `build-test` log checked out
+`f9a238c64db477141bdece6e2ad047fad971296b` and reported success in
+13 minutes 42 seconds. Locked restore, documentation and security/supply-chain
+checks, the 1,128-file Git-index size gate (9,249,036 indexed bytes), Release
+builds, public API contracts, 1,149 deterministic focused tests, coverage
+floors, four fault seeds, the full suite (1,443 passed; six environment/opt-in
+skips), three Milestone 2 coordinator soak iterations, and static packaging
+and upgrade checks passed. No real-model cold/warm performance measurement,
+manual compatibility enforcement, signed installer, or clean-machine
+install/upgrade was established by this CI run.
+
+At this baseline, ten commits are reachable from the parentless KoncusNai
+root, all authored locally as Ram Adhikari. The 1,128 committed regular files
+are enumerated in ignored local evidence at
+`artifacts/release-audit/public-source-2026-09-24/committed-file-list-f9a238c.txt`
+with SHA-256
+`804a28ea607bcb2623c7353d46e704e459d0e3841725ad70a79896880289ca33`.
+Current and reachable-history path scans found zero forbidden audio, model,
+user-data, credential, cache, or generated-output paths. A high-signal secret
+scan across all ten reachable commits found zero hit files. The old Notype
+rollback Git history was not accessed or imported. GitHub account attribution
+and settings were not independently queried; the owner-supplied log and local
+author metadata are the available evidence.
+
+The [source/runtime rights review packet](../docs/release/public-source-rights-review-packet.md)
+records the actual app-initiated Python and FFmpeg flows, source/publish
+membership, exact pinned GPL/LGPL package metadata, and questions for
+qualified review. The AI4Bharat, Nyra, and Ampixa emails have no recorded
+reply or grant. Their pending status does not stop technical preparation, but
+it does not establish downstream model, output, or speaker permissions.
+Source-only visibility remains a distinct owner decision informed by qualified
+review; retaining every model option does not turn an integration notice into
+a license. The next documentation commit requires its own green private CI
+run and exact-tree review before an explicit visibility approval.

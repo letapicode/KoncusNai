@@ -65,11 +65,12 @@ patched builds cannot be mistaken for unmodified upstream releases.
   contain their wheels. Optional per-user runtimes download `phonemizer-fork`
   (GPL-3.0-or-later), `num2words` (LGPL), and `soxr` (LGPL-2.1-or-later) from
   their upstream package indexes. Their terms still apply to those packages;
-  review the resulting runtime distribution with qualified counsel before a
-  commercial installer or prebuilt runtime is offered.
+  qualified review is needed for the current source-only app-initiated setup
+  flow and separately for any future commercial installer or prebuilt runtime.
 - llama.cpp is MIT licensed and is downloaded from a pinned release.
-- FFmpeg is GPL-3.0-or-later in the selected distribution. It is downloaded on
-  explicit video-export use and is not bundled in the installer.
+- Gyan describes the selected FFmpeg build as GPLv3. Its page does not state
+  whether an "or later" option applies to that exact archive. Koncus Nai
+  downloads it on first video-export use and does not bundle it in the installer.
 - Ollama is MIT licensed and is installed through its vendor-signed channel.
 - Python is PSF-2.0 licensed and is installed separately for the isolated Indic
   Parler runtime when required.
