@@ -4,8 +4,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         presentation:WindowThemeBehavior.IsEnabled="True"
+        presentation:WindowWorkAreaConstraintBehavior.IsEnabled="True"
         Title="Reading Studio help"
+        PreviewKeyDown="OnPreviewKeyDown"
         Width="920"
         Height="740"
         MinWidth="720"
@@ -20,6 +23,8 @@
   </shell:WindowChrome.WindowChrome>
 
   <Window.Resources>
+    <sys:Double x:Key="Help.Prose.MaxWidth">920</sys:Double>
+
     <Style x:Key="HelpCard" TargetType="Border">
       <Setter Property="Margin" Value="6" />
       <Setter Property="Padding" Value="20" />
@@ -38,14 +43,19 @@
       <Setter Property="FontSize" Value="{DynamicResource Font.Size.BodyComfortable}" />
       <Setter Property="LineHeight" Value="{DynamicResource Line.Height.Body}" />
       <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="MaxWidth" Value="{DynamicResource Help.Prose.MaxWidth}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
       <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+    </Style>
+    <Style x:Key="HelpReferenceSection" TargetType="StackPanel">
+      <Setter Property="Margin" Value="8,0,8,22" />
     </Style>
   </Window.Resources>
 
   <Border Background="{DynamicResource Brush.Surface.Canvas}" BorderBrush="{DynamicResource Brush.Border.Subtle}" BorderThickness="1" CornerRadius="14">
     <Grid>
       <Grid.RowDefinitions><RowDefinition Height="54" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-      <Grid Grid.Row="0" Margin="20,0,12,0" presentation:WindowDragRegionBehavior.IsEnabled="True">
+      <Grid x:Name="HelpHeaderGrid" Grid.Row="0" Margin="20,0,12,0" presentation:WindowDragRegionBehavior.IsEnabled="True">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
         <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
           <Border Width="27" Height="27" Margin="0,0,11,0" BorderBrush="#D8B36A" BorderThickness="1.5" CornerRadius="14">
@@ -58,6 +68,8 @@
 
       <ScrollViewer x:Name="HelpContentScrollViewer"
                     Grid.Row="1"
+                    SizeChanged="OnContentViewportSizeChanged"
+                    ScrollChanged="OnContentScrollChanged"
                     presentation:StaticContentScrollViewerBehavior.IsEnabled="True"
                     Focusable="True"
                     IsTabStop="True"
@@ -65,29 +77,65 @@
                     AutomationProperties.Name="Reading Studio help content"
                     VerticalScrollBarVisibility="Auto"
                     HorizontalScrollBarVisibility="Disabled">
-        <StackPanel MaxWidth="820" Margin="42,28,42,36" HorizontalAlignment="Center">
-          <TextBlock FontFamily="Georgia" FontSize="{DynamicResource Font.Size.Hero}" FontWeight="SemiBold" TextWrapping="Wrap" Text="Write it. Shape it. Hear it." />
-          <TextBlock Margin="0,10,0,18" MaxWidth="820" HorizontalAlignment="Left" Style="{StaticResource HelpBody}" FontSize="{DynamicResource Font.Size.Lead}" LineHeight="{DynamicResource Line.Height.Lead}"
+        <StackPanel x:Name="HelpContentPanel" Margin="42,28,42,36" HorizontalAlignment="Center">
+          <TextBlock x:Name="HelpHeroTextBlock" MaxWidth="{DynamicResource Help.Prose.MaxWidth}" HorizontalAlignment="Left" FontFamily="Georgia" FontSize="{DynamicResource Font.Size.Hero}" FontWeight="SemiBold" TextWrapping="Wrap" Text="Write it. Shape it. Hear&#xA0;it." />
+          <TextBlock x:Name="HelpLeadTextBlock" Margin="0,10,0,18" Style="{StaticResource HelpBody}" FontSize="{DynamicResource Font.Size.Lead}" LineHeight="{DynamicResource Line.Height.Lead}"
                      Text="Reading Studio turns a draft or document into a private, synchronized reading experience. Everything starts on the page: type freely, choose how you want it read, then create the narration only when you are ready." />
 
-<StackPanel Margin="0,4,0,24">
-    <TextBlock Style="{StaticResource HelpCardTitle}" Text="1. Write or import" />
-    <TextBlock Style="{StaticResource HelpBody}" Text="Type or paste on the page, or choose Import document. Try a short paragraph to get started." Margin="0,0,0,18" />
-    <TextBlock Style="{StaticResource HelpCardTitle}" Text="2. Create narration" />
-    <TextBlock Style="{StaticResource HelpBody}" Text="Choose a language and voice, preview it, then select Create narration. Listen and follow the words on the page." Margin="0,0,0,18" />
-    <TextBlock Style="{StaticResource HelpCardTitle}" Text="3. Read or export" />
-    <TextBlock Style="{StaticResource HelpBody}" Text="Adjust Reading appearance while you listen. When narration is ready, export audio or video from the Export section." />
-  </StackPanel>
-  <TextBlock Style="{StaticResource HelpCardTitle}" Text="Reference" Margin="0,0,0,12" /><Expander Header="1. Start with the page" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="A new session opens as a blank, scrollable page with the caret ready. Type or paste directly into it. Import document opens EPUB, PDF, DOCX, text, web, image, and other supported documents; searchable text and local OCR are used automatically where appropriate." /></StackPanel></Expander>
-<Expander Header="2. Create narration" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="Choose Language, Voice, and Processing mode, then select Create narration. Start sooner prepares the first section and continues quietly as you listen. Full range prepares every selected section before playback. A visible progress surface reports each phase and elapsed time." /></StackPanel></Expander>
-<Expander Header="3. Read and navigate" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="Use Previous, Play or Pause, Next, the timeline, or a word on the page. Reading Studio follows the narration with precise timing and shows document progress beside the transport controls. The fullscreen icon removes distractions; the pencil icon returns the complete source to the editable page." /></StackPanel></Expander>
-<Expander Header="Reading range" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="Start section and End section determine what is prepared, exported, or published. A new draft selects its complete generated range automatically. Changing the range, language, voice, or source text invalidates narration that no longer matches; appearance-only changes do not." /></StackPanel></Expander>
-<Expander Header="Language and Voice" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="Language identifies the local narrator engine and filters the Voice list to compatible choices. Voice descriptions summarize tone—such as warm, expressive, clear, or grounded. The small play icon previews the selected voice before creating narration." /></StackPanel></Expander>
-<Expander Header="Reading focus" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="Reading focus chooses a full page, focused sentence, or focused word. Highlight style changes how the active word or sentence is treated. Focus color is the narration guide color; the eight circular choices include warm, cool, vivid, and neutral options and show their names when hovered." /></StackPanel></Expander>
-<Expander Header="Typeface, theme, size, and speed" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="Typeface and Text size control the page typography. Reading theme changes the page and surrounding surfaces; hover a circular theme swatch to see its name. Speed changes narration playback without regenerating audio. These appearance controls remain safe after preparation." /></StackPanel></Expander>
-<Expander Header="Export &amp; Publish" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="Export the selected range as a lossless audiobook or synchronized reading video. Video canvas supports landscape and vertical formats and carries the selected theme, typeface, focus color, and reading treatment. YouTube publishing creates an episode series through its dedicated workflow." /></StackPanel></Expander>
-<Expander Header="Privacy and first use" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="Document extraction, OCR, narration, timing, and playback stay on this device. A narrator may need to download its local runtime or model the first time it is used; Reading Studio reports that work and continues the requested action. Publishing is the only workflow that sends prepared media to an external service." /></StackPanel></Expander>
-<Expander Header="Good to know" Margin="0,0,0,8"><StackPanel Margin="12,8,12,12"><TextBlock Style="{StaticResource HelpBody}" Text="The hamburger hides or restores the controls. Voice preview, narration preparation, export, and publishing can take longer on a CPU; GPU acceleration is used when a compatible local backend is available. This help page will continue to evolve with Reading Studio." /></StackPanel></Expander>
+          <Border x:Name="HelpQuickStartCard" Style="{StaticResource HelpCard}" Margin="0,4,0,24">
+            <StackPanel>
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="1. Write or import" />
+              <TextBlock Style="{StaticResource HelpBody}" Margin="0,0,0,18" Text="Type or paste on the page, or choose Import document. Try a short paragraph to get started." />
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="2. Create narration" />
+              <TextBlock Style="{StaticResource HelpBody}" Margin="0,0,0,18" Text="Choose a language and voice, preview it, then select Create narration. Listen and follow the words on the page." />
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="3. Read or export" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="Adjust Reading appearance while you listen. When narration is ready, export audio or video from the Export section." />
+            </StackPanel>
+          </Border>
+
+          <TextBlock Margin="8,0,8,18" Style="{StaticResource HelpCardTitle}" FontSize="{DynamicResource Font.Size.Heading}" TextWrapping="Wrap" Text="Reference" />
+          <StackPanel x:Name="HelpReferencePanel">
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="1. Start with the page" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="A new session opens as a blank, scrollable page with the caret ready. Type or paste directly into it. Import document opens EPUB, PDF, DOCX, text, web, image, and other supported documents; searchable text and local OCR are used automatically where appropriate." />
+            </StackPanel>
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="2. Create narration" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="Choose Language, Voice, and Processing mode, then select Create narration. Start sooner prepares the first section and continues quietly as you listen. Full range prepares every selected section before playback. A visible progress surface reports each phase and elapsed time." />
+            </StackPanel>
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="3. Read and navigate" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="Use Previous, Play or Pause, Next, the timeline, or a word on the page. Reading Studio follows the narration with precise timing and shows document progress beside the transport controls. The fullscreen icon removes distractions; the pencil icon returns the complete source to the editable page." />
+            </StackPanel>
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="Reading range" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="Start section and End section determine what is prepared, exported, or published. A new draft selects its complete generated range automatically. Changing the range, language, voice, or source text invalidates narration that no longer matches; appearance-only changes do not." />
+            </StackPanel>
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="Language and Voice" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="Language identifies the local narrator engine and filters the Voice list to compatible choices. Voice descriptions summarize tone—such as warm, expressive, clear, or grounded. The small play icon previews the selected voice before creating narration." />
+            </StackPanel>
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="Reading focus" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="Reading focus chooses a full page, focused sentence, or focused word. Highlight style changes how the active word or sentence is treated. Focus color is the narration guide color; the eight circular choices include warm, cool, vivid, and neutral options and show their names when hovered." />
+            </StackPanel>
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="Typeface, theme, size, and speed" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="Typeface and Text size control the page typography. Reading theme changes the page and surrounding surfaces; hover a circular theme swatch to see its name. Speed changes narration playback without regenerating audio. These appearance controls remain safe after preparation." />
+            </StackPanel>
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="Export &amp; Publish" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="Export the selected range as a lossless audiobook or synchronized reading video. Video canvas supports landscape and vertical formats and carries the selected theme, typeface, focus color, and reading treatment. YouTube publishing creates an episode series through its dedicated workflow." />
+            </StackPanel>
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="Privacy and first use" />
+              <TextBlock Style="{StaticResource HelpBody}" Text="Document extraction, OCR, narration, timing, and playback stay on this device. A narrator may need to download its local runtime or model the first time it is used; Reading Studio reports that work and continues the requested action. Publishing is the only workflow that sends prepared media to an external service." />
+            </StackPanel>
+            <StackPanel Style="{StaticResource HelpReferenceSection}">
+              <TextBlock Style="{StaticResource HelpCardTitle}" Text="Good to know" />
+              <TextBlock x:Name="HelpFinalNote" Style="{StaticResource HelpBody}" Text="The hamburger hides or restores the controls. Voice preview, narration preparation, export, and publishing can take longer on a CPU; GPU acceleration is used when a compatible local backend is available. This help page will continue to evolve with Reading Studio." />
+            </StackPanel>
+          </StackPanel>
         </StackPanel>
       </ScrollViewer>
     </Grid>
