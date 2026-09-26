@@ -2,5 +2,5 @@ namespace DictateAnywhere.Settings;
 
 internal static class SettingsSchema
 {
-  public const int CurrentVersion = 20;
+  public const int CurrentVersion = 21;
 }

@@ -235,17 +235,24 @@
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
-    <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2" Panel.ZIndex="30"
-                Margin="18,12,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
-      <Image Width="26" Height="26" Margin="0,0,8,0" Style="{DynamicResource AppBrandMarkStyle}" />
-      <TextBlock Text="Koncus Nai" VerticalAlignment="Center" FontWeight="SemiBold"
-                 FontSize="{DynamicResource Font.Size.Section}" Margin="0,0,10,0" />
-      <Button x:Name="SidebarToggleButton" Style="{StaticResource ComposerIconButtonStyle}"
+    <Grid Grid.ColumnSpan="2" Panel.ZIndex="30" Margin="18,12,0,0"
+          VerticalAlignment="Top">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition x:Name="HeaderSidebarColumn" Width="{DynamicResource Layout.Workbench.SidebarWidth}" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
+        <Image Width="26" Height="26" Margin="0,0,8,0" Style="{DynamicResource AppBrandMarkStyle}" />
+        <TextBlock Text="Koncus Nai" VerticalAlignment="Center" FontWeight="SemiBold"
+                   FontSize="{DynamicResource Font.Size.Section}" />
+      </StackPanel>
+      <Button x:Name="SidebarToggleButton" Grid.Column="0" HorizontalAlignment="Right"
+              Margin="0,0,14,0" Style="{StaticResource ComposerIconButtonStyle}"
               ToolTip="Hide sidebar" AutomationProperties.Name="Hide sidebar"
               Click="OnToggleSidebarClicked" shell:WindowChrome.IsHitTestVisibleInChrome="True">
         <Path x:Name="SidebarToggleGlyph" Style="{StaticResource AppSidebarToggleIconStyle}" />
       </Button>
-    </StackPanel>
+    </Grid>
 
     <workbench:WorkbenchSidebarView x:Name="SidebarView"
                                     Grid.Column="0"
@@ -278,6 +285,19 @@
                                         NewSessionClicked="OnNewSessionClicked"
                                         SaveHistoryEditsClicked="OnSaveHistoryEditsClicked"
                                         DeleteHistorySessionClicked="OnDeleteHistorySessionClicked" />
+
+        <Border x:Name="PaperSurface" Grid.Row="1" Grid.RowSpan="2"
+                Margin="18,0,18,0" MaxWidth="1060" CornerRadius="8" ClipToBounds="True"
+                BorderBrush="{DynamicResource Brush.Paper.Border}" BorderThickness="1"
+                IsHitTestVisible="False" Visibility="Collapsed">
+          <Grid>
+            <Border CornerRadius="8" Background="{DynamicResource Brush.Paper.Page}" />
+            <presentation:PaperTexture />
+          </Grid>
+          <Border.Effect>
+            <DropShadowEffect Color="#000000" Opacity="0.12" BlurRadius="16" ShadowDepth="3" />
+          </Border.Effect>
+        </Border>
 
         <Grid x:Name="ConversationLayout" Grid.Row="1" Grid.RowSpan="2" Margin="0,12,0,0" VerticalAlignment="Center">
           <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>

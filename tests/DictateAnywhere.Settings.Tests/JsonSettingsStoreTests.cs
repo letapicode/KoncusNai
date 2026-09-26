@@ -136,7 +136,8 @@ public sealed class JsonSettingsStoreTests
       AssistantFeaturesEnabled: false,
       CrisperWhisperLicenseAcceptanceVersion: CrisperWhisperLicensePolicy.AcceptanceVersion,
       LegalAcceptanceVersion: AppLegalAcceptancePolicy.AcceptanceVersion,
-      LegalAcceptanceAcceptedAtUtc: new DateTimeOffset(2026, 9, 22, 1, 2, 3, TimeSpan.Zero));
+      LegalAcceptanceAcceptedAtUtc: new DateTimeOffset(2026, 9, 22, 1, 2, 3, TimeSpan.Zero),
+      ChatPaperViewEnabled: true);
 
     await store.SaveAsync(expected);
     AppSettings actual = await store.LoadAsync();
@@ -162,6 +163,7 @@ public sealed class JsonSettingsStoreTests
     Xunit.Assert.Equal(expected.LastDictationRetryWindowSeconds, actual.LastDictationRetryWindowSeconds);
     Xunit.Assert.Equal(expected.ThemePreference, actual.ThemePreference);
     Xunit.Assert.Equal(expected.ChatOutputFontSize, actual.ChatOutputFontSize);
+    Xunit.Assert.Equal(expected.ChatPaperViewEnabled, actual.ChatPaperViewEnabled);
     Xunit.Assert.Equal(expected.ChatTypefaceId, actual.ChatTypefaceId);
     Xunit.Assert.Equal(expected.EnableAutomaticPunctuation, actual.EnableAutomaticPunctuation);
     Xunit.Assert.Equal(expected.WorkbenchZoomPercent, actual.WorkbenchZoomPercent);
@@ -171,7 +173,7 @@ public sealed class JsonSettingsStoreTests
     Xunit.Assert.Equal(expected.LegalAcceptanceAcceptedAtUtc, actual.LegalAcceptanceAcceptedAtUtc);
 
     string json = await File.ReadAllTextAsync(path);
-    Xunit.Assert.Contains("\"schemaVersion\": 20", json, StringComparison.Ordinal);
+    Xunit.Assert.Contains("\"schemaVersion\": 21", json, StringComparison.Ordinal);
     Xunit.Assert.DoesNotContain("activeProfileId", json, StringComparison.OrdinalIgnoreCase);
     Xunit.Assert.DoesNotContain("experienceMode", json, StringComparison.OrdinalIgnoreCase);
     Xunit.Assert.DoesNotContain("profiles", json, StringComparison.OrdinalIgnoreCase);
@@ -228,7 +230,7 @@ public sealed class JsonSettingsStoreTests
       new HotkeyBinding(HotkeyModifiers.Control | HotkeyModifiers.Shift, 0x20),
       settings.Hotkey);
     Xunit.Assert.True(settings.HasCompletedFirstRun);
-    Xunit.Assert.Contains("\"schemaVersion\": 20", rewrittenJson, StringComparison.Ordinal);
+    Xunit.Assert.Contains("\"schemaVersion\": 21", rewrittenJson, StringComparison.Ordinal);
   }
 
   [Xunit.Fact]
@@ -584,7 +586,7 @@ public sealed class JsonSettingsStoreTests
     string rewrittenJson = await File.ReadAllTextAsync(path);
 
     Xunit.Assert.Equal("en-us", settings.TranscriptionLanguage);
-    Xunit.Assert.Contains("\"schemaVersion\": 20", rewrittenJson, StringComparison.Ordinal);
+    Xunit.Assert.Contains("\"schemaVersion\": 21", rewrittenJson, StringComparison.Ordinal);
     Xunit.Assert.Contains("\"enableAutomaticPunctuation\": true", rewrittenJson, StringComparison.OrdinalIgnoreCase);
     Xunit.Assert.Contains("\"chatOutputFontSize\": 15", rewrittenJson, StringComparison.Ordinal);
     Xunit.Assert.DoesNotContain("caretIndicatorEnabled", rewrittenJson, StringComparison.OrdinalIgnoreCase);
@@ -766,7 +768,7 @@ public sealed class JsonSettingsStoreTests
     AppSettings settings = await store.LoadAsync();
 
     string migratedJson = await File.ReadAllTextAsync(path);
-    Xunit.Assert.Contains("\"schemaVersion\": 20", migratedJson, StringComparison.Ordinal);
+    Xunit.Assert.Contains("\"schemaVersion\": 21", migratedJson, StringComparison.Ordinal);
     Xunit.Assert.DoesNotContain("rewriteProviderId", migratedJson, StringComparison.OrdinalIgnoreCase);
     Xunit.Assert.DoesNotContain("rewriteModelId", migratedJson, StringComparison.OrdinalIgnoreCase);
     Xunit.Assert.DoesNotContain("rewriteMode", migratedJson, StringComparison.OrdinalIgnoreCase);
@@ -829,7 +831,32 @@ public sealed class JsonSettingsStoreTests
     Xunit.Assert.Equal(CrisperWhisperLicensePolicy.AcceptanceVersion, settings.CrisperWhisperLicenseAcceptanceVersion);
     Xunit.Assert.Null(settings.LegalAcceptanceVersion);
     Xunit.Assert.Null(settings.LegalAcceptanceAcceptedAtUtc);
-    Xunit.Assert.Contains("\"schemaVersion\": 20", await File.ReadAllTextAsync(path), StringComparison.Ordinal);
+    Xunit.Assert.Contains("\"schemaVersion\": 21", await File.ReadAllTextAsync(path), StringComparison.Ordinal);
+  }
+
+  [Xunit.Fact]
+  public async Task LoadAsync_MigratesSchema20_PreservingLegalAcceptanceAndDefaultingPaperOff()
+  {
+    using TemporaryDirectoryScope scope = new();
+    string path = Path.Combine(scope.DirectoryPath, "settings.json");
+    await File.WriteAllTextAsync(path, """
+{
+  "schemaVersion": 20,
+  "chatOutputFontSize": 19,
+  "themePreference": 2,
+  "legalAcceptanceVersion": "accepted-v1",
+  "legalAcceptanceAcceptedAtUtc": "2026-09-22T01:02:03+00:00"
+}
+""");
+
+    AppSettings settings = await new JsonSettingsStore(path).LoadAsync();
+
+    Xunit.Assert.Equal(19, settings.ChatOutputFontSize);
+    Xunit.Assert.Equal(AppThemePreference.Dark, settings.ThemePreference);
+    Xunit.Assert.Equal("accepted-v1", settings.LegalAcceptanceVersion);
+    Xunit.Assert.Equal(new DateTimeOffset(2026, 9, 22, 1, 2, 3, TimeSpan.Zero), settings.LegalAcceptanceAcceptedAtUtc);
+    Xunit.Assert.False(settings.ChatPaperViewEnabled);
+    Xunit.Assert.Contains("\"schemaVersion\": 21", await File.ReadAllTextAsync(path), StringComparison.Ordinal);
   }
 
   private sealed class TemporaryDirectoryScope : IDisposable

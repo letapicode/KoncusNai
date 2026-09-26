@@ -86,9 +86,11 @@ internal static class WorkbenchPresentationReducer
     bool canEditPrompt = !snapshot.IsOperationBusy && !snapshot.IsImportingFiles;
     bool canManageConversation = canInteractWithChat && !snapshot.IsImportingFiles;
     bool canUseQuickLocalReply = snapshot.CanUseQuickLocalReply && !snapshot.IsImportingFiles;
+    // Submission refreshes readiness itself. Stale readiness must not disable the
+    // pointer affordance while the keyboard can run the same submission command.
     bool canSend = canInteractWithChat
       && snapshot.HasComposerText
-      && ((snapshot.IsChatModelInstalled && isChatRuntimeReady) || canUseQuickLocalReply);
+      && !snapshot.IsImportingFiles;
     bool showOperationalStatus = snapshot.IsImportingFiles
       || !snapshot.IsChatModelInstalled
       || !isChatRuntimeReady

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using DictateAnywhere.App.Presentation;
 
 namespace DictateAnywhere.App.Workbench;
 
@@ -60,6 +61,27 @@ public partial class WorkbenchExpandedPromptView : UserControl
     ArgumentNullException.ThrowIfNull(fontFamily);
     Prompt.FontSize = fontSize;
     Prompt.FontFamily = fontFamily;
+  }
+
+  internal void SetPaperView(bool enabled)
+  {
+    DictateAnywhere.App.Presentation.PaperChatResources.Apply(this, enabled);
+    Prompt.Resources.Remove("Brush.Control.InputDisabled");
+    bool showGrain = enabled && !WindowThemeBehavior.GetIsHighContrastActive(this);
+    PaperGrain.Visibility = showGrain ? Visibility.Visible : Visibility.Collapsed;
+    Surface.SetResourceReference(Border.BackgroundProperty,
+      enabled ? "Brush.Paper.Page" : "Brush.Surface.Composer");
+    Surface.SetResourceReference(Border.BorderBrushProperty,
+      enabled ? "Brush.Paper.Border" : "Brush.Border.Subtle");
+    if (showGrain)
+    {
+      Prompt.Background = Brushes.Transparent;
+      Prompt.Resources["Brush.Control.InputDisabled"] = Brushes.Transparent;
+    }
+    else Prompt.SetResourceReference(Control.BackgroundProperty,
+      enabled ? "Brush.Paper.Composer" : "Brush.Control.Input");
+    Prompt.SetResourceReference(Control.ForegroundProperty,
+      enabled ? "Brush.Paper.Ink" : "Brush.Text.Primary");
   }
 
   private void OnPromptTextChanged(object sender, TextChangedEventArgs args)

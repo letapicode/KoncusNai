@@ -84,6 +84,7 @@ public partial class App : Application
     windowCoordinator.ThemePreferenceRequested += OnWorkbenchThemePreferenceRequested;
     windowCoordinator.TranscriptionModelSelectionRequested += OnWorkbenchTranscriptionModelSelectionRequested;
     windowCoordinator.ChatOutputFontSizeRequested += OnWorkbenchChatOutputFontSizeRequested;
+    windowCoordinator.ChatPaperViewRequested += OnWorkbenchChatPaperViewRequested;
     windowCoordinator.WorkbenchZoomRequested += OnWorkbenchZoomRequested;
     activationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
     activationTimer.Tick += OnActivationRequested;
@@ -186,6 +187,7 @@ public partial class App : Application
       windowCoordinator.ThemePreferenceRequested -= OnWorkbenchThemePreferenceRequested;
       windowCoordinator.TranscriptionModelSelectionRequested -= OnWorkbenchTranscriptionModelSelectionRequested;
       windowCoordinator.ChatOutputFontSizeRequested -= OnWorkbenchChatOutputFontSizeRequested;
+      windowCoordinator.ChatPaperViewRequested -= OnWorkbenchChatPaperViewRequested;
       windowCoordinator.WorkbenchZoomRequested -= OnWorkbenchZoomRequested;
       await windowCoordinator.DisposeAsync().ConfigureAwait(true);
       windowCoordinator = null;
@@ -373,6 +375,11 @@ public partial class App : Application
     await RunTrayActionAsync(() => ApplyWorkbenchChatOutputFontSizeAsync(fontSize)).ConfigureAwait(true);
   }
 
+  private async void OnWorkbenchChatPaperViewRequested(bool enabled)
+  {
+    await RunTrayActionAsync(() => ApplyWorkbenchChatPaperViewAsync(enabled)).ConfigureAwait(true);
+  }
+
   private async void OnWorkbenchZoomRequested(int percent)
   {
     await RunTrayActionAsync(() => ApplyWorkbenchZoomAsync(percent)).ConfigureAwait(true);
@@ -407,6 +414,15 @@ public partial class App : Application
       ChatOutputFontSize = ChatTextSizePolicy.Normalize(fontSize),
     };
     await settingsStore.SaveAsync(updated).ConfigureAwait(true);
+  }
+
+  private async Task ApplyWorkbenchChatPaperViewAsync(bool enabled)
+  {
+    if (settingsStore is null)
+      throw new InvalidOperationException("Settings store is not initialized.");
+
+    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    await settingsStore.SaveAsync(settings with { ChatPaperViewEnabled = enabled }).ConfigureAwait(true);
   }
 
   private async Task ApplyWorkbenchZoomAsync(int percent)

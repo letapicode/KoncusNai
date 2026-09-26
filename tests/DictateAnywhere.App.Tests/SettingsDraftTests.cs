@@ -53,6 +53,7 @@ public sealed class SettingsDraftTests
       ThemePreference: AppThemePreference.Light,
       ChatOutputFontSize: 20,
       ChatTypefaceId: ChatTypefaceIds.Kalam,
+      ChatPaperViewEnabled: true,
       EnableAutomaticPunctuation: false);
 
     SettingsDraft draft = SettingsDraft.FromSettings(custom);
@@ -60,6 +61,7 @@ public sealed class SettingsDraftTests
 
     Assert.Equal(custom, converted);
     Assert.False(draft.IsDirty(custom));
+    Assert.False(draft.HasAppearanceChanges(custom));
   }
 
   [Fact]

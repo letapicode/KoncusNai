@@ -33,8 +33,13 @@ Update this document whenever a user-visible feature, supported model, workflow,
 - Applies the selected System, Book Serif, Literary Serif, Modern Serif, Excalifont, or Kalam chat typeface to replies, the composer, its expanded editor, and request-progress text.
 - Sentence-cases automatically generated chat-history titles while preserving deliberate mixed-case names and manually entered titles.
 - Uses a continuous 12-30 px chat text-size slider with live preview and persisted integer values.
+- Starts new chats at 15 px. Fenced and indented code uses selectable, colored syntax for common languages, with a plain-text fallback and horizontal scrolling for long lines. Each code header offers a display-only Wrap lines toggle with hanging continuation indentation based on the source line plus four spaces, bounded for narrow windows; copying retains the original source and line breaks. The shared renderer applies across chat models.
+- Enables pointer submission for nonempty idle drafts, with model readiness refreshed by the same send flow as keyboard submission. Busy operations and file imports continue to block submission.
+- Provides a full-width horizontal scrollbar for overflowing code and an additional horizontal control at the visible edge of tall blocks whose own scrollbar is offscreen. Code widths are measured with the rendering font; the responsive chat/composer column grows up to 900 units.
+- Keeps Light and Dark themes and adds an independent, optional Paper view for the chat page and composer. Paper view and Workbench zoom persist without changing stored chat content or exports.
+- Uses rounded, content-fitting user bubbles with left-aligned text and a shared reading column. Code distinguishes keywords, primitive types, recognizable types, methods, members, literals, and comments while keeping ordinary variables neutral; classification is lexical and contextual, not compiler symbol analysis. Paper uses a pale off-white base with continuous procedural vector grain and fibers, coordinated controls, page edge and shadow, and dark action icons. Its compact composer shares the underlying paper surface; the expanded editor uses the same grain treatment. No image tiles are used.
 - Refreshes the open dictation-history sidebar and standalone History window immediately after a global dictation is stored.
-- Uses a compact settings menu with one-click light/dark mode, an Advanced settings entry, model readiness, and the current transcription provider shown without internal release identifiers.
+- Uses a compact settings menu with one-click light/dark mode, a separate Paper view toggle, Workbench zoom controls, an Advanced settings entry, model readiness, and the current transcription provider shown without internal release identifiers.
 
 ### Dictation formatting
 
