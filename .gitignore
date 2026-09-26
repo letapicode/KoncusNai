@@ -92,3 +92,4 @@ id_rsa*
 # Third-party runtime bundles restored by setup scripts
 /tools/whispercpp/Release/
 /tools/whispercpp/whisper-bin-x64.zip
+/src/DictateAnywhere.App/Assets/Textures/paper.png
