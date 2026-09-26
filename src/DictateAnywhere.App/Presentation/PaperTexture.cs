@@ -5,7 +5,7 @@ using System.Windows.Media;
 namespace DictateAnywhere.App.Presentation;
 
 /// <summary>Draws continuous paper grain in viewport coordinates, without image tiles.</summary>
-internal sealed class PaperTexture : FrameworkElement
+public sealed class PaperTexture : FrameworkElement
 {
   private DrawingGroup? grain;
   private Size grainSize;

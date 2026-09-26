@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Markup;
 using DictateAnywhere.App.Presentation;
 using DictateAnywhere.App.Workbench;
 using Xunit;
@@ -11,6 +12,26 @@ namespace DictateAnywhere.App.Tests;
 
 public sealed class PaperSurfaceTests
 {
+  [Theory]
+  [InlineData(7)]
+  [InlineData(17)]
+  public void PaperTexture_LooseXamlCanResolveTypeAndCornerRadiusWithoutRendering(int radius) => RunOnSta(() =>
+  {
+    string markup = $$"""
+      <Grid xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation;assembly=DictateAnywhere.App">
+        <presentation:PaperTexture x:Name="Grain" CornerRadius="{{radius}}" />
+      </Grid>
+      """;
+    Grid grid = Assert.IsType<Grid>(XamlReader.Parse(markup));
+    PaperTexture texture = Assert.IsType<PaperTexture>(grid.FindName("Grain"));
+    Assert.Same(texture, Assert.Single(grid.Children.Cast<UIElement>()));
+    Assert.Equal(radius, texture.CornerRadius);
+    Assert.False(texture.IsHitTestVisible);
+    Assert.False(texture.Focusable);
+  });
+
   [Fact]
   public void Grain_IsFrozenVectorGeometryAndBoundedAtLargeSizes() => RunOnSta(() =>
   {
