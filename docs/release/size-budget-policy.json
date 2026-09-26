@@ -61,8 +61,8 @@
       "baselineBytes": 1247869,
       "minimumFiles": 190,
       "minimumBytes": 1123082,
-      "maximumBytes": 1650000,
-      "rationale": "September 16 release audit measured 1558353 bytes in the isolated candidate index after the chat, insertion, history and security regression additions. A 1650000-byte cap retains about six percent headroom for test source; generated outputs and model assets remain prohibited. The historical baseline is unchanged."
+      "maximumBytes": 1780000,
+      "rationale": "September 26 CI measured 1675782 Git blob bytes after adding chat readability, Paper appearance, code scrolling and continuation wrapping regression coverage. A 1780000-byte cap retains about six percent headroom for test source. Generated outputs and model assets remain prohibited, and the historical baseline is unchanged."
     },
     {
       "id": "scripts",
@@ -100,8 +100,8 @@
       "baselineBytes": 718389,
       "minimumFiles": 105,
       "minimumBytes": 646550,
-      "maximumBytes": 1500000,
-      "rationale": "September 16 candidate measurement was 1349625 bytes including the existing rebrand and hardening plans and compiled API baseline. A 1.5-megabyte cap admits the release audit and bounded documentation growth; generated outputs remain excluded."
+      "maximumBytes": 1600000,
+      "rationale": "September 26 tracked documentation and planning measured 1503922 Git blob bytes after the chat readability and Paper plans and verification reports. A 1600000-byte cap retains about six percent headroom for bounded documentation growth. Historical baselines are unchanged and generated outputs remain excluded."
     },
     {
       "id": "bundled-app-assets",

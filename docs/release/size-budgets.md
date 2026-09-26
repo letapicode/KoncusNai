@@ -55,6 +55,14 @@ projects are excluded. This checkpoint had no LFS entries or submodules.
 
 ## Historical bundled-asset baseline
 
+The September 26 chat readability and Paper update measured 1,675,782 Git blob
+bytes of test source in CI and 1,503,922 Git blob bytes of documentation and
+planning. Their caps are 1,780,000 and 1,600,000 bytes respectively, retaining
+about six percent headroom for regression coverage and implementation reports.
+Repository, production, bundled-asset, and release-output caps remain unchanged;
+historical checkpoint baselines above are retained. The unused paper reference
+image is untracked, and Paper grain is generated in code.
+
 At the September 6 checkpoint, 129 manifest-backed voice previews totaled
 35,632,392 WAV bytes. File sizes ranged from 132,044 to 482,348 bytes; the
 nearest-rank median was 291,884 and p95 was 435,244. The Git-normalized manifest
