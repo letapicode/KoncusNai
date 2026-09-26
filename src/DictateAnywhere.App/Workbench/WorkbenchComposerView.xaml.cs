@@ -172,6 +172,29 @@ public partial class WorkbenchComposerView : UserControl
 
   internal void StartProgress(FontFamily fontFamily) => ProgressView.Start(fontFamily);
 
+  internal void SetPaperView(bool enabled)
+  {
+    DictateAnywhere.App.Presentation.PaperChatResources.Apply(this, enabled);
+    Prompt.Resources.Remove("Brush.Control.InputDisabled");
+    bool sharePaper = enabled && !WindowThemeBehavior.GetIsHighContrastActive(this);
+    if (sharePaper) CompactComposer.Background = Brushes.Transparent;
+    else CompactComposer.SetResourceReference(Border.BackgroundProperty,
+      enabled ? "Brush.Paper.Composer" : "Brush.Surface.Composer");
+    CompactComposer.SetResourceReference(Border.BorderBrushProperty,
+      enabled ? "Brush.Paper.Border" : "Brush.Border.Subtle");
+    Prompt.SetResourceReference(Control.ForegroundProperty,
+      enabled ? "Brush.Paper.Ink" : "Brush.Text.Primary");
+    if (sharePaper)
+    {
+      Prompt.Background = Brushes.Transparent;
+      Prompt.Resources["Brush.Control.InputDisabled"] = Brushes.Transparent;
+    }
+    else Prompt.SetResourceReference(Control.BackgroundProperty,
+      enabled ? "Brush.Paper.Composer" : "Brush.Control.Input");
+    PromptPlaceholder.SetResourceReference(TextBlock.ForegroundProperty,
+      enabled ? "Brush.Paper.Comment" : "Brush.Text.Secondary");
+  }
+
   internal TimeSpan StopProgress() => ProgressView.Stop();
 
   internal void DisposePresentation()
@@ -207,7 +230,7 @@ public partial class WorkbenchComposerView : UserControl
     Send.Visibility = !chatIsBusy && hasPrompt ? Visibility.Visible : Visibility.Collapsed;
     Send.ToolTip = canUseQuickLocalReply
       ? "Send quick local greeting"
-      : canSend ? "Submit" : "Set up the selected model before submitting";
+      : "Submit (checks model readiness)";
     StopChat.IsEnabled = canCancelChat;
     StopChat.Visibility = canCancelChat ? Visibility.Visible : Visibility.Collapsed;
     ReadDocument.IsEnabled = !isPreparingSpeech;
@@ -263,6 +286,7 @@ public partial class WorkbenchComposerView : UserControl
   private void OnPromptTextChanged(object sender, TextChangedEventArgs args)
   {
     promptRevision++;
+    PromptPlaceholder.Visibility = HasPrompt ? Visibility.Collapsed : Visibility.Visible;
     if (!isApplyingPrompt)
     {
       PromptTextChanged?.Invoke(this, args);

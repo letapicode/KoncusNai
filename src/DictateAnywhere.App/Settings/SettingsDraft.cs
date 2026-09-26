@@ -46,6 +46,7 @@ public sealed record SettingsDraft
   public int ChatOutputFontSize { get; init; } = 15;
   public string ChatTypefaceId { get; init; } = ChatTypefaceIds.System;
   public int WorkbenchZoomPercent { get; init; } = 100;
+  public bool ChatPaperViewEnabled { get; init; }
   public bool AssistantFeaturesEnabled { get; init; } = true;
   public string? CrisperWhisperLicenseAcceptanceVersion { get; init; }
   public string? LegalAcceptanceVersion { get; init; }
@@ -101,6 +102,7 @@ public sealed record SettingsDraft
       ChatOutputFontSize = normalized.ChatOutputFontSize,
       ChatTypefaceId = normalized.ChatTypefaceId,
       WorkbenchZoomPercent = normalized.WorkbenchZoomPercent,
+      ChatPaperViewEnabled = normalized.ChatPaperViewEnabled,
       AssistantFeaturesEnabled = normalized.AssistantFeaturesEnabled,
       CrisperWhisperLicenseAcceptanceVersion = normalized.CrisperWhisperLicenseAcceptanceVersion,
       LegalAcceptanceVersion = normalized.LegalAcceptanceVersion,
@@ -176,6 +178,7 @@ public sealed record SettingsDraft
       ChatTypefaceId: ChatTypefaceId,
       EnableAutomaticPunctuation: EnableAutomaticPunctuation,
       WorkbenchZoomPercent: WorkbenchZoomPercent,
+      ChatPaperViewEnabled: ChatPaperViewEnabled,
       AssistantFeaturesEnabled: AssistantFeaturesEnabled,
       CrisperWhisperLicenseAcceptanceVersion: CrisperWhisperLicenseAcceptanceVersion,
       LegalAcceptanceVersion: LegalAcceptanceVersion,
@@ -232,6 +235,7 @@ public sealed record SettingsDraft
       || ChatOutputFontSize != baseline.ChatOutputFontSize
       || !string.Equals(ChatTypefaceId, baseline.ChatTypefaceId, StringComparison.Ordinal)
       || WorkbenchZoomPercent != baseline.WorkbenchZoomPercent
+      || ChatPaperViewEnabled != baseline.ChatPaperViewEnabled
       || AssistantFeaturesEnabled != baseline.AssistantFeaturesEnabled
       || !string.Equals(CrisperWhisperLicenseAcceptanceVersion, baseline.CrisperWhisperLicenseAcceptanceVersion, StringComparison.Ordinal)
       || !string.Equals(LegalAcceptanceVersion, baseline.LegalAcceptanceVersion, StringComparison.Ordinal)
@@ -250,6 +254,7 @@ public sealed record SettingsDraft
     return ThemePreference != baseline.ThemePreference
       || ChatOutputFontSize != baseline.ChatOutputFontSize
       || WorkbenchZoomPercent != baseline.WorkbenchZoomPercent
+      || ChatPaperViewEnabled != baseline.ChatPaperViewEnabled
       || !string.Equals(ChatTypefaceId, baseline.ChatTypefaceId, StringComparison.Ordinal);
   }
 

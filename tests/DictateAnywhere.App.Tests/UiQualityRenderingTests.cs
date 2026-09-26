@@ -6,6 +6,7 @@ using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -21,6 +22,82 @@ namespace DictateAnywhere.App.Tests;
 [Trait("Category", "WindowsWpf")]
 public sealed class UiQualityRenderingTests
 {
+  [Fact]
+  public void ProductionWorkbench_AppearanceChangesPreserveDraftConversationAndSelection()
+  {
+    RunOnSta(() =>
+    {
+      if (Application.Current is null)
+      {
+        DictateAnywhere.App.App app = new();
+        app.InitializeComponent();
+      }
+      // Construct the production window and event handlers, but do not load settings,
+      // register hotkeys, query history, send a request or write to user stores.
+      TextboxWorkbenchWindow window = DictateAnywhere.App.Composition.ApplicationComposition.CreateProduction().CreateWorkbenchWindow();
+      try
+      {
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = -10000;
+        window.Top = -10000;
+        window.ShowInTaskbar = false;
+        WorkbenchChatController controller = Assert.IsType<WorkbenchChatController>(
+          typeof(TextboxWorkbenchWindow).GetField("chatController", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(window));
+        controller.AddMessage(new ChatMessage(ChatMessageRoles.User, "Implement binary search in Java.", DateTimeOffset.UtcNow));
+        controller.AddMessage(new ChatMessage(ChatMessageRoles.Assistant,
+          "```java\npublic class BinarySearch {\n  public static int search(int[] nums, int target) {\n    int left = 0;\n    int right = nums.length - 1;\n    while (left <= right) {\n      int mid = left + (right - left) / 2;\n      if (nums[mid] == target) return mid;\n      if (nums[mid] < target) left = mid + 1;\n      else right = mid - 1;\n    }\n    return -1;\n  }\n}\n```", DateTimeOffset.UtcNow));
+        ChatMessage[] original = controller.Messages.ToArray();
+        WorkbenchComposerView composer = Assert.IsType<WorkbenchComposerView>(window.FindName("ComposerView"));
+        WorkbenchQuickSettingsView quick = Assert.IsType<WorkbenchQuickSettingsView>(window.FindName("QuickSettingsView"));
+        Button paper = Assert.IsType<Button>(quick.FindName("PaperViewButton"));
+        WorkbenchChatTranscriptView transcript = Assert.IsType<WorkbenchChatTranscriptView>(window.FindName("ChatTranscriptView"));
+        window.Show();
+        Assert.IsType<TextBox>(composer.FindName("Prompt")).Text = "My unsent draft — नमस्ते";
+        controller.AddPendingFile(ChatFileAttachment.Create("C:\\test\\notes.txt", "Pending test context"));
+        foreach (bool dark in new[] { true, false })
+        {
+          AppThemeManager.ApplyPalette(window.Resources, dark);
+          foreach (bool enabled in new[] { true, false })
+          {
+            paper.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Settle(window);
+            Assert.Equal(enabled ? Visibility.Visible : Visibility.Collapsed, Assert.IsType<Border>(window.FindName("PaperSurface")).Visibility);
+            Assert.Equal(original, controller.Messages);
+            Assert.Equal("My unsent draft — नमस्ते", composer.PromptText);
+            Assert.Equal(Visibility.Collapsed, Assert.IsType<TextBlock>(composer.FindName("PromptPlaceholder")).Visibility);
+            Assert.Single(controller.PendingFiles);
+            transcript.TranscriptElement.SelectAll();
+            string selected = transcript.TranscriptElement.Selection.Text;
+            Assert.Contains("Implement binary search", selected);
+            typeof(TextboxWorkbenchWindow).GetMethod("RenderChatTranscript", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(window, null);
+            Assert.Equal(selected, transcript.TranscriptElement.Selection.Text);
+            transcript.TranscriptElement.Selection.Select(transcript.TranscriptElement.Document.ContentStart, transcript.TranscriptElement.Document.ContentStart);
+            transcript.TranscriptElement.ScrollToHome();
+            Settle(window);
+            Capture(Render(window, 1d), $"production-workbench-{(dark ? "dark" : "light")}-{(enabled ? "paper" : "standard")}");
+          }
+        }
+        quick.SetTextSize(15);
+        foreach (int size in new[] { 12, 30, 15 })
+        {
+          Assert.IsType<Slider>(quick.FindName("TextSizeSlider")).Value = size;
+          Settle(window);
+          Assert.Equal(size, transcript.TranscriptElement.FontSize);
+          Assert.Equal("My unsent draft — नमस्ते", composer.PromptText);
+          Assert.Single(controller.PendingFiles);
+          Capture(Render(window, 1d), $"production-workbench-text-{size}");
+        }
+      }
+      finally
+      {
+        Task disposal = window.DisposeAsync().AsTask();
+        while (!disposal.IsCompleted) window.Dispatcher.Invoke(() => { }, DispatcherPriority.Background);
+        disposal.GetAwaiter().GetResult();
+        window.Close();
+      }
+    });
+  }
+
   [Theory]
   [InlineData(false, 1d)]
   [InlineData(true, 1.25d)]
@@ -63,6 +140,7 @@ public sealed class UiQualityRenderingTests
 
   [Theory]
   [InlineData("Workbench/TextboxWorkbenchWindow.xaml", true, 1d)]
+  [InlineData("Workbench/TextboxWorkbenchWindow.xaml", true, 1.25d)]
   [InlineData("Workbench/TextboxWorkbenchWindow.xaml", false, 1.5d)]
   [InlineData("Workbench/TextboxWorkbenchWindow.xaml", true, 2d)]
   [InlineData("Workbench/Reading/ReaderWindow.xaml", true, 1d)]
@@ -141,6 +219,28 @@ public sealed class UiQualityRenderingTests
           emptyComposer.SetConversationActionState(true, false);
           emptyComposer.SetChatActionState(false, false, false, true, true, false, false, false, false);
         }
+        if (window.FindName("ChatTranscriptView") is WorkbenchChatTranscriptView transcript)
+        {
+          bool paper = textScale == 1.25d || !dark;
+          transcript.ApplyTypography(15, new FontFamily("Segoe UI"));
+          transcript.SetPaperView(paper);
+          transcript.Render(
+            [
+              new ChatMessage(ChatMessageRoles.User, "Give me the code for binary search in Java.", DateTimeOffset.UtcNow),
+              new ChatMessage(ChatMessageRoles.Assistant,
+                "Here is a binary search method:\n\n```java\npublic class BinarySearch {\n  public static int search(int[] nums, int target) {\n    int left = 0;\n    int right = nums.length - 1;\n    while (left <= right) {\n      int mid = left + (right - left) / 2;\n      if (nums[mid] == target) return mid;\n      if (nums[mid] < target) left = mid + 1;\n      else right = mid - 1;\n    }\n    return -1;\n  }\n}\n```",
+                DateTimeOffset.UtcNow),
+            ],
+            _ => paper ? Brushes.Black : Brushes.White,
+            _ => { }, _ => { }, _ => { }, paper);
+          if (window.FindName("PaperSurface") is Border paperSurface)
+            paperSurface.Visibility = paper ? Visibility.Visible : Visibility.Collapsed;
+          if (window.FindName("ComposerView") is WorkbenchComposerView chatComposer)
+          {
+            chatComposer.SetPaperView(paper);
+            chatComposer.Margin = new Thickness(24, 0, 24, 18);
+          }
+        }
         window.Show();
         Settle(window);
         if (window.FindName("ComposerView") is WorkbenchComposerView composer)
@@ -152,6 +252,61 @@ public sealed class UiQualityRenderingTests
           Assert.True(recordBounds.Right <= window.ActualWidth && recordBounds.Bottom <= window.ActualHeight);
         }
         Capture(Render(window, 1d), $"{Path.GetFileNameWithoutExtension(relativePath)}-{dark}-{textScale}");
+        if (relativePath == "Workbench/TextboxWorkbenchWindow.xaml" && dark && textScale == 1.25d
+            && window.FindName("WorkbenchRoot") is Grid paperRoot
+            && window.FindName("PaperSurface") is Border texture
+            && window.FindName("ChatTranscriptView") is WorkbenchChatTranscriptView paperTranscript)
+        {
+          paperRoot.LayoutTransform = new ScaleTransform(0.8, 0.8);
+          Settle(window);
+          Capture(Render(window, 1d), "TextboxWorkbenchWindow-paper-zoom80");
+          paperRoot.LayoutTransform = new ScaleTransform(1.5, 1.5);
+          Settle(window);
+          Capture(Render(window, 1d), "TextboxWorkbenchWindow-paper-zoom150");
+          paperRoot.LayoutTransform = Transform.Identity;
+          window.Width = 1600;
+          window.Height = 900;
+          Settle(window);
+          Capture(Render(window, 1d), "TextboxWorkbenchWindow-paper-wide");
+          AppThemeManager.ApplyPalette(window.Resources, useDarkTheme: true, isHighContrast: true);
+          Assert.IsType<WorkbenchComposerView>(window.FindName("ComposerView")).SetPaperView(true);
+          texture.Visibility = Visibility.Collapsed;
+          paperTranscript.Render(
+            [new ChatMessage(ChatMessageRoles.Assistant, "```java\npublic class Contrast { int value = 15; }\n```", DateTimeOffset.UtcNow)],
+            _ => SystemColors.WindowTextBrush, _ => { }, _ => { }, _ => { }, paperView: true);
+          Settle(window);
+          Assert.Equal(Visibility.Collapsed, texture.Visibility);
+          Capture(Render(window, 1d), "TextboxWorkbenchWindow-paper-high-contrast");
+        }
+        if (relativePath == "Workbench/TextboxWorkbenchWindow.xaml" && dark && textScale == 1d
+            && window.FindName("WorkbenchRoot") is Grid workbenchRoot
+            && window.FindName("QuickSettingsView") is WorkbenchQuickSettingsView quickSettings
+            && window.FindName("SidebarView") is WorkbenchSidebarView workbenchSidebar)
+        {
+          workbenchRoot.LayoutTransform = new ScaleTransform(1.5, 1.5);
+          quickSettings.Show();
+          quickSettings.SetZoom(150);
+          Settle(window);
+          quickSettings.UpdatePlacement(workbenchRoot, workbenchSidebar.Surface,
+            workbenchSidebar.SettingsAction, workbenchSidebar.ActualWidth);
+          Settle(window);
+          Capture(Render(window, 1d), "TextboxWorkbenchWindow-quick-settings-zoom150");
+          quickSettings.Hide();
+          workbenchRoot.LayoutTransform = Transform.Identity;
+          WorkbenchChatTranscriptView longTranscript = Assert.IsType<WorkbenchChatTranscriptView>(window.FindName("ChatTranscriptView"));
+          longTranscript.Render(
+            [new ChatMessage(ChatMessageRoles.Assistant,
+              "```java\npublic class Demo { // " + new string('x', 220) + "\n}\n```",
+              DateTimeOffset.UtcNow)],
+            _ => Brushes.White, _ => { }, _ => { }, _ => { });
+          Settle(window);
+          Section section = Assert.IsType<Section>(longTranscript.TranscriptElement.Document.Blocks.FirstBlock);
+          Border codeBorder = Assert.IsType<Border>(Assert.IsType<BlockUIContainer>(section.Blocks.FirstBlock).Child);
+          RichTextBox longCode = Assert.Single(Assert.IsType<Grid>(codeBorder.Child).Children.OfType<RichTextBox>());
+          Assert.True(longCode.Document.PageWidth > longCode.ActualWidth);
+          Assert.True(longCode.ActualWidth <= longTranscript.ActualWidth);
+          Capture(Render(window, 1d), "TextboxWorkbenchWindow-long-code-scroll");
+        }
       }
       finally
       {

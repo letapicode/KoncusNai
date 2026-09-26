@@ -4,6 +4,20 @@ namespace DictateAnywhere.App.Tests;
 
 public sealed class WorkbenchPresentationReducerTests
 {
+  [Xunit.Theory]
+  [Xunit.InlineData(false, false)]
+  [Xunit.InlineData(true, false)]
+  [Xunit.InlineData(true, true)]
+  public void Reduce_NonemptyIdleDraft_AllowsSubmitToRefreshReadiness(bool installed, bool ready)
+  {
+    WorkbenchPresentationState state = WorkbenchPresentationReducer.Reduce(CreateSnapshot(
+      hasPrompt: true, isChatModelInstalled: installed, isChatRuntimeReady: ready));
+    Xunit.Assert.True(state.Composer.CanSend);
+    Xunit.Assert.False(WorkbenchPresentationReducer.Reduce(CreateSnapshot(
+      hasPrompt: true, isImportingFiles: true, isChatModelInstalled: installed, isChatRuntimeReady: ready)).Composer.CanSend);
+    Xunit.Assert.False(WorkbenchPresentationReducer.Reduce(CreateSnapshot(
+      hasPrompt: false, isChatModelInstalled: installed, isChatRuntimeReady: ready)).Composer.CanSend);
+  }
   [Xunit.Fact]
   public void Reduce_IdleReadyWorkbench_EnablesExpectedActions()
   {

@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Text.Json;
 using DictateAnywhere.Core.Contracts;
 
@@ -157,6 +158,15 @@ internal static class LegacySettingsReader
       };
     }
 
+    if (schemaVersion >= 20)
+    {
+      migrated = migrated with
+      {
+        LegalAcceptanceVersion = ReadNullableString(root, "legalAcceptanceVersion", defaults.LegalAcceptanceVersion),
+        LegalAcceptanceAcceptedAtUtc = ReadDateTimeOffset(root, "legalAcceptanceAcceptedAtUtc"),
+      };
+    }
+
     return migrated;
   }
 
@@ -193,6 +203,14 @@ internal static class LegacySettingsReader
       _ => defaultValue,
     };
   }
+
+  private static DateTimeOffset? ReadDateTimeOffset(JsonElement element, string propertyName) =>
+    TryGetPropertyIgnoreCase(element, propertyName, out JsonElement value)
+      && value.ValueKind == JsonValueKind.String
+      && DateTimeOffset.TryParse(value.GetString(), CultureInfo.InvariantCulture,
+        DateTimeStyles.RoundtripKind, out DateTimeOffset parsed)
+        ? parsed
+        : null;
 
   private static bool TryGetPropertyIgnoreCase(
     JsonElement element,

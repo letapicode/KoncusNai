@@ -29,6 +29,7 @@ public partial class WorkbenchQuickSettingsView : UserControl
     Surface.MouseDown += (_, args) => SurfaceMouseDown?.Invoke(this, args);
     AdvancedButton.Click += (_, args) => OpenAdvancedClicked?.Invoke(this, args);
     ThemeButton.Click += (_, args) => ToggleThemeClicked?.Invoke(this, args);
+    PaperViewButton.Click += (_, args) => PaperViewToggleRequested?.Invoke();
     lastCommittedTextSize = (int)TextSizeSlider.Value;
     textSizeCommitTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
     {
@@ -66,6 +67,7 @@ public partial class WorkbenchQuickSettingsView : UserControl
   public event MouseButtonEventHandler? SurfaceMouseDown;
   public event RoutedEventHandler? OpenAdvancedClicked;
   public event RoutedEventHandler? ToggleThemeClicked;
+  internal event Action? PaperViewToggleRequested;
   public event Action<int>? ChatTextSizePreviewRequested;
   public event Action<int>? ChatTextSizeCommitRequested;
   public event SelectionChangedEventHandler? ChatModelSelectionChanged;
@@ -105,6 +107,13 @@ public partial class WorkbenchQuickSettingsView : UserControl
 
   private void OnPreviewKeyDown(object sender, KeyEventArgs args)
   {
+    int? zoom = WorkbenchZoomShortcut.Delta(args.Key, Keyboard.Modifiers);
+    if (zoom is not null)
+    {
+      args.Handled = true;
+      ZoomRequested?.Invoke(zoom.Value);
+      return;
+    }
     if (args.Key != Key.Escape)
     {
       return;
@@ -119,6 +128,12 @@ public partial class WorkbenchQuickSettingsView : UserControl
     ThemeGlyph.Text = isDark ? "\uE708" : "\uE706";
     ThemeMode.Text = isDark ? "Dark Mode" : "Light Mode";
     ThemeMode.ToolTip = isDark ? "Switch to light mode" : "Switch to dark mode";
+  }
+
+  internal void SetPaperViewState(bool enabled)
+  {
+    PaperViewState.Text = enabled ? "On" : "Off";
+    PaperViewButton.ToolTip = enabled ? "Turn off paper view" : "Turn on paper view";
   }
 
   internal void SetTranscriptionStatus(string status) =>

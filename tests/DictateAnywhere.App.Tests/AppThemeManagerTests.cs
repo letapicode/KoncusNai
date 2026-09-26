@@ -10,6 +10,37 @@ namespace DictateAnywhere.App.Tests;
 public sealed class AppThemeManagerTests
 {
   [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public void CodeAndPaperSmallText_MeetsContrastAgainstItsSurface(bool dark)
+  {
+    ResourceDictionary resources = new();
+    AppThemeManager.ApplyPalette(resources, dark);
+    foreach (string prefix in new[] { "Code", "Paper" })
+    {
+      Color surface = ((SolidColorBrush)resources[$"Brush.{prefix}.{(prefix == "Code" ? "Background" : "Page")}"]).Color;
+      foreach (string token in new[] { "Comment", "Keyword", "Identifier", "Primitive", "Type", "Method", "Member", "Literal", "Number", "String", "Operator", "Bracket", "Punctuation" })
+      {
+        Color foreground = ((SolidColorBrush)resources[$"Brush.{prefix}.{token}"]).Color;
+        double first = Luminance(surface);
+        double second = Luminance(foreground);
+        double contrast = (Math.Max(first, second) + 0.05) / (Math.Min(first, second) + 0.05);
+        Xunit.Assert.True(contrast >= 4.5, $"{prefix}.{token} contrast is {contrast:F2} in {(dark ? "Dark" : "Light")}.");
+      }
+    }
+  }
+
+  private static double Luminance(Color color)
+  {
+    static double Linear(byte value)
+    {
+      double channel = value / 255d;
+      return channel <= 0.04045 ? channel / 12.92 : Math.Pow((channel + 0.055) / 1.055, 2.4);
+    }
+    return 0.2126 * Linear(color.R) + 0.7152 * Linear(color.G) + 0.0722 * Linear(color.B);
+  }
+
+  [Xunit.Theory]
   [Xunit.InlineData(12d, 1d)]
   [Xunit.InlineData(15d, 1.25d)]
   [Xunit.InlineData(18d, 1.5d)]
@@ -236,6 +267,25 @@ public sealed class AppThemeManagerTests
       "Brush.Code.Comment",
       "Brush.Code.String",
       "Brush.Code.Keyword",
+      "Brush.Code.Identifier",
+      "Brush.Code.Number",
+      "Brush.Code.Header", "Brush.Code.Label", "Brush.Code.Icon", "Brush.Code.Primitive",
+      "Brush.Code.Type", "Brush.Code.Method", "Brush.Code.Member", "Brush.Code.Literal",
+      "Brush.Code.Operator", "Brush.Code.Bracket", "Brush.Code.Punctuation",
+      "Brush.Chat.User",
+      "Brush.Chat.UserText",
+      "Brush.Paper.Ink",
+      "Brush.Paper.User",
+      "Brush.Paper.UserText",
+      "Brush.Paper.Composer",
+      "Brush.Paper.Keyword",
+      "Brush.Paper.Identifier",
+      "Brush.Paper.Number",
+      "Brush.Paper.String",
+      "Brush.Paper.Comment",
+      "Brush.Paper.Page", "Brush.Paper.Border", "Brush.Paper.Control", "Brush.Paper.Hover",
+      "Brush.Paper.Primitive", "Brush.Paper.Type", "Brush.Paper.Method", "Brush.Paper.Member",
+      "Brush.Paper.Literal", "Brush.Paper.Operator", "Brush.Paper.Bracket", "Brush.Paper.Punctuation",
       "Brush.Border.Subtle",
       "Brush.Control.Input",
       "Brush.Control.InputDisabled",

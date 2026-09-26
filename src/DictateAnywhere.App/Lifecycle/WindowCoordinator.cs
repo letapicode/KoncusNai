@@ -50,6 +50,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
   public event Action<AppThemePreference>? ThemePreferenceRequested;
   public event Action<TranscriptionModelSelection>? TranscriptionModelSelectionRequested;
   public event Action<int>? ChatOutputFontSizeRequested;
+  public event Action<bool>? ChatPaperViewRequested;
   public event Action<int>? WorkbenchZoomRequested;
 
   public async Task EnsureWorkbenchAsync(
@@ -201,6 +202,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
     window.ThemePreferenceRequested += OnWorkbenchThemePreferenceRequested;
     window.TranscriptionModelSelectionRequested += OnWorkbenchTranscriptionModelSelectionRequested;
     window.ChatOutputFontSizeRequested += OnWorkbenchChatOutputFontSizeRequested;
+    window.ChatPaperViewRequested += OnWorkbenchChatPaperViewRequested;
     window.WorkbenchZoomRequested += OnWorkbenchZoomRequested;
     window.Closed += OnWorkbenchWindowClosed;
   }
@@ -212,6 +214,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
     window.ThemePreferenceRequested -= OnWorkbenchThemePreferenceRequested;
     window.TranscriptionModelSelectionRequested -= OnWorkbenchTranscriptionModelSelectionRequested;
     window.ChatOutputFontSizeRequested -= OnWorkbenchChatOutputFontSizeRequested;
+    window.ChatPaperViewRequested -= OnWorkbenchChatPaperViewRequested;
     window.WorkbenchZoomRequested -= OnWorkbenchZoomRequested;
     window.Closed -= OnWorkbenchWindowClosed;
   }
@@ -279,6 +282,8 @@ internal sealed class WindowCoordinator : IAsyncDisposable
   private void OnWorkbenchZoomRequested(int percent) => WorkbenchZoomRequested?.Invoke(percent);
 
   private void OnWorkbenchChatOutputFontSizeRequested(int fontSize) => ChatOutputFontSizeRequested?.Invoke(fontSize);
+
+  private void OnWorkbenchChatPaperViewRequested(bool enabled) => ChatPaperViewRequested?.Invoke(enabled);
 
   private void OnDictationHistoryRecordAdded(object? sender, DictationHistoryRecord record)
   {

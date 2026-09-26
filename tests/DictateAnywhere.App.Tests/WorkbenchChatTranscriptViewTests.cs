@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -16,6 +17,62 @@ namespace DictateAnywhere.App.Tests;
 [Xunit.Trait("Category", "WindowsWpf")]
 public sealed class WorkbenchChatTranscriptViewTests
 {
+  [Xunit.Fact]
+  public void Composer_TypingEnablesPointerSubmitEvenBeforeReadinessRefresh()
+  {
+    RunOnSta(() =>
+    {
+      WorkbenchComposerView view = new();
+      try
+      {
+        void Render()
+        {
+          WorkbenchPresentationState state = WorkbenchPresentationReducer.Reduce(new WorkbenchPresentationSnapshot(
+            WorkbenchSessionState.Idle, false, false, false, false, false, false,
+            false, view.HasPrompt, false, false, false, false, true, false, false, false, "Idle", "Ready"));
+          view.Render(state.Composer, state.Dictation);
+        }
+        view.PromptTextChanged += (_, _) => Render();
+        Button send = Xunit.Assert.IsType<Button>(view.FindName("Send"));
+        int clicks = 0;
+        view.SendClicked += (_, _) => clicks++;
+        Render();
+        Xunit.Assert.False(send.IsEnabled);
+        view.PromptElement.Text = "Explain an algorithm";
+        Xunit.Assert.True(send.IsEnabled);
+        Xunit.Assert.Equal(Visibility.Visible, send.Visibility);
+        send.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Xunit.Assert.Equal(1, clicks);
+        view.PromptElement.Text = "   ";
+        Xunit.Assert.False(send.IsEnabled);
+        view.PromptElement.Text = "Another draft";
+        Xunit.Assert.True(send.IsEnabled);
+      }
+      finally { view.DisposePresentation(); }
+    });
+  }
+  [Xunit.Fact]
+  public void QuickSettings_PaperToggleIsSeparateFromLightDarkSelection()
+  {
+    RunOnSta(() =>
+    {
+      WorkbenchQuickSettingsView view = new();
+      try
+      {
+        int requested = 0;
+        view.PaperViewToggleRequested += () => requested++;
+        view.SetThemeState(isDark: true);
+        view.SetPaperViewState(enabled: true);
+        Xunit.Assert.Equal("Dark Mode", Xunit.Assert.IsType<TextBlock>(view.FindName("ThemeMode")).Text);
+        Xunit.Assert.Equal("On", Xunit.Assert.IsType<TextBlock>(view.FindName("PaperViewState")).Text);
+        Xunit.Assert.IsType<Button>(view.FindName("PaperViewButton"))
+          .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Xunit.Assert.Equal(1, requested);
+      }
+      finally { view.DisposePresentation(); }
+    });
+  }
+
   [Xunit.Fact]
   public void QuickSettingsView_OwnsThemeStatusAndVisibilityPresentation()
   {
@@ -875,7 +932,7 @@ public sealed class WorkbenchChatTranscriptViewTests
         Button export = Xunit.Assert.IsType<Button>(view.FindName("ExportChatButton"));
         Button record = Xunit.Assert.IsType<Button>(view.FindName("Record"));
         Button send = Xunit.Assert.IsType<Button>(view.FindName("Send"));
-        double expectedWidth = Math.Min(availableWidth, 720d);
+        double expectedWidth = Math.Min(availableWidth, 900d);
         Xunit.Assert.InRange(Math.Abs(compactComposer.ActualWidth - expectedWidth), 0d, 0.01d);
         Button[] orderedActions = [newChat, addFile, readDocument, export];
         double previousRight = 0d;
@@ -988,6 +1045,84 @@ public sealed class WorkbenchChatTranscriptViewTests
       Xunit.Assert.Equal(Visibility.Visible, view.TranscriptElement.Visibility);
       Xunit.Assert.True(firstRenderBlockCount > 0);
       Xunit.Assert.Equal(firstRenderBlockCount, view.TranscriptElement.Document.Blocks.Count);
+    });
+  }
+
+  [Xunit.Fact]
+  public void Render_SwitchingPaperRebuildsPresentationWithoutChangingMessages()
+  {
+    RunOnSta(() =>
+    {
+      WorkbenchChatTranscriptView view = new();
+      ChatMessage[] messages =
+      [
+        new ChatMessage(ChatMessageRoles.User, "Hello", DateTimeOffset.UtcNow),
+        new ChatMessage(ChatMessageRoles.Assistant, "```java\nreturn 1;\n```", DateTimeOffset.UtcNow),
+      ];
+      view.Render(messages, _ => Brushes.Black, _ => { }, _ => { }, _ => { });
+      Section original = Xunit.Assert.IsType<Section>(view.TranscriptElement.Document.Blocks.FirstBlock);
+
+      view.SetPaperView(true);
+      view.Render(messages, _ => Brushes.Black, _ => { }, _ => { }, _ => { }, paperView: true);
+
+      Section updated = Xunit.Assert.IsType<Section>(view.TranscriptElement.Document.Blocks.FirstBlock);
+      Xunit.Assert.NotSame(original, updated);
+      Xunit.Assert.Equal(System.Windows.TextAlignment.Left, updated.TextAlignment);
+      Xunit.Assert.Equal(2, view.TranscriptElement.Document.Blocks.OfType<Section>().Count());
+    });
+  }
+
+  [Xunit.Fact]
+  public void UserBubbles_FitShortTextWrapLongTextAndFollowScrollingWithoutLosingSelection()
+  {
+    RunOnSta(() =>
+    {
+      WorkbenchChatTranscriptView view = new();
+      Window host = new() { Content = view, Width = 900, Height = 400, Left = -10000, Top = -10000, ShowInTaskbar = false };
+      try
+      {
+        ChatMessage[] messages =
+        [
+          new(ChatMessageRoles.User, "Hello नमस्ते", DateTimeOffset.UtcNow),
+          new(ChatMessageRoles.Assistant, "A reply.", DateTimeOffset.UtcNow),
+          new(ChatMessageRoles.User, string.Join(" ", Enumerable.Repeat("A much longer message", 35)), DateTimeOffset.UtcNow),
+          new(ChatMessageRoles.User, "First line\n\nSecond paragraph", DateTimeOffset.UtcNow),
+        ];
+        view.ApplyTypography(15, new FontFamily("Segoe UI"));
+        view.Render(messages, _ => Brushes.Black, _ => { }, _ => { }, _ => { });
+        host.Show();
+        void Settle()
+        {
+          host.UpdateLayout();
+          host.Dispatcher.Invoke(() => { }, DispatcherPriority.Background);
+          host.UpdateLayout();
+        }
+        Settle();
+        view.TranscriptElement.ScrollToHome();
+        Settle();
+        Canvas layer = Xunit.Assert.IsType<Canvas>(view.FindName("BubbleLayer"));
+        Border[] bubbles = layer.Children.OfType<Border>().ToArray();
+        Xunit.Assert.Equal(3, bubbles.Length);
+        Xunit.Assert.True(bubbles[0].Width < bubbles[1].Width);
+        double available = view.TranscriptElement.ViewportWidth - view.TranscriptElement.Document.PagePadding.Left - view.TranscriptElement.Document.PagePadding.Right;
+        Xunit.Assert.All(bubbles, bubble =>
+        {
+          Xunit.Assert.Equal(new CornerRadius(18), bubble.CornerRadius);
+          Xunit.Assert.InRange(bubble.Width, 1, available * 0.75 + 1);
+        });
+        double before = Canvas.GetTop(bubbles[0]);
+        view.TranscriptElement.ScrollToVerticalOffset(80);
+        Settle();
+        Xunit.Assert.True(Canvas.GetTop(bubbles[0]) < before);
+        view.TranscriptElement.SelectAll();
+        string selected = view.TranscriptElement.Selection.Text;
+        Xunit.Assert.Contains("A reply.", selected);
+        view.Render(messages, _ => Brushes.Black, _ => { }, _ => { }, _ => { }, paperView: true);
+        Settle();
+        Xunit.Assert.Equal(selected, view.TranscriptElement.Selection.Text);
+        Xunit.Assert.All(view.TranscriptElement.Document.Blocks.OfType<Section>(), section => Xunit.Assert.Equal(TextAlignment.Left, section.TextAlignment));
+      }
+      finally { host.Close(); }
     });
   }
 

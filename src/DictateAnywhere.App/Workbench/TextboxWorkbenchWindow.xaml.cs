@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
@@ -48,6 +49,8 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     "Private local chat. Koncus Nai sends the most recent 12 messages (about 8,000 characters) and bounded excerpts from files you add.";
 
   private readonly object deferredReadAloudRenderSync = new();
+  private static readonly DependencyPropertyDescriptor HighContrastDescriptor =
+    DependencyPropertyDescriptor.FromProperty(WindowThemeBehavior.IsHighContrastActiveProperty, typeof(Window));
   private AppSettings CurrentSettings => settingsApplicationController.CurrentSettings;
   private IDisposable? themeChangeSubscription;
   private DispatcherOperation? deferredReadAloudRender;
@@ -60,6 +63,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
   public event Action<AppThemePreference>? ThemePreferenceRequested;
   public event Action<TranscriptionModelSelection>? TranscriptionModelSelectionRequested;
   public event Action<int>? ChatOutputFontSizeRequested;
+  public event Action<bool>? ChatPaperViewRequested;
   public event Action<int>? WorkbenchZoomRequested;
 
   private Border SidebarBorder => SidebarView.Surface;
@@ -97,6 +101,8 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     InitializeComponent();
     PreviewKeyDown += OnWorkbenchZoomKeyDown;
     QuickSettingsView.ZoomRequested += ChangeWorkbenchZoom;
+    QuickSettingsView.PaperViewToggleRequested += OnPaperViewToggleRequested;
+    HighContrastDescriptor.AddValueChanged(this, OnHighContrastChanged);
     readAloudController.StateChanged += OnReadAloudStateChanged;
     QuickSettingsView.ChatTextSizePreviewRequested += OnChatTextSizePreviewRequested;
     QuickSettingsView.ChatTextSizeCommitRequested += OnChatTextSizeCommitRequested;
@@ -240,6 +246,8 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     QuickSettingsView.CommitPendingTextSize();
     QuickSettingsView.ChatTextSizePreviewRequested -= OnChatTextSizePreviewRequested;
     QuickSettingsView.ChatTextSizeCommitRequested -= OnChatTextSizeCommitRequested;
+    QuickSettingsView.PaperViewToggleRequested -= OnPaperViewToggleRequested;
+    HighContrastDescriptor.RemoveValueChanged(this, OnHighContrastChanged);
     QuickSettingsView.DisposePresentation();
     ComposerView.DisposePresentation();
     OperationalStatusView.TransientOutcomeExpired -= OnTransientOutcomeExpired;
@@ -1113,7 +1121,8 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
       ResolveChatMessageBrush,
       CopyReplyToClipboard,
       CopyCodeToClipboard,
-      SpeakChatResponse);
+      SpeakChatResponse,
+      CurrentSettings.ChatPaperViewEnabled);
     RefreshChatModelDetail();
   }
 
@@ -1161,7 +1170,9 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private Brush ResolveChatMessageBrush(bool isAssistant)
   {
-    string resourceKey = isAssistant ? "Brush.Text.Primary" : "Brush.Text.Secondary";
+    if (CurrentSettings.ChatPaperViewEnabled)
+      return TryFindResource(isAssistant ? "Brush.Paper.Ink" : "Brush.Paper.UserText") as Brush ?? Brushes.Black;
+    string resourceKey = isAssistant ? "Brush.Text.Primary" : "Brush.Chat.UserText";
     return TryFindResource(resourceKey) as Brush
       ?? (isAssistant ? Brushes.Black : Brushes.DimGray);
   }
@@ -1365,6 +1376,30 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
       : AppThemePreference.Dark);
   }
 
+  private void OnPaperViewToggleRequested()
+  {
+    bool enabled = !CurrentSettings.ChatPaperViewEnabled;
+    settingsApplicationController.ApplyPresentationOnly(CurrentSettings with { ChatPaperViewEnabled = enabled });
+    ApplyPaperView();
+    CloseSettingsMenu();
+    ChatPaperViewRequested?.Invoke(enabled);
+  }
+
+  private void OnHighContrastChanged(object? sender, EventArgs e) => ApplyPaperView();
+
+  private void ApplyPaperView()
+  {
+    bool enabled = CurrentSettings.ChatPaperViewEnabled;
+    PaperSurface.Visibility = enabled && !WindowThemeBehavior.GetIsHighContrastActive(this)
+      ? Visibility.Visible : Visibility.Collapsed;
+    ChatTranscriptView.SetPaperView(enabled);
+    ComposerView.SetPaperView(enabled);
+    ComposerView.Margin = new Thickness(24, 0, 24, 18);
+    ExpandedPromptView.SetPaperView(enabled);
+    QuickSettingsView.SetPaperViewState(enabled);
+    RenderChatTranscript();
+  }
+
   private void ApplyThemePreferenceFromMenu(AppThemePreference preference)
   {
     settingsApplicationController.ApplyPresentationOnly(CurrentSettings with
@@ -1372,7 +1407,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
       ThemePreference = preference,
     });
     AppThemeManager.ApplyThemeResources(preference);
-    RenderChatTranscript();
+    ApplyPaperView();
     RefreshThemeMenuState();
     CloseSettingsMenu();
     ThemePreferenceRequested?.Invoke(preference);
@@ -1453,6 +1488,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     if (WorkbenchRoot.LayoutTransform is not ScaleTransform transform || transform.ScaleX != scale)
       WorkbenchRoot.LayoutTransform = new ScaleTransform(scale, scale);
     QuickSettingsView.SetZoom(percent);
+    if (QuickSettingsView.IsOpen) UpdateSettingsMenuPlacement();
   }
 
   private void ChangeWorkbenchZoom(int delta)
@@ -1468,15 +1504,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
   {
     // Inline Settings contains hotkey capture; let that surface own all keystrokes.
     if (InlineSettingsView.IsOpen || e.IsRepeat || e.Key == Key.ImeProcessed) return;
-    ModifierKeys modifiers = Keyboard.Modifiers;
-    if (modifiers != ModifierKeys.Control && modifiers != (ModifierKeys.Control | ModifierKeys.Shift)) return;
-    int? delta = e.Key switch
-    {
-      Key.Add or Key.OemPlus => 10,
-      Key.Subtract or Key.OemMinus when modifiers == ModifierKeys.Control => -10,
-      Key.D0 or Key.NumPad0 when modifiers == ModifierKeys.Control => 0,
-      _ => null,
-    };
+    int? delta = WorkbenchZoomShortcut.Delta(e.Key, Keyboard.Modifiers);
     if (delta is null) return;
     e.Handled = true;
     ChangeWorkbenchZoom(delta.Value);
@@ -1489,10 +1517,12 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     if (isVisible)
     {
       SidebarColumn.SetResourceReference(ColumnDefinition.WidthProperty, "Layout.Workbench.SidebarWidth");
+      HeaderSidebarColumn.SetResourceReference(ColumnDefinition.WidthProperty, "Layout.Workbench.SidebarWidth");
     }
     else
     {
       SidebarColumn.Width = new GridLength(0);
+      HeaderSidebarColumn.Width = new GridLength(190);
     }
     SetSidebarToggleAccessibility(SidebarToggleButton, isVisible);
     RenderPresentation();
@@ -1827,6 +1857,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     ChatTranscriptView.ApplyTypography(fontSize, fontFamily);
     ComposerView.ApplyTypography(fontSize, fontFamily);
     ExpandedPromptView.ApplyTypography(fontSize, fontFamily);
+    ApplyPaperView();
     QueuePromptExpansionButtonRefresh();
   }
 

@@ -2,6 +2,10 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
     <StackPanel x:Name="Welcome"
           HorizontalAlignment="Stretch"
           VerticalAlignment="Center"
@@ -11,15 +15,17 @@
                  FontSize="{DynamicResource Font.Size.Display}"
                  FontWeight="Normal"
                  Text="Ready when you are." />
-      <TextBlock Margin="0,12,0,0" Text="Ask a question, dictate a thought, or bring a document."
+      <TextBlock x:Name="WelcomeSubtitle" Margin="0,12,0,0" Text="Ask a question, dictate a thought, or bring a document."
                  TextAlignment="Center" TextWrapping="Wrap" FontSize="{DynamicResource Font.Size.Lead}"
                  Foreground="{DynamicResource Brush.Text.Secondary}" />
     </StackPanel>
 
+    <Canvas x:Name="BubbleLayer" IsHitTestVisible="False" ClipToBounds="True" />
     <RichTextBox x:Name="Transcript"
                  HorizontalAlignment="Stretch"
                  SizeChanged="OnTranscriptSizeChanged"
                  Style="{DynamicResource ChatTranscriptStyle}"
                  AutomationProperties.Name="Chat transcript" />
+    <Canvas x:Name="CodeScrollLayer" Grid.Row="1" Height="0" ClipToBounds="True" />
   </Grid>
 </UserControl>

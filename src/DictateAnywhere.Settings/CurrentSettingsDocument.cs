@@ -23,6 +23,7 @@ internal sealed class CurrentSettingsDocument
   public int LastDictationRetryWindowSeconds { get; init; } = AppSettings.Default.LastDictationRetryWindowSeconds;
   public int ThemePreference { get; init; } = (int)AppSettings.Default.ThemePreference;
   public int ChatOutputFontSize { get; init; } = AppSettings.Default.ChatOutputFontSize;
+  public bool ChatPaperViewEnabled { get; init; }
   public string ChatTypefaceId { get; init; } = ChatTypefaceIds.System;
   public int WorkbenchZoomPercent { get; init; } = 100;
   public bool AssistantFeaturesEnabled { get; init; } = true;
@@ -54,6 +55,7 @@ internal sealed class CurrentSettingsDocument
       LastDictationRetryWindowSeconds = Math.Clamp(settings.LastDictationRetryWindowSeconds, 60, 86_400),
       ThemePreference = (int)settings.ThemePreference,
       ChatOutputFontSize = Math.Clamp(settings.ChatOutputFontSize, 12, 30),
+      ChatPaperViewEnabled = settings.ChatPaperViewEnabled,
       ChatTypefaceId = ChatTypefaceSettings.Normalize(settings.ChatTypefaceId),
       EnableAutomaticPunctuation = settings.EnableAutomaticPunctuation,
       WorkbenchZoomPercent = Math.Clamp(settings.WorkbenchZoomPercent, 80, 150),
@@ -87,6 +89,7 @@ internal sealed class CurrentSettingsDocument
         ? (AppThemePreference)ThemePreference
         : defaults.ThemePreference,
       ChatOutputFontSize = Math.Clamp(ChatOutputFontSize, 12, 30),
+      ChatPaperViewEnabled = ChatPaperViewEnabled,
       ChatTypefaceId = ChatTypefaceSettings.Normalize(ChatTypefaceId),
       EnableAutomaticPunctuation = EnableAutomaticPunctuation,
       WorkbenchZoomPercent = Math.Clamp(WorkbenchZoomPercent, 80, 150),

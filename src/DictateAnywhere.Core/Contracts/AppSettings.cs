@@ -31,7 +31,8 @@ public sealed record AppSettings(
   bool AssistantFeaturesEnabled = true,
   string? CrisperWhisperLicenseAcceptanceVersion = null,
   string? LegalAcceptanceVersion = null,
-  DateTimeOffset? LegalAcceptanceAcceptedAtUtc = null)
+  DateTimeOffset? LegalAcceptanceAcceptedAtUtc = null,
+  bool ChatPaperViewEnabled = false)
 {
   public const int MinChatOutputFontSize = 10;
   public const int MaxChatOutputFontSize = 36;
