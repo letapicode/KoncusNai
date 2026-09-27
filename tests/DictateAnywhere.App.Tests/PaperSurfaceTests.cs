@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -10,12 +8,14 @@ using Xunit;
 
 namespace DictateAnywhere.App.Tests;
 
+[Collection(WpfApplicationCollection.Name)]
+[Trait("Category", "WindowsWpf")]
 public sealed class PaperSurfaceTests
 {
   [Theory]
   [InlineData(7)]
   [InlineData(17)]
-  public void PaperTexture_LooseXamlCanResolveTypeAndCornerRadiusWithoutRendering(int radius) => RunOnSta(() =>
+  public void PaperTexture_LooseXamlCanResolveTypeAndCornerRadiusWithoutRendering(int radius) => WpfTestSta.Run(() =>
   {
     string markup = $$"""
       <Grid xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -33,7 +33,7 @@ public sealed class PaperSurfaceTests
   });
 
   [Fact]
-  public void Grain_IsFrozenVectorGeometryAndBoundedAtLargeSizes() => RunOnSta(() =>
+  public void Grain_IsFrozenVectorGeometryAndBoundedAtLargeSizes() => WpfTestSta.Run(() =>
   {
     Assert.Empty(PaperTexture.CreateGrain(new Size(0, 0)).Children);
     Assert.Throws<ArgumentOutOfRangeException>(() => PaperTexture.CreateGrain(new Size(double.PositiveInfinity, 100)));
@@ -57,9 +57,10 @@ public sealed class PaperSurfaceTests
   });
 
   [Fact]
-  public void PaperComposer_SharesSurfaceAndRestoresThemeWithoutChangingPrompt() => RunOnSta(() =>
+  public void PaperComposer_SharesSurfaceAndRestoresThemeWithoutChangingPrompt() => WpfTestSta.Run(() =>
   {
     WorkbenchComposerView composer = new();
+    WpfTestSta.Cleanup(composer.DisposePresentation);
     Grid host = new();
     host.Children.Add(composer);
     Brush input = Brushes.Navy;
@@ -81,11 +82,10 @@ public sealed class PaperSurfaceTests
     Assert.Same(input, composer.PromptElement.Background);
     Assert.Same(background, Assert.IsType<Border>(composer.FindName("CompactComposer")).Background);
     Assert.Equal("Draft with\nmultiple lines", composer.PromptText);
-    composer.DisposePresentation();
   });
 
   [Fact]
-  public void ExpandedPaper_UsesGrainAndPreservesDraftAcrossAppearanceChanges() => RunOnSta(() =>
+  public void ExpandedPaper_UsesGrainAndPreservesDraftAcrossAppearanceChanges() => WpfTestSta.Run(() =>
   {
     WorkbenchExpandedPromptView expanded = new();
     Grid host = new();
@@ -107,14 +107,4 @@ public sealed class PaperSurfaceTests
     Assert.Equal("Unsent draft", expanded.Text);
   });
 
-  [SuppressMessage("Design", "CA1031", Justification = "Transfers STA test failures to the test runner.")]
-  private static void RunOnSta(Action action)
-  {
-    Exception? failure = null;
-    Thread thread = new(() => { try { action(); } catch (Exception exception) { failure = exception; } });
-    thread.SetApartmentState(ApartmentState.STA);
-    thread.Start();
-    Assert.True(thread.Join(TimeSpan.FromSeconds(25)), "STA test timed out.");
-    if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
-  }
 }

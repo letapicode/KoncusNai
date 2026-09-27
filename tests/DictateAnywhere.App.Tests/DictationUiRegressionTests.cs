@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -19,9 +17,11 @@ namespace DictateAnywhere.App.Tests;
 public sealed class DictationUiRegressionTests
 {
   [Fact]
-  public void ComposerDraftTrackingCoversProgrammaticInsertionUndoAndClearing() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void ComposerDraftTrackingCoversProgrammaticInsertionUndoAndClearing() => WpfTestSta.Run(() =>
   {
     WorkbenchComposerView composer = new();
+    WpfTestSta.Cleanup(composer.DisposePresentation);
     List<string> edits = [];
     composer.DraftChanged += edits.Add;
     composer.PromptText = "loaded";
@@ -33,13 +33,14 @@ public sealed class DictationUiRegressionTests
     Assert.Contains("loaded", edits);
     Assert.Contains("inserted", edits);
     Assert.Equal(string.Empty, edits[^1]);
-    composer.DisposePresentation();
   });
 
   [Fact]
-  public void MicrophoneChromeIsTransparentWithStableHitTargetAndFocus() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void MicrophoneChromeIsTransparentWithStableHitTargetAndFocus() => WpfTestSta.Run(() =>
   {
     WorkbenchComposerView composer = new();
+    WpfTestSta.Cleanup(composer.DisposePresentation);
     Button mic = Assert.IsType<Button>(composer.FindName("Record"));
     mic.ApplyTemplate();
     Border chrome = Assert.IsType<Border>(mic.Template.FindName("Chrome", mic));
@@ -52,11 +53,11 @@ public sealed class DictationUiRegressionTests
     Assert.Equal(36, mic.Width);
     Assert.Equal(36, mic.Height);
     Assert.Contains(mic.Template.Triggers.OfType<Trigger>(), t => t.Property == UIElement.IsKeyboardFocusedProperty);
-    composer.DisposePresentation();
   });
 
   [Fact]
-  public void DisabledEditorRejectsCapturedDictationWithoutMutatingDraft() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void DisabledEditorRejectsCapturedDictationWithoutMutatingDraft() => WpfTestSta.Run(() =>
   {
     TextBox editor = new() { Text = "draft" };
     WorkbenchDictationTarget target = new(editor, () => true);
@@ -66,9 +67,11 @@ public sealed class DictationUiRegressionTests
   });
 
   [Fact]
-  public void ImportFeedbackSharesAvailableWidthWithoutFixedPanelOverflow() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void ImportFeedbackSharesAvailableWidthWithoutFixedPanelOverflow() => WpfTestSta.Run(() =>
   {
     WorkbenchOperationalStatusView view = new();
+    WpfTestSta.Cleanup(view.DisposePresentation);
     view.SetVisible(true);
     view.SetModelReadinessText("Transcribing imported audio with a long descriptive filename");
     view.SetSessionStatus("Import is in progress", Brushes.Black);
@@ -77,45 +80,43 @@ public sealed class DictationUiRegressionTests
     view.Arrange(new Rect(0, 0, 260, view.DesiredSize.Height));
     Assert.Equal(260, Assert.IsType<Grid>(view.FindName("StatusRow")).ActualWidth);
     Assert.True(view.DesiredSize.Width <= 260);
-    view.DisposePresentation();
   });
 
   [Fact]
-  public void ContextTargetSelectionDoesNotActivateHistoryIncludingRowActionClick() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void ContextTargetSelectionDoesNotActivateHistoryIncludingRowActionClick() => WpfTestSta.Run(() =>
   {
     WorkbenchSidebarView sidebar = new();
     Window host = new() { Content = sidebar, Width = 320, Height = 600,
       Left = -10000, Top = -10000, ShowInTaskbar = false };
-    try
-    {
-      ChatHistoryRecord record = new("chat", "Chat", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "provider", "model", []);
-      sidebar.RenderHistory(new WorkbenchHistoryViewState("", [], [ChatHistoryItemViewModel.FromRecord(record)], "", "", true), null, null);
-      int activations = 0;
-      sidebar.ChatHistorySelectionChanged += (_, _) => activations++;
-      host.Show(); host.UpdateLayout();
-      ListBox list = Assert.IsType<ListBox>(sidebar.FindName("ChatHistoryListBox"));
-      ListBoxItem item = Assert.IsType<ListBoxItem>(list.ItemContainerGenerator.ContainerFromIndex(0));
-      sidebar.ChatHistoryPreviewMouseRightButtonDown += (_, e) => sidebar.PrepareChatContextMenuSelection(e.OriginalSource as DependencyObject);
-      item.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Right)
-        { RoutedEvent = Mouse.PreviewMouseDownEvent });
-      Assert.True(item.IsSelected);
-      Assert.Equal(0, activations);
-      list.UnselectAll(); activations = 0;
-      Button action = Descendants(item).OfType<Button>().Single();
-      action.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-      Assert.True(item.IsSelected);
-      Assert.Equal(0, activations);
-      ChatHistoryRecord other = record with { ConversationId = "other", Title = "Other" };
-      sidebar.RenderHistory(new WorkbenchHistoryViewState("", [],
-        [ChatHistoryItemViewModel.FromRecord(record), ChatHistoryItemViewModel.FromRecord(other)], "", "", true), null, "other");
-      Assert.Equal("chat", sidebar.SelectedChat?.Record.ConversationId);
-      Assert.Equal(0, activations);
-      list.ContextMenu!.IsOpen = false;
-      list.UnselectAll(); activations = 0;
-      list.SelectedIndex = 0;
-      Assert.Equal(1, activations);
-    }
-    finally { host.Close(); }
+    WpfTestSta.Cleanup(host.Close);
+    ChatHistoryRecord record = new("chat", "Chat", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "provider", "model", []);
+    sidebar.RenderHistory(new WorkbenchHistoryViewState("", [], [ChatHistoryItemViewModel.FromRecord(record)], "", "", true), null, null);
+    int activations = 0;
+    sidebar.ChatHistorySelectionChanged += (_, _) => activations++;
+    host.Show(); host.UpdateLayout();
+    ListBox list = Assert.IsType<ListBox>(sidebar.FindName("ChatHistoryListBox"));
+    WpfTestSta.Cleanup(() => { if (list.ContextMenu is { } menu) menu.IsOpen = false; });
+    ListBoxItem item = Assert.IsType<ListBoxItem>(list.ItemContainerGenerator.ContainerFromIndex(0));
+    sidebar.ChatHistoryPreviewMouseRightButtonDown += (_, e) => sidebar.PrepareChatContextMenuSelection(e.OriginalSource as DependencyObject);
+    item.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Right)
+      { RoutedEvent = Mouse.PreviewMouseDownEvent });
+    Assert.True(item.IsSelected);
+    Assert.Equal(0, activations);
+    list.UnselectAll(); activations = 0;
+    Button action = Descendants(item).OfType<Button>().Single();
+    action.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Assert.True(item.IsSelected);
+    Assert.Equal(0, activations);
+    ChatHistoryRecord other = record with { ConversationId = "other", Title = "Other" };
+    sidebar.RenderHistory(new WorkbenchHistoryViewState("", [],
+      [ChatHistoryItemViewModel.FromRecord(record), ChatHistoryItemViewModel.FromRecord(other)], "", "", true), null, "other");
+    Assert.Equal("chat", sidebar.SelectedChat?.Record.ConversationId);
+    Assert.Equal(0, activations);
+    list.ContextMenu!.IsOpen = false;
+    list.UnselectAll(); activations = 0;
+    list.SelectedIndex = 0;
+    Assert.Equal(1, activations);
   });
 
   private static IEnumerable<DependencyObject> Descendants(DependencyObject parent)
@@ -128,7 +129,8 @@ public sealed class DictationUiRegressionTests
     }
   }
   [Fact]
-  public void SettingsNavigation_RespectsFocusedControlsAndModifiers() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void SettingsNavigation_RespectsFocusedControlsAndModifiers() => WpfTestSta.Run(() =>
   {
     foreach (Key key in new[] { Key.Home, Key.End })
     {
@@ -145,11 +147,14 @@ public sealed class DictationUiRegressionTests
   });
 
   [Fact]
-  public void ModelNotice_ReservesSpaceAndNeverChangesTheDraft() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void ModelNotice_ReservesSpaceAndNeverChangesTheDraft() => WpfTestSta.Run(() =>
   {
     WorkbenchChatController chat = new(_ => throw new InvalidOperationException());
+    WpfTestSta.Cleanup(() => chat.DisposeAsync().AsTask().GetAwaiter().GetResult());
     WorkbenchModelNoticeView notice = new();
     WorkbenchComposerView composer = new() { PromptText = "Unicode draft — नमस्ते\nsecond line" };
+    WpfTestSta.Cleanup(composer.DisposePresentation);
     StackPanel host = new() { Width = 420 };
     host.Children.Add(notice);
     host.Children.Add(composer);
@@ -168,13 +173,14 @@ public sealed class DictationUiRegressionTests
     Assert.Equal(Visibility.Visible, notice.Visibility);
     notice.Render(chat);
     Assert.Equal(Visibility.Hidden, notice.Visibility);
-    chat.DisposeAsync().AsTask().GetAwaiter().GetResult();
   });
 
   [Fact]
-  public void LongNoticeAtNarrowWidthStaysBoundedAndActionRemainsReachable() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void LongNoticeAtNarrowWidthStaysBoundedAndActionRemainsReachable() => WpfTestSta.Run(() =>
   {
     WorkbenchChatController chat = new(_ => throw new InvalidOperationException());
+    WpfTestSta.Cleanup(() => chat.DisposeAsync().AsTask().GetAwaiter().GetResult());
     chat.SetReadiness(false, false, false);
     chat.SetModelStatus(string.Concat(Enumerable.Repeat("Model status unavailable — कृपया पुनः प्रयास करें. ", 30)));
     WorkbenchModelNoticeView notice = new();
@@ -188,28 +194,30 @@ public sealed class DictationUiRegressionTests
     Assert.True(action.IsEnabled);
     Rect bounds = action.TransformToAncestor(notice).TransformBounds(new Rect(action.RenderSize));
     Assert.True(bounds.Right <= notice.ActualWidth);
-    chat.DisposeAsync().AsTask().GetAwaiter().GetResult();
   });
 
   [Fact]
-  public void ExpiredStatusCannotReappearAndSidebarRowsAreCompact() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void ExpiredStatusCannotReappearAndSidebarRowsAreCompact() => WpfTestSta.Run(() =>
   {
     WorkbenchOperationalStatusView status = new();
+    WpfTestSta.Cleanup(status.DisposePresentation);
     status.SetSessionStatus("Old outcome", Brushes.Black);
     status.ShowTransientOutcome();
     status.ExpireTransientOutcome();
     Assert.Empty(status.SessionStatusText);
     Assert.False(status.IsTransientOutcomeVisible);
-    status.DisposePresentation();
     WorkbenchSidebarView sidebar = new();
     ListBox list = Assert.IsType<ListBox>(sidebar.FindName("ChatHistoryListBox"));
+    WpfTestSta.Cleanup(() => { if (list.ContextMenu is { } menu) menu.IsOpen = false; });
     ListBoxItem item = new() { Style = list.ItemContainerStyle };
     Assert.Equal(new Thickness(10, 3, 10, 3), item.Padding);
     Assert.Equal(34, item.MinHeight);
   });
 
   [Fact]
-  public void ReplyActions_RenderWithThemeAndPaperResources() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void ReplyActions_RenderWithThemeAndPaperResources() => WpfTestSta.Run(() =>
   {
     StackPanel samples = new();
     foreach ((string label, Brush background, bool paper) in new[] {
@@ -241,7 +249,8 @@ public sealed class DictationUiRegressionTests
     encoder.Save(file);
   });
   [Fact]
-  public void HistoryRefresh_RestoresSelectionWithoutActivatingEitherHistory() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void HistoryRefresh_RestoresSelectionWithoutActivatingEitherHistory() => WpfTestSta.Run(() =>
   {
     WorkbenchSidebarView sidebar = new();
     DictationHistoryRecord record = new(DateTimeOffset.UtcNow, "default", "provider", "model",
@@ -268,28 +277,27 @@ public sealed class DictationUiRegressionTests
   });
 
   [Fact]
-  public void ComposerInsertion_ReplacesSelectionOnceAndSupportsUndo() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void ComposerInsertion_ReplacesSelectionOnceAndSupportsUndo() => WpfTestSta.Run(() =>
   {
     TextBox editor = new() { Text = "Hello old world", IsUndoEnabled = true };
     Window host = new() { Content = editor, Width = 300, Height = 100, Left = -10000, Top = -10000, ShowInTaskbar = false };
-    try
-    {
-      host.Show();
-      host.UpdateLayout();
-      editor.Select(6, 3);
-      WorkbenchDictationTarget target = new(editor, () => true);
-      Assert.True(target.TryInsert("new"));
-      Assert.Equal("Hello new world", editor.Text);
-      Assert.Equal(9, editor.CaretIndex);
-      Assert.False(target.TryInsert("duplicate"));
-      Assert.True(editor.Undo());
-      Assert.Equal("Hello old world", editor.Text);
-    }
-    finally { host.Close(); }
+    WpfTestSta.Cleanup(host.Close);
+    host.Show();
+    host.UpdateLayout();
+    editor.Select(6, 3);
+    WorkbenchDictationTarget target = new(editor, () => true);
+    Assert.True(target.TryInsert("new"));
+    Assert.Equal("Hello new world", editor.Text);
+    Assert.Equal(9, editor.CaretIndex);
+    Assert.False(target.TryInsert("duplicate"));
+    Assert.True(editor.Undo());
+    Assert.Equal("Hello old world", editor.Text);
   });
 
   [Fact]
-  public void ComposerInsertion_RejectsEditsAndChangedIdentity() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void ComposerInsertion_RejectsEditsAndChangedIdentity() => WpfTestSta.Run(() =>
   {
     TextBox editor = new() { Text = "draft" };
     WorkbenchDictationTarget target = new(editor, () => true);
@@ -301,10 +309,11 @@ public sealed class DictationUiRegressionTests
   });
 
   [Theory]
+  [Trait("Category", "WindowsWpf")]
   [InlineData(false, false)]
   [InlineData(true, false)]
   [InlineData(false, true)]
-  public void ReplyActions_HaveTransparentChromeAndStableTooltip(bool paper, bool code) => RunOnSta(() =>
+  public void ReplyActions_HaveTransparentChromeAndStableTooltip(bool paper, bool code) => WpfTestSta.Run(() =>
   {
     int copies = 0;
     Button button = ChatMarkdownRenderer.CreateIconButton("Copy code", "\uE8C8", () => copies++,
@@ -322,7 +331,8 @@ public sealed class DictationUiRegressionTests
   });
 
   [Fact]
-  public void GlobalInsertion_UsesOwnedEditorAndNeverFallsBackAfterDraftChanges() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void GlobalInsertion_UsesOwnedEditorAndNeverFallsBackAfterDraftChanges() => WpfTestSta.Run(() =>
   {
     TextBox editor = new() { Text = "Hello " };
     editor.Select(editor.Text.Length, 0);
@@ -372,7 +382,8 @@ public sealed class DictationUiRegressionTests
   }
 
   [Fact]
-  public void TargetReportsActualDraftChangeSeparatelyFromFocusOrAvailability() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void TargetReportsActualDraftChangeSeparatelyFromFocusOrAvailability() => WpfTestSta.Run(() =>
   {
     TextBox editor = new() { Text = "original" };
     WorkbenchInsertionOutcome permission = WorkbenchInsertionOutcome.Inserted;
@@ -385,7 +396,8 @@ public sealed class DictationUiRegressionTests
   });
 
   [Fact]
-  public void CodeWrapTooltipIsShortAndCopyRetainsOriginalWhitespaceAndUnicode() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void CodeWrapTooltipIsShortAndCopyRetainsOriginalWhitespaceAndUnicode() => WpfTestSta.Run(() =>
   {
     string source = "\tvar नमस्ते = \"" + new string('x', 220) + "\";  \n\t// second line  ";
     System.Windows.Documents.FlowDocument document = new();
@@ -411,19 +423,21 @@ public sealed class DictationUiRegressionTests
   });
 
   [Fact]
-  public void QueuedExpirationTickCannotHidePersistentReplacement() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void QueuedExpirationTickCannotHidePersistentReplacement() => WpfTestSta.Run(() =>
   {
     WorkbenchOperationalStatusView view = new();
+    WpfTestSta.Cleanup(view.DisposePresentation);
     view.ShowTransientOutcome();
     view.ShowTransientOutcome(autoExpire: false);
     typeof(WorkbenchOperationalStatusView).GetMethod("OnTransientOutcomeTimerTick",
       System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(view, [view, EventArgs.Empty]);
     Assert.True(view.IsTransientOutcomeVisible);
-    view.DisposePresentation();
   });
 
   [Fact]
-  public void PressedRecoveryActionKeepsIdentityAcrossNoticeReplacement() => RunOnSta(() =>
+  [Trait("Category", "WindowsWpf")]
+  public void PressedRecoveryActionKeepsIdentityAcrossNoticeReplacement() => WpfTestSta.Run(() =>
   {
     WorkbenchModelNoticeView notice = new();
     Grid grid = Assert.IsType<Grid>(notice.Content);
@@ -461,14 +475,4 @@ public sealed class DictationUiRegressionTests
     }
   }
 
-  [SuppressMessage("Design", "CA1031", Justification = "Transfers STA assertion failures to the runner.")]
-  private static void RunOnSta(Action action)
-  {
-    Exception? failure = null;
-    Thread thread = new(() => { try { action(); } catch (Exception ex) { failure = ex; } });
-    thread.SetApartmentState(ApartmentState.STA);
-    thread.Start();
-    Assert.True(thread.Join(TimeSpan.FromSeconds(20)), "STA regression timed out.");
-    if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
-  }
 }
