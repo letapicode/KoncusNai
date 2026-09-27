@@ -12,6 +12,7 @@ public partial class WorkbenchOperationalStatusView : UserControl
 {
   private readonly DispatcherTimer transientOutcomeTimer;
   private bool presentationDisposed;
+  private long expiryTick;
 
   public WorkbenchOperationalStatusView()
   {
@@ -42,7 +43,7 @@ public partial class WorkbenchOperationalStatusView : UserControl
   {
     ModelProgress.IsIndeterminate = false;
     ModelProgress.Value = progress;
-    ModelReadiness.Text = detail ?? string.Empty;
+    ModelReadiness.Text = string.Empty;
   }
 
   internal void SetModelReadinessText(string detail) =>
@@ -59,16 +60,24 @@ public partial class WorkbenchOperationalStatusView : UserControl
 
   internal void StopProgress() => ModelProgress.IsIndeterminate = false;
 
+  internal void SetCompactDictationFeedback(bool compact)
+  {
+    ModelProgress.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+    ModelReadiness.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+  }
+
   internal void SetSessionStatus(string status, Brush foreground)
   {
     ArgumentNullException.ThrowIfNull(foreground);
     SessionStatus.Text = status ?? string.Empty;
+    SessionStatus.Visibility = string.IsNullOrWhiteSpace(status) || string.Equals(status, "Idle", StringComparison.OrdinalIgnoreCase)
+      ? Visibility.Collapsed : Visibility.Visible;
     SessionStatus.Foreground = foreground;
   }
 
   internal void SetModelDetail(string detail) => ModelDetail.Text = detail ?? string.Empty;
 
-  internal void ShowTransientOutcome()
+  internal void ShowTransientOutcome(bool autoExpire = true)
   {
     if (presentationDisposed)
     {
@@ -77,13 +86,18 @@ public partial class WorkbenchOperationalStatusView : UserControl
 
     IsTransientOutcomeVisible = true;
     transientOutcomeTimer.Stop();
-    transientOutcomeTimer.Start();
+    if (autoExpire)
+    {
+      expiryTick = Environment.TickCount64 + (long)transientOutcomeTimer.Interval.TotalMilliseconds;
+      transientOutcomeTimer.Start();
+    }
   }
 
   internal void ClearTransientOutcome()
   {
     transientOutcomeTimer.Stop();
     IsTransientOutcomeVisible = false;
+    SessionStatus.Text = string.Empty;
   }
 
   internal void DisposePresentation()
@@ -113,7 +127,8 @@ public partial class WorkbenchOperationalStatusView : UserControl
 
   private void OnTransientOutcomeTimerTick(object? sender, EventArgs args)
   {
-    ExpireTransientOutcome();
+    // A previously queued tick must not expire a replacement or persistent notice.
+    if (transientOutcomeTimer.IsEnabled && Environment.TickCount64 >= expiryTick) ExpireTransientOutcome();
   }
 
 }

@@ -1,7 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using DictateAnywhere.Core.Contracts;
+using DictateAnywhere.Core.Domain;
 
 namespace DictateAnywhere.App.Workbench;
 
@@ -24,6 +27,8 @@ internal sealed class WorkbenchDictationController : IAsyncDisposable
   private readonly Func<AppSettings, IAudioCaptureService> audioCaptureServiceFactory;
   private readonly Func<AppSettings, IDiagnostics, ITranscriptionService> transcriptionServiceFactory;
   private readonly Func<IHotkeyService> hotkeyServiceFactory;
+  private readonly Func<AppSettings, IOverlayService>? overlayFactory;
+  private IOverlayService? overlay;
   private readonly WorkbenchSessionStateMachine stateMachine = new();
 
   private IAudioCaptureService? audioCaptureService;
@@ -36,12 +41,14 @@ internal sealed class WorkbenchDictationController : IAsyncDisposable
     IDiagnostics diagnostics,
     Func<AppSettings, IAudioCaptureService> audioCaptureServiceFactory,
     Func<AppSettings, IDiagnostics, ITranscriptionService> transcriptionServiceFactory,
-    Func<IHotkeyService> hotkeyServiceFactory)
+    Func<IHotkeyService> hotkeyServiceFactory,
+    Func<AppSettings, IOverlayService>? overlayFactory = null)
   {
     this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
     this.audioCaptureServiceFactory = audioCaptureServiceFactory ?? throw new ArgumentNullException(nameof(audioCaptureServiceFactory));
     this.transcriptionServiceFactory = transcriptionServiceFactory ?? throw new ArgumentNullException(nameof(transcriptionServiceFactory));
     this.hotkeyServiceFactory = hotkeyServiceFactory ?? throw new ArgumentNullException(nameof(hotkeyServiceFactory));
+    this.overlayFactory = overlayFactory;
   }
 
   public event EventHandler? ToggleRequested;
@@ -64,6 +71,7 @@ internal sealed class WorkbenchDictationController : IAsyncDisposable
       audioCaptureService = new WorkbenchAudioCaptureServiceAdapter(audioCaptureServiceFactory(newSettings));
       transcriptionService = new WorkbenchTranscriptionServiceAdapter(
         transcriptionServiceFactory(newSettings, diagnostics));
+      overlay = overlayFactory?.Invoke(newSettings);
       if (!registerHotkey)
       {
         return null;
@@ -84,6 +92,7 @@ internal sealed class WorkbenchDictationController : IAsyncDisposable
     }
   }
 
+  [SuppressMessage("Design", "CA1031", Justification = "Startup cleanup must preserve the original failure while observing cleanup failures.")]
   public async Task<bool> StartRecordingAsync(CancellationToken cancellationToken = default)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
@@ -99,18 +108,35 @@ internal sealed class WorkbenchDictationController : IAsyncDisposable
 
     try
     {
+      Stopwatch startup = Stopwatch.StartNew();
       await audioCaptureService.StartAsync(cancellationToken).ConfigureAwait(true);
+      diagnostics.Info($"Workbench recording startupMs={startup.Elapsed.TotalMilliseconds:F2}.");
+      if (overlay is not null)
+        await overlay.ShowStateAsync(DictationSessionState.Recording,
+          display: OverlayDisplayOptions.AnchoredRecording, cancellationToken: cancellationToken).ConfigureAwait(true);
       return true;
     }
     catch
     {
+      // Startup feedback can fail after the device has already been acquired.
+      // Release the device without allowing cancellation to skip cleanup.
+      if (audioCaptureService.IsCapturing)
+      {
+        try { await audioCaptureService.StopAsync(CancellationToken.None).ConfigureAwait(true); }
+        catch (Exception cleanupFailure) { diagnostics.Error("Recording startup cleanup failed.", cleanupFailure); }
+      }
+      if (overlay is not null)
+      {
+        try { await overlay.HideAsync(CancellationToken.None).ConfigureAwait(true); }
+        catch (Exception cleanupFailure) { diagnostics.Error("Recording startup overlay cleanup failed.", cleanupFailure); }
+      }
       stateMachine.Reset();
       throw;
     }
   }
 
   public async Task<WorkbenchTranscriptionOutcome> StopAndTranscribeAsync(
-    CancellationToken cancellationToken = default)
+    CancellationToken cancellationToken = default, Action? onTranscribing = null)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
     if (audioCaptureService is null || transcriptionService is null)
@@ -128,15 +154,23 @@ internal sealed class WorkbenchDictationController : IAsyncDisposable
 
     try
     {
+      onTranscribing?.Invoke();
+      Stopwatch finalize = Stopwatch.StartNew();
       AudioCaptureResult capture = await audioCaptureService.StopAsync(cancellationToken).ConfigureAwait(true);
+      diagnostics.Info($"Workbench capture finalizationMs={finalize.Elapsed.TotalMilliseconds:F2}.");
+      if (overlay is not null)
+        await overlay.ShowStateAsync(DictationSessionState.Transcribing,
+          display: OverlayDisplayOptions.AnchoredTranscribing, cancellationToken: cancellationToken).ConfigureAwait(true);
       if (capture.Pcm16Mono.Length == 0)
       {
         return Complete(WorkbenchTranscriptionStatus.NoAudibleSpeech, string.Empty, capture.Duration);
       }
 
+      Stopwatch transcriptionTimer = Stopwatch.StartNew();
       TranscriptionResult transcription = await transcriptionService
         .TranscribeAsync(capture, settings.GetConfiguredTranscriptionModelId(), cancellationToken)
         .ConfigureAwait(true);
+      diagnostics.Info($"Workbench transcriptionMs={transcriptionTimer.Elapsed.TotalMilliseconds:F2}.");
       string text = (transcription.Text ?? string.Empty).Trim();
       return string.IsNullOrWhiteSpace(text)
         ? Complete(WorkbenchTranscriptionStatus.NoAudibleSpeech, string.Empty, capture.Duration)
@@ -169,6 +203,9 @@ internal sealed class WorkbenchDictationController : IAsyncDisposable
 
   public async Task ResetAsync()
   {
+    if (overlay is IAsyncDisposable overlayDisposable)
+      await overlayDisposable.DisposeAsync().ConfigureAwait(true);
+    overlay = null;
     if (hotkeyService is not null)
     {
       hotkeyService.HotkeyPressed -= OnHotkeyPressed;
@@ -212,4 +249,8 @@ internal sealed class WorkbenchDictationController : IAsyncDisposable
   }
 
   private void OnHotkeyPressed(object? sender, HotkeyEventArgs e) => ToggleRequested?.Invoke(this, EventArgs.Empty);
+
+  internal Task ShowOutcomeAsync(bool inserted, string message) => overlay is null ? Task.CompletedTask
+    : overlay.ShowStateAsync(inserted ? DictationSessionState.Completed : DictationSessionState.Error,
+      message, display: inserted ? OverlayDisplayOptions.AnchoredCompletion : OverlayDisplayOptions.AnchoredNotice);
 }

@@ -114,7 +114,7 @@
               <StackPanel>
                 <TextBlock Style="{StaticResource AboutCardTitle}" Text="Your data, on your device" />
                 <TextBlock Style="{StaticResource AboutBody}" Foreground="{DynamicResource Brush.Text.Primary}"
-                           Text="Core dictation, transcription, spoken formatting commands, chat, document extraction, OCR, narration, alignment, and rendering run on this device. Network access is used for model/runtime downloads and optional publishing. Dictation and chat history are always saved as local plaintext and protected by your Windows account and file permissions; history never stores raw microphone audio." />
+                           Text="Core dictation, transcription, spoken formatting commands, chat, document extraction, OCR, narration, alignment, and rendering run on this device. Network access is used for model/runtime downloads and optional publishing. Successfully saved dictation and chat history are local plaintext and protected by your Windows account and file permissions; history never stores raw microphone audio." />
               </StackPanel>
             </Border>
 
@@ -154,11 +154,11 @@
           <StackPanel x:Name="AboutFeaturesPanel">
             <StackPanel Style="{StaticResource AboutFeatureSection}">
               <TextBlock Style="{StaticResource AboutCardTitle}" Text="Dictate anywhere" />
-              <TextBlock Style="{StaticResource AboutBody}" Text="Start or stop from a global toggle shortcut, follow the bottom-center recording and status indicator, and insert the result into the app where dictation began. If that target disappears, Koncus Nai keeps a recovery copy and saves it to local history. Clipboard restoration, Unicode fallback, secure-field detection, and optional elevated insertion keep the destination predictable." />
+              <TextBlock Style="{StaticResource AboutBody}" Text="Start or stop from a global toggle shortcut, follow the recording and status overlay, and insert the result into the app where dictation began. If that target disappears, Koncus Nai offers recovery; local history is saved when storage is available. Clipboard restoration, Unicode fallback, secure-field detection, and optional elevated insertion keep the destination predictable." />
             </StackPanel>
             <StackPanel Style="{StaticResource AboutFeatureSection}">
               <TextBlock Style="{StaticResource AboutCardTitle}" Text="Workbench" />
-              <TextBlock Style="{StaticResource AboutBody}" Text="Record into a focused composer, edit transcripts, import audio or video for transcription, and use private local chat. Search saved chats and dictations, rename or delete entries, copy responses, and export conversations. A continuous text-size slider and the selected chat typeface apply while writing as well as while reading replies." />
+              <TextBlock Style="{StaticResource AboutBody}" Text="Record into a focused composer, edit transcripts, import audio or video for transcription, and use private local chat. Search saved chats and dictations, rename or delete entries, copy responses, and export conversations. A continuous text-size slider and the selected chat typeface apply while writing as well as while reading replies. Microphone and shortcut dictation share the same overlay. Model notices above Just Ask explain setup and gate chat until ready; recovery offers Copy and Dismiss. Paper view spans the workspace." />
             </StackPanel>
             <StackPanel Style="{StaticResource AboutFeatureSection}">
               <TextBlock Style="{StaticResource AboutCardTitle}" Text="Speech to text" />

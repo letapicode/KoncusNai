@@ -8,6 +8,7 @@ internal sealed record LocalChatRuntimeReadiness(
   IReadOnlyList<string> MissingModules,
   IReadOnlyList<string> BrokenModules)
 {
+  public bool? IsInstalled { get; init; }
   public static LocalChatRuntimeReadiness Ready { get; } = new(
     true,
     "Local model runtime is ready.",

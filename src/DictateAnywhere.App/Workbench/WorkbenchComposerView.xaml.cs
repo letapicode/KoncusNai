@@ -147,6 +147,17 @@ public partial class WorkbenchComposerView : UserControl
   {
     bool shouldOffer = !expansionOverlayVisible
       && PromptExpansionPolicy.ShouldOfferExpansion(Prompt.Text, Prompt.LineCount);
+    if (!shouldOffer && ExpandPrompt.IsKeyboardFocusWithin && !expansionOverlayVisible)
+    {
+      if (Prompt.IsVisible && Prompt.IsEnabled)
+      {
+        double horizontal = Prompt.HorizontalOffset, vertical = Prompt.VerticalOffset;
+        Prompt.Focus();
+        Prompt.ScrollToHorizontalOffset(horizontal);
+        Prompt.ScrollToVerticalOffset(vertical);
+      }
+      else ExpandPrompt.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+    }
     ExpandPrompt.Visibility = shouldOffer ? Visibility.Visible : Visibility.Collapsed;
   }
 
@@ -205,6 +216,9 @@ public partial class WorkbenchComposerView : UserControl
     }
 
     presentationDisposed = true;
+    Record.Background = Brushes.Transparent;
+    Record.IsEnabled = false;
+    RecordIcon.Data = MicrophoneGlyph;
     expansionRefreshOperation?.Abort();
     expansionRefreshOperation = null;
     expansionRefreshQueued = false;
@@ -228,9 +242,7 @@ public partial class WorkbenchComposerView : UserControl
     PromptPlaceholder.Visibility = hasPrompt ? Visibility.Collapsed : Visibility.Visible;
     Send.IsEnabled = canInteract && canSend && hasPrompt;
     Send.Visibility = !chatIsBusy && hasPrompt ? Visibility.Visible : Visibility.Collapsed;
-    Send.ToolTip = canUseQuickLocalReply
-      ? "Send quick local greeting"
-      : "Submit (checks model readiness)";
+    Send.ToolTip = canSend ? "Send" : "Set up the selected model before sending";
     StopChat.IsEnabled = canCancelChat;
     StopChat.Visibility = canCancelChat ? Visibility.Visible : Visibility.Collapsed;
     ReadDocument.IsEnabled = !isPreparingSpeech;
@@ -266,8 +278,11 @@ public partial class WorkbenchComposerView : UserControl
     ArgumentNullException.ThrowIfNull(viewModel);
     HotkeyStatusText.Text = viewModel.HotkeyStatusText;
     Record.IsEnabled = viewModel.RecordEnabled || viewModel.StopEnabled;
-    RecordIcon.Text = isRecording ? "\uE71A" : "\uE720";
+    RecordIcon.Data = isRecording ? StopGlyph : MicrophoneGlyph;
+    if (isRecording) Record.SetResourceReference(BackgroundProperty, "Brush.Control.Muted");
+    else Record.Background = System.Windows.Media.Brushes.Transparent;
     Record.ToolTip = isRecording ? "Stop dictation" : "Dictate";
+    System.Windows.Automation.AutomationProperties.SetName(Record, isRecording ? "Stop dictation" : "Dictate");
     StopDictation.IsEnabled = viewModel.StopEnabled;
   }
 
@@ -286,12 +301,15 @@ public partial class WorkbenchComposerView : UserControl
   private void OnPromptTextChanged(object sender, TextChangedEventArgs args)
   {
     promptRevision++;
+    DraftChanged?.Invoke(Prompt.Text);
     PromptPlaceholder.Visibility = HasPrompt ? Visibility.Collapsed : Visibility.Visible;
     if (!isApplyingPrompt)
     {
       PromptTextChanged?.Invoke(this, args);
     }
   }
+
+  internal event Action<string>? DraftChanged;
 
   private void OnPromptGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs args) =>
     UpdatePromptFocusPresentation(InputManager.Current.MostRecentInputDevice);
@@ -332,6 +350,14 @@ public partial class WorkbenchComposerView : UserControl
   }
 
   internal Button ExpandPromptElement => ExpandPrompt;
+  private static readonly Geometry MicrophoneGlyph = FrozenGlyph("M9,5 A3,3 0 0 1 15,5 L15,10 A3,3 0 0 1 9,10 Z M6,9 L6,10 A6,6 0 0 0 18,10 L18,9 M12,16 L12,20 M8,20 L16,20");
+  private static readonly Geometry StopGlyph = FrozenGlyph("M7,7 L17,7 L17,17 L7,17 Z");
+  private static Geometry FrozenGlyph(string path)
+  {
+    Geometry geometry = Geometry.Parse(path);
+    geometry.Freeze();
+    return geometry;
+  }
   internal TextBox PromptElement => Prompt;
   internal bool IsExpansionRefreshQueued => expansionRefreshQueued;
   internal bool IsProgressRunning => ProgressView.IsRunning;

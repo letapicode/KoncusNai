@@ -11,6 +11,36 @@ namespace DictateAnywhere.App.Tests;
 public sealed class WorkbenchChatModelControllerTests
 {
   [Xunit.Fact]
+  public async Task Setup_RechecksInstallationBeforeDownloadingFromStaleUiState()
+  {
+    ChatModelSelection selection = new(ChatProviderIds.GemmaLocal, "managed-chat-model");
+    FakeModelManager models = new([new ModelInfo(selection.ProviderId, selection.ModelId, "Chat", true, true, ["en"])]);
+    WorkbenchChatModelController controller = new(models, new ReadyRuntimeProbe(), new NoOpDiagnostics());
+    await controller.SetupAsync(selection, isInstalled: false, isRuntimeReady: false);
+    Xunit.Assert.Null(models.DownloadedSelection);
+  }
+
+  [Xunit.Fact]
+  public async Task RuntimeCheckFailure_DoesNotForgetDownloadedModel()
+  {
+    ChatModelSelection selection = new(ChatProviderIds.GemmaLocal, "managed-chat-model");
+    FakeModelManager models = new([new ModelInfo(selection.ProviderId, selection.ModelId, "Chat", true, true, ["en"])]);
+    WorkbenchChatModelController controller = new(models, new FailingRuntimeProbe(), new NoOpDiagnostics());
+    WorkbenchChatModelReadinessState state = await controller.CheckAsync(selection);
+    Xunit.Assert.True(state.IsInstalled);
+    Xunit.Assert.True(state.IsInstallationKnown);
+    Xunit.Assert.False(state.IsRuntimeReady);
+    Xunit.Assert.NotNull(state.Failure);
+  }
+
+  private sealed class FailingRuntimeProbe : IChatRuntimeReadinessProbe
+  {
+    public Task<LocalChatRuntimeReadiness> CheckGemmaChatAsync(CancellationToken cancellationToken = default) =>
+      Task.FromException<LocalChatRuntimeReadiness>(new System.IO.IOException("unavailable runtime"));
+    public Task<LocalChatRuntimeReadiness> RepairGemmaChatAsync(IProgress<double>? progress = null,
+      CancellationToken cancellationToken = default) => CheckGemmaChatAsync(cancellationToken);
+  }
+  [Xunit.Fact]
   public async Task CheckAsync_ManagedInstalledModel_CombinesAcquisitionAndRuntimeReadiness()
   {
     ChatModelSelection selection = new(ChatProviderIds.GemmaLocal, "managed-chat-model");

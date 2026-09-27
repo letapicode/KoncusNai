@@ -44,8 +44,10 @@ public sealed class WorkbenchDictationCommandControllerTests : IDisposable
     Xunit.Assert.Equal(WorkbenchDictationCommandStatus.TranscriptionCompleted, completed.Status);
     Xunit.Assert.Equal($"existing prompt{Environment.NewLine}{Environment.NewLine}transcribed text", completed.ComposerText);
     Xunit.Assert.True(completed.ShouldRefreshHistory);
+    Xunit.Assert.False(completed.NeedsAttention);
+    Xunit.Assert.Empty(completed.StatusMessage);
     Xunit.Assert.NotNull(persisted);
-    Xunit.Assert.Equal(completed.ComposerText, persisted!.FinalText);
+    Xunit.Assert.Equal("transcribed text", persisted!.FinalText);
     Xunit.Assert.Equal("session-1", persisted.SessionId);
     Xunit.Assert.Equal("session-1", completed.SourceSessionId);
     Xunit.Assert.Equal(42, completed.SourceComposerRevision);
@@ -104,7 +106,164 @@ public sealed class WorkbenchDictationCommandControllerTests : IDisposable
     Xunit.Assert.False(operations.IsBusy);
   }
 
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task StartupFeedbackFailure_StopsAcquiredMicrophone(bool cancellation)
+  {
+    using CancellationTokenSource startup = new();
+    FakeAudioCaptureService audio = new(new AudioCaptureResult([1], 16000, TimeSpan.Zero));
+    await using WorkbenchDictationController dictation = new(new NoOpDiagnostics(), _ => audio,
+      (_, _) => new FakeTranscriptionService("hello"), () => new FakeHotkeyService(),
+      _ => new FailingOverlay(DictateAnywhere.Core.Domain.DictationSessionState.Recording, cancellation ? startup : null));
+    await dictation.ConfigureAsync(AppSettings.Default, false);
+    if (cancellation) await Xunit.Assert.ThrowsAnyAsync<OperationCanceledException>(() => dictation.StartRecordingAsync(startup.Token));
+    else await Xunit.Assert.ThrowsAsync<InvalidOperationException>(() => dictation.StartRecordingAsync());
+    Xunit.Assert.False(audio.IsCapturing);
+    Xunit.Assert.Equal(WorkbenchSessionState.Idle, dictation.State);
+  }
+
+  [Xunit.Fact]
+  public async Task CompletionFeedbackFailure_DoesNotDiscardInsertionOrPersistence()
+  {
+    FakeAudioCaptureService audio = new(new AudioCaptureResult([1], 16000, TimeSpan.Zero));
+    await using WorkbenchDictationController dictation = new(new NoOpDiagnostics(), _ => audio,
+      (_, _) => new FakeTranscriptionService("hello"), () => new FakeHotkeyService(),
+      _ => new FailingOverlay(DictateAnywhere.Core.Domain.DictationSessionState.Completed));
+    await dictation.ConfigureAsync(AppSettings.Default, false);
+    await using WorkbenchOperationSession operations = new();
+    int writes = 0;
+    WorkbenchDictationHistoryRecorder history = new((_, _, _) =>
+    { writes++; return Task.FromResult(HistoryCommandResult.Succeeded(1)); }, new NoOpDiagnostics());
+    WorkbenchDictationCommandController controller = new(operations, dictation, history, new NoOpDiagnostics());
+    await controller.StartAsync("microphone");
+    WorkbenchDictationCommandResult result = await controller.StopAndTranscribeAsync("button", "", "session", AppSettings.Default);
+    Xunit.Assert.Equal(WorkbenchDictationCommandStatus.TranscriptionCompleted, result.Status);
+    Xunit.Assert.Equal(1, writes);
+    Xunit.Assert.False(result.NeedsAttention);
+  }
+
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task FailedErrorOverlayPreservesTheActualCaptureOrTranscriptionOutcome(bool transcriptionFailure)
+  {
+    FakeAudioCaptureService audio = new(new AudioCaptureResult(transcriptionFailure ? [1] : [], 16000, TimeSpan.Zero));
+    await using WorkbenchDictationController dictation = new(new NoOpDiagnostics(), _ => audio,
+      (_, _) => new FailedTranscription(), () => new FakeHotkeyService(),
+      _ => new FailingOverlay(DictateAnywhere.Core.Domain.DictationSessionState.Error));
+    await dictation.ConfigureAsync(AppSettings.Default, false);
+    await using WorkbenchOperationSession operations = new();
+    int writes = 0;
+    WorkbenchDictationHistoryRecorder history = new((_, _, _) =>
+    { writes++; return Task.FromResult(HistoryCommandResult.Succeeded(1)); }, new NoOpDiagnostics());
+    WorkbenchDictationCommandController controller = new(operations, dictation, history, new NoOpDiagnostics());
+    await controller.StartAsync("microphone");
+    WorkbenchDictationCommandResult result = await controller.StopAndTranscribeAsync("button", "", "session", AppSettings.Default);
+    Xunit.Assert.Equal(transcriptionFailure ? WorkbenchDictationCommandStatus.Failed : WorkbenchDictationCommandStatus.NoAudibleSpeech, result.Status);
+    Xunit.Assert.Equal(0, writes);
+  }
+
+  private sealed class FailedTranscription : ITranscriptionService
+  {
+    public Task<TranscriptionResult> TranscribeAsync(AudioCaptureResult audio, string modelId,
+      CancellationToken cancellationToken = default) => Task.FromException<TranscriptionResult>(new InvalidOperationException("inference failed"));
+  }
+
+  private sealed class FailingOverlay(DictateAnywhere.Core.Domain.DictationSessionState failedState,
+    CancellationTokenSource? cancellation = null) : IOverlayService
+  {
+    public Task ShowStateAsync(DictateAnywhere.Core.Domain.DictationSessionState state, string? message = null,
+      TimeSpan? elapsed = null, OverlayDisplayOptions? display = null, CancellationToken cancellationToken = default)
+    {
+      if (state != failedState) return Task.CompletedTask;
+      if (cancellation is null) return Task.FromException(new InvalidOperationException("presentation failed"));
+      cancellation.Cancel();
+      return Task.FromCanceled(cancellationToken);
+    }
+    public Task HideAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+  }
+
+  [Xunit.Fact]
+  public async Task TranscriptIsPublishedBeforeSlowStorageAndShutdownStillWaits()
+  {
+    FakeAudioCaptureService audio = new(new AudioCaptureResult([1, 2], 16_000, TimeSpan.FromSeconds(1)));
+    await using WorkbenchDictationController dictation = CreateDictation(audio, "hello");
+    await dictation.ConfigureAsync(AppSettings.Default, registerHotkey: false);
+    await using WorkbenchOperationSession operations = new();
+    TaskCompletionSource<HistoryCommandResult> storage = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    bool visible = false;
+    WorkbenchDictationHistoryRecorder history = new((_, record, token) =>
+    {
+      Xunit.Assert.True(visible);
+      Xunit.Assert.False(token.CanBeCanceled);
+      Xunit.Assert.Equal("hello", record.FinalText);
+      return storage.Task;
+    }, new NoOpDiagnostics());
+    WorkbenchDictationCommandController controller = new(operations, dictation, history, new NoOpDiagnostics());
+    await controller.StartAsync("microphone");
+    Task<WorkbenchDictationCommandResult> pending = controller.StopAndTranscribeAsync("button", "draft", "session",
+      AppSettings.Default, insertTranscript: text => visible = text == "hello");
+    Xunit.Assert.True(visible);
+    Xunit.Assert.False(pending.IsCompleted);
+    Task shutdown = operations.DisposeAsync().AsTask();
+    Xunit.Assert.False(shutdown.IsCompleted);
+    LastDictationSessionCache.Store(new DictationHistoryRecord(DateTimeOffset.UtcNow, "default", "provider", "model",
+      "overlapping hotkey", "overlapping hotkey", TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero,
+      SessionId: "other").Normalize());
+    storage.SetResult(HistoryCommandResult.Succeeded(1));
+    WorkbenchDictationCommandResult result = await pending;
+    Xunit.Assert.Equal(WorkbenchDictationCommandStatus.TranscriptionCompleted, result.Status);
+    Xunit.Assert.Equal("hello", result.TranscribedText);
+    Xunit.Assert.Equal("hello", result.HistoryWrite!.Record.FinalText);
+    await shutdown;
+  }
+
+  [Xunit.Fact]
+  public async Task FailedEditorCallback_PreservesTranscriptInsteadOfReportingTranscriptionFailure()
+  {
+    FakeAudioCaptureService audio = new(new AudioCaptureResult([1], 16_000, TimeSpan.FromSeconds(1)));
+    await using WorkbenchDictationController dictation = CreateDictation(audio, "recover me");
+    await dictation.ConfigureAsync(AppSettings.Default, registerHotkey: false);
+    await using WorkbenchOperationSession operations = new();
+    WorkbenchDictationHistoryRecorder history = new((_, _, _) => Task.FromResult(HistoryCommandResult.Succeeded(1)), new NoOpDiagnostics());
+    WorkbenchDictationCommandController controller = new(operations, dictation, history, new NoOpDiagnostics());
+    await controller.StartAsync("microphone");
+    WorkbenchDictationCommandResult result = await controller.StopAndTranscribeAsync("button", "", "session",
+      AppSettings.Default, insertTranscript: _ => throw new InvalidOperationException("editor closed"));
+    Xunit.Assert.Equal(WorkbenchDictationCommandStatus.TranscriptionCompleted, result.Status);
+    Xunit.Assert.Contains("Saved to history", result.StatusMessage);
+    Xunit.Assert.Equal(WorkbenchInsertionOutcome.Failed, result.InsertionOutcome);
+    Xunit.Assert.DoesNotContain("draft changed", result.StatusMessage);
+    Xunit.Assert.Equal("recover me", result.HistoryWrite!.Record.FinalText);
+  }
+
   public void Dispose() => LastDictationSessionCache.Clear();
+
+  [Xunit.Theory]
+  [Xunit.InlineData((int)WorkbenchInsertionOutcome.DraftChanged, true)]
+  [Xunit.InlineData((int)WorkbenchInsertionOutcome.FocusLost, false)]
+  [Xunit.InlineData((int)WorkbenchInsertionOutcome.TargetUnavailable, true)]
+  [Xunit.InlineData((int)WorkbenchInsertionOutcome.ConversationChanged, false)]
+  public async Task RejectionReasonAndSaveOutcomeStayIndependent(int reason, bool saved)
+  {
+    WorkbenchInsertionOutcome rejection = (WorkbenchInsertionOutcome)reason;
+    await using WorkbenchDictationController dictation = CreateDictation(
+      new FakeAudioCaptureService(new AudioCaptureResult([1], 16000, TimeSpan.FromSeconds(1))), "recover");
+    await dictation.ConfigureAsync(AppSettings.Default, registerHotkey: false);
+    await using WorkbenchOperationSession operations = new();
+    WorkbenchDictationHistoryRecorder history = new((_, _, _) => Task.FromResult(saved
+      ? HistoryCommandResult.Succeeded(1) : HistoryCommandResult.Unavailable(new System.IO.IOException("Storage unavailable"))), new NoOpDiagnostics());
+    WorkbenchDictationCommandController controller = new(operations, dictation, history, new NoOpDiagnostics());
+    await controller.StartAsync("microphone");
+    WorkbenchDictationCommandResult result = await controller.StopAndTranscribeAsync("microphone", "", "session",
+      AppSettings.Default, insertOutcome: _ => rejection);
+    Xunit.Assert.Equal(rejection, result.InsertionOutcome);
+    Xunit.Assert.Equal(rejection == WorkbenchInsertionOutcome.DraftChanged, result.StatusMessage.Contains("draft changed", StringComparison.Ordinal));
+    Xunit.Assert.Equal(saved, result.StatusMessage.Contains("Saved to history", StringComparison.Ordinal));
+    Xunit.Assert.Equal("recover", result.TranscribedText);
+    Xunit.Assert.True(result.NeedsAttention);
+  }
 
   private static WorkbenchDictationController CreateDictation(
     FakeAudioCaptureService audio,

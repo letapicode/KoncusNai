@@ -16,7 +16,8 @@ internal sealed record WorkbenchChatModelReadinessState(
   double Progress,
   string Detail,
   string Status,
-  Exception? Failure = null);
+  Exception? Failure = null,
+  bool IsInstallationKnown = true);
 
 internal sealed record WorkbenchChatModelSetupProgress(
   string Status,
@@ -93,6 +94,7 @@ internal sealed class WorkbenchChatModelController
   {
     ArgumentNullException.ThrowIfNull(selection);
     ChatModelSelection normalized = selection.Normalize();
+    bool? discoveredInstallation = null;
     try
     {
       if (string.Equals(normalized.ProviderId, ChatProviderIds.OllamaLocal, StringComparison.OrdinalIgnoreCase))
@@ -101,7 +103,7 @@ internal sealed class WorkbenchChatModelController
           .CheckAsync(normalized.ModelId, cancellationToken)
           .ConfigureAwait(true);
         if (readiness.IsReady && !OllamaListenerTrust.IsCurrentTrusted())
-          return new WorkbenchChatModelReadinessState(false, false, 0,
+          return new WorkbenchChatModelReadinessState(true, false, 0,
             "Ollama listener needs review.",
             "Review the running Ollama service from model setup before sending private chat content.");
         return FromProviderReadiness(readiness, "Ready in Ollama.", "Start Ollama or pull Gemma 4.");
@@ -115,10 +117,12 @@ internal sealed class WorkbenchChatModelController
         return FromProviderReadiness(readiness, "Ready on this device.", "Local setup needed.");
       }
 
-      IReadOnlyList<ModelInfo> models = await modelManager.GetModelsAsync(cancellationToken).ConfigureAwait(true);
+      IReadOnlyList<ModelInfo> models = await Task.Run(() => modelManager.GetModelsAsync(cancellationToken),
+        cancellationToken).ConfigureAwait(true);
       ModelInfo? model = models.FirstOrDefault(candidate =>
         string.Equals(candidate.ProviderId, normalized.ProviderId, StringComparison.OrdinalIgnoreCase)
         && string.Equals(candidate.ModelId, normalized.ModelId, StringComparison.OrdinalIgnoreCase));
+      discoveredInstallation = model?.IsInstalled == true;
       if (model?.IsInstalled != true)
       {
         return new WorkbenchChatModelReadinessState(
@@ -139,15 +143,18 @@ internal sealed class WorkbenchChatModelController
         Detail: runtime.IsReady ? "Ready on this device." : "Runtime needs update.",
         Status: runtime.IsReady ? "Selected chat model is ready." : runtime.StatusMessage);
     }
-    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException || IsModelManagementException(ex))
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
+      or HttpRequestException or System.Text.Json.JsonException
+      || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested) || IsModelManagementException(ex))
     {
       return new WorkbenchChatModelReadinessState(
-        IsInstalled: false,
+        IsInstalled: discoveredInstallation == true,
         IsRuntimeReady: false,
         Progress: 0,
         Detail: "Model status unavailable.",
         Status: "Could not check chat model status. See Diagnostics.",
-        ex);
+        ex,
+        IsInstallationKnown: discoveredInstallation.HasValue);
     }
   }
 
@@ -155,11 +162,12 @@ internal sealed class WorkbenchChatModelController
     LocalChatRuntimeReadiness readiness,
     string readyDetail,
     string unavailableDetail) => new(
-      readiness.IsReady,
+      readiness.IsInstalled ?? readiness.IsReady,
       readiness.IsReady,
       readiness.IsReady ? 100 : 0,
       readiness.IsReady ? readyDetail : unavailableDetail,
-      readiness.StatusMessage);
+      readiness.StatusMessage,
+      IsInstallationKnown: readiness.IsInstalled.HasValue || readiness.IsReady);
 
   private async Task<WorkbenchChatModelSetupResult> SetupOllamaAsync(
     ChatModelSelection selection,
@@ -185,7 +193,7 @@ internal sealed class WorkbenchChatModelController
         return new WorkbenchChatModelSetupResult(
           "The Ollama listener changed during review. Retry model setup.", RefreshReadiness: false);
     }
-    if (!readiness.IsReady)
+    if (!readiness.IsReady && readiness.IsInstalled == false)
     {
       progress?.Report(new WorkbenchChatModelSetupProgress("Downloading the selected Ollama model. This is only needed once."));
       readiness = await LocalOllamaRuntimeReadiness
@@ -203,8 +211,15 @@ internal sealed class WorkbenchChatModelController
     CancellationToken cancellationToken)
   {
     diagnostics.Info("llama.cpp chat model setup requested from the Workbench.");
-    progress?.Report(new WorkbenchChatModelSetupProgress("Downloading the selected local chat model..."));
-    Progress<double> transferProgress = CreateTransferProgress(progress, "Downloading the selected local chat model...");
+    LocalChatRuntimeReadiness current = await LocalLlamaCppRuntimeReadiness
+      .CheckAsync(selection.ModelId, cancellationToken).ConfigureAwait(true);
+    if (current.IsReady)
+      return new WorkbenchChatModelSetupResult(current.StatusMessage, RefreshReadiness: true);
+    string status = current.IsInstalled == true
+      ? "Repairing the selected local chat model / runtime..."
+      : "Downloading the selected local chat model...";
+    progress?.Report(new WorkbenchChatModelSetupProgress(status));
+    Progress<double> transferProgress = CreateTransferProgress(progress, status);
     LocalChatRuntimeReadiness readiness = await LocalLlamaCppRuntimeReadiness
       .ProvisionAsync(selection.ModelId, transferProgress, cancellationToken)
       .ConfigureAwait(true);
@@ -219,6 +234,11 @@ internal sealed class WorkbenchChatModelController
     IProgress<WorkbenchChatModelSetupProgress>? progress,
     CancellationToken cancellationToken)
   {
+    WorkbenchChatModelReadinessState current = await CheckAsync(selection, cancellationToken).ConfigureAwait(true);
+    if (!current.IsInstallationKnown)
+      return new WorkbenchChatModelSetupResult(current.Status, RefreshReadiness: true, current.Failure);
+    isInstalled = current.IsInstalled;
+    isRuntimeReady = current.IsRuntimeReady;
     bool shouldDownload = !isInstalled;
     bool shouldRepairRuntime = isInstalled && !isRuntimeReady;
     Progress<double> transferProgress = CreateTransferProgress(

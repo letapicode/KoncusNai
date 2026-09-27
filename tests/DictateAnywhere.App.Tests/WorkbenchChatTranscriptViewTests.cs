@@ -18,17 +18,18 @@ namespace DictateAnywhere.App.Tests;
 public sealed class WorkbenchChatTranscriptViewTests
 {
   [Xunit.Fact]
-  public void Composer_TypingEnablesPointerSubmitEvenBeforeReadinessRefresh()
+  public void Composer_TypingKeepsSubmitBlockedUntilModelReadinessIsVerified()
   {
     RunOnSta(() =>
     {
       WorkbenchComposerView view = new();
       try
       {
+        bool ready = false;
         void Render()
         {
           WorkbenchPresentationState state = WorkbenchPresentationReducer.Reduce(new WorkbenchPresentationSnapshot(
-            WorkbenchSessionState.Idle, false, false, false, false, false, false,
+            WorkbenchSessionState.Idle, false, false, false, false, ready, ready,
             false, view.HasPrompt, false, false, false, false, true, false, false, false, "Idle", "Ready"));
           view.Render(state.Composer, state.Dictation);
         }
@@ -39,6 +40,9 @@ public sealed class WorkbenchChatTranscriptViewTests
         Render();
         Xunit.Assert.False(send.IsEnabled);
         view.PromptElement.Text = "Explain an algorithm";
+        Xunit.Assert.False(send.IsEnabled);
+        ready = true;
+        Render();
         Xunit.Assert.True(send.IsEnabled);
         Xunit.Assert.Equal(Visibility.Visible, send.Visibility);
         send.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -333,7 +337,7 @@ public sealed class WorkbenchChatTranscriptViewTests
       Button export = Xunit.Assert.IsType<Button>(view.FindName("ExportChatButton"));
 
       WrapPanel actions = Xunit.Assert.IsType<WrapPanel>(newChat.Parent);
-      Xunit.Assert.Equal(new UIElement[] { newChat, addFile, readDocument, export }, actions.Children.Cast<UIElement>().Take(4));
+      Xunit.Assert.Equal(new UIElement[] { newChat, addFile, readDocument, view.ExpandPromptElement, export }, actions.Children.Cast<UIElement>().Take(5));
       StackPanel newChatContent = Xunit.Assert.IsType<StackPanel>(newChat.Content);
       Xunit.Assert.Equal("New chat", Xunit.Assert.IsType<TextBlock>(newChatContent.Children[1]).Text);
       StackPanel importContent = Xunit.Assert.IsType<StackPanel>(addFile.Content);

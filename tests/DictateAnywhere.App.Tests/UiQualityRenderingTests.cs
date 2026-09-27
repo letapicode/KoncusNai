@@ -29,12 +29,18 @@ public sealed class UiQualityRenderingTests
     {
       if (Application.Current is null)
       {
-        DictateAnywhere.App.App app = new();
-        app.InitializeComponent();
+        // Loading App itself queues production OnStartup on the test dispatcher.
+        // Use its resources without starting tray/runtime services or a second logger.
+        Application app = new() { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        app.Resources.MergedDictionaries.Add(new ResourceDictionary
+          { Source = new Uri("/DictateAnywhere.App;component/Theming/DesignTokens.xaml", UriKind.Relative) });
+        app.Resources.MergedDictionaries.Add(new ResourceDictionary
+          { Source = new Uri("/DictateAnywhere.App;component/Theming/ControlStyles.xaml", UriKind.Relative) });
       }
       // Construct the production window and event handlers, but do not load settings,
       // register hotkeys, query history, send a request or write to user stores.
-      TextboxWorkbenchWindow window = DictateAnywhere.App.Composition.ApplicationComposition.CreateProduction().CreateWorkbenchWindow();
+      DictateAnywhere.App.Composition.ApplicationComposition composition = DictateAnywhere.App.Composition.ApplicationComposition.CreateProduction();
+      TextboxWorkbenchWindow window = composition.CreateWorkbenchWindow();
       try
       {
         window.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -62,6 +68,22 @@ public sealed class UiQualityRenderingTests
             paper.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Settle(window);
             Assert.Equal(enabled ? Visibility.Visible : Visibility.Collapsed, Assert.IsType<Border>(window.FindName("PaperSurface")).Visibility);
+            Border fullPaper = Assert.IsType<Border>(window.FindName("PaperSurface"));
+            Assert.Equal(new Thickness(0), fullPaper.BorderThickness);
+            if (enabled)
+            {
+              Assert.Equal(window.ActualWidth, fullPaper.ActualWidth, 1);
+              Assert.Same(Brushes.Transparent, window.Resources["Brush.Surface.Canvas"]);
+              Assert.Same(Brushes.Transparent, window.Resources["Brush.Surface.Sidebar"]);
+              foreach (int zoom in new[] { 80, 150, 100 })
+              {
+                Grid rootGrid = Assert.IsType<Grid>(window.FindName("WorkbenchRoot"));
+                rootGrid.LayoutTransform = new ScaleTransform(zoom / 100d, zoom / 100d);
+                Settle(window);
+                Assert.Equal("My unsent draft — नमस्ते", composer.PromptText);
+                Capture(Render(window, 1d), $"production-paper-{dark}-zoom{zoom}");
+              }
+            }
             Assert.Equal(original, controller.Messages);
             Assert.Equal("My unsent draft — नमस्ते", composer.PromptText);
             Assert.Equal(Visibility.Collapsed, Assert.IsType<TextBlock>(composer.FindName("PromptPlaceholder")).Visibility);
@@ -75,6 +97,13 @@ public sealed class UiQualityRenderingTests
             transcript.TranscriptElement.ScrollToHome();
             Settle(window);
             Capture(Render(window, 1d), $"production-workbench-{(dark ? "dark" : "light")}-{(enabled ? "paper" : "standard")}");
+            Button mic = Assert.IsType<Button>(composer.FindName("Record"));
+            composer.SetDictationState(WorkbenchViewModelFactory.Create(WorkbenchSessionState.Recording, "", ""), true);
+            mic.Focus();
+            Settle(window);
+            Capture(Render(window, 1.5d), $"recording-focus-{dark}-{enabled}");
+            Assert.Null(mic.FocusVisualStyle);
+            composer.SetDictationState(WorkbenchViewModelFactory.Create(WorkbenchSessionState.Idle, "", ""), false);
           }
         }
         quick.SetTextSize(15);
@@ -87,6 +116,71 @@ public sealed class UiQualityRenderingTests
           Assert.Single(controller.PendingFiles);
           Capture(Render(window, 1d), $"production-workbench-text-{size}");
         }
+        controller.SetReadiness(false, false, false);
+        controller.SetModelStatus("Ollama is not running. Start Ollama to check the installed model.");
+        typeof(TextboxWorkbenchWindow).GetMethod("SetChatStatus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+          .Invoke(window, ["Copied reply.", false]);
+        Assert.StartsWith("Ollama is not running", controller.ModelStatus, StringComparison.Ordinal);
+        Assert.IsType<WorkbenchOperationalStatusView>(window.FindName("OperationalStatusView")).ExpireTransientOutcome();
+        Assert.IsType<Button>(composer.FindName("NewChatButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.StartsWith("Ollama is not running", controller.ModelStatus, StringComparison.Ordinal);
+        Grid noticeGrid = Assert.IsType<Grid>(Assert.IsType<WorkbenchModelNoticeView>(window.FindName("ModelNotice")).Content);
+        Assert.StartsWith("Ollama is not running", Assert.IsType<TextBlock>(noticeGrid.Children.OfType<ScrollViewer>().Single().Content).Text, StringComparison.Ordinal);
+        WorkbenchModelNoticeView notice = Assert.IsType<WorkbenchModelNoticeView>(window.FindName("ModelNotice"));
+        Border compact = Assert.IsType<Border>(composer.FindName("CompactComposer"));
+        WorkbenchSidebarView sidebar = Assert.IsType<WorkbenchSidebarView>(window.FindName("SidebarView"));
+        Grid root = Assert.IsType<Grid>(window.FindName("WorkbenchRoot"));
+        WorkbenchRecoveryStore recoveries = Assert.IsType<WorkbenchRecoveryStore>(typeof(TextboxWorkbenchWindow)
+          .GetField("recoveries", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(window));
+        WorkbenchRecovery recovery = recoveries.Add("Recover this exact transcript", "Dictation wasn’t inserted. History wasn’t saved.", false);
+        typeof(TextboxWorkbenchWindow).GetMethod("SelectRecovery", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+          .Invoke(window, [recovery.Id]);
+        Button dismiss = noticeGrid.Children.OfType<WrapPanel>().Single().Children.OfType<Button>().Single(button => Equals(button.Content, "Dismiss"));
+        dismiss.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Null(recoveries.Current);
+        Assert.Equal(recovery, Assert.Single(recoveries.Pending));
+        Assert.StartsWith("Ollama is not running", Assert.IsType<TextBlock>(noticeGrid.Children.OfType<ScrollViewer>().Single().Content).Text, StringComparison.Ordinal);
+        Button recover = noticeGrid.Children.OfType<WrapPanel>().Single().Children.OfType<Button>().Single(button => Equals(button.Content, "Recover dictation"));
+        Assert.True(recover.IsVisible);
+        MenuItem retained = Assert.IsType<MenuItem>(recover.ContextMenu.Items[0]);
+        retained.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Assert.Equal(recovery.Id, notice.RecoveryIdentity);
+        foreach (double width in new[] { 1000d, 2400d })
+          foreach (bool showSidebar in new[] { true, false })
+            foreach (double zoom in new[] { .8d, 1d, 1.5d })
+            {
+              window.Width = width;
+              sidebar.SetSidebarVisible(showSidebar);
+              root.LayoutTransform = new ScaleTransform(zoom, zoom);
+              Settle(window);
+              Rect editorBounds = compact.TransformToAncestor(window).TransformBounds(new Rect(compact.RenderSize));
+              Rect noticeBounds = notice.TransformToAncestor(window).TransformBounds(new Rect(notice.RenderSize));
+              Assert.Equal(editorBounds.Left, noticeBounds.Left, 1);
+              Assert.Equal(editorBounds.Right, noticeBounds.Right, 1);
+              Capture(Render(window, 1.25d), $"notice-aligned-{width}-{showSidebar}-{zoom}");
+            }
+        root.LayoutTransform = Transform.Identity;
+        composer.PromptText = "Preserve this unsent expanded draft";
+        WorkbenchExpandedPromptView expanded = Assert.IsType<WorkbenchExpandedPromptView>(window.FindName("ExpandedPromptView"));
+        typeof(TextboxWorkbenchWindow).GetMethod("OnExpandPromptClicked", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+          .Invoke(window, [composer, new RoutedEventArgs()]);
+        expanded.PromptElement.Select(2, 4);
+        string draft = expanded.Text;
+        typeof(TextboxWorkbenchWindow).GetMethod("OnExpandedSendChatClicked", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+          .Invoke(window, [expanded, new RoutedEventArgs()]);
+        Assert.True(expanded.IsOpen);
+        Assert.Equal(draft, expanded.Text);
+        Assert.Equal(2, expanded.PromptElement.SelectionStart);
+        Assert.Equal(4, expanded.PromptElement.SelectionLength);
+        KeyEventArgs blockedEnter = new(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), Environment.TickCount, Key.Enter)
+          { RoutedEvent = Keyboard.KeyDownEvent };
+        expanded.PromptElement.RaiseEvent(blockedEnter);
+        Assert.True(blockedEnter.Handled);
+        Assert.True(expanded.IsOpen);
+        Assert.Equal(2, expanded.PromptElement.SelectionStart);
+        Assert.Equal(4, expanded.PromptElement.SelectionLength);
+        Settle(window);
+        Assert.Equal(expanded.PromptElement.ActualWidth, expanded.Notice.ActualWidth, 1);
       }
       finally
       {
@@ -94,6 +188,7 @@ public sealed class UiQualityRenderingTests
         while (!disposal.IsCompleted) window.Dispatcher.Invoke(() => { }, DispatcherPriority.Background);
         disposal.GetAwaiter().GetResult();
         window.Close();
+        composition.Diagnostics.Dispose();
       }
     });
   }
@@ -160,6 +255,14 @@ public sealed class UiQualityRenderingTests
       while (root is not null && !File.Exists(Path.Combine(root.FullName, "DictateAnywhere.sln"))) { root = root.Parent; }
       Assert.NotNull(root);
       XElement markup = XElement.Load(Path.Combine(root.FullName, "src/DictateAnywhere.App", relativePath));
+      if (relativePath == "Workbench/AboutWindow.xaml")
+      {
+        string prose = string.Join(" ", markup.Descendants().Attributes("Text").Select(attribute => attribute.Value));
+        Assert.Contains("Copy and Dismiss", prose);
+        Assert.Contains("Model notices above Just Ask", prose);
+        Assert.DoesNotContain("bottom-center", prose);
+        Assert.DoesNotContain("always saved", prose);
+      }
       XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
       XNamespace wpf = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
       markup.Attribute(xaml + "Class")?.Remove();
@@ -489,12 +592,223 @@ public sealed class UiQualityRenderingTests
     });
   }
 
+  [Theory]
+  [InlineData(false, false, false, 900d, .8d)]
+  [InlineData(false, false, false, 460d, 1.5d)]
+  [InlineData(true, false, false, 900d, 1d)]
+  [InlineData(true, false, false, 460d, 1.5d)]
+  [InlineData(false, true, false, 900d, 1d)]
+  [InlineData(true, true, false, 460d, 1.5d)]
+  [InlineData(false, true, true, 460d, 1.5d)]
+  [InlineData(true, false, true, 900d, 1d)]
+  public void ComposerExpansionLayout_WrapsWithoutCollisions(bool dark, bool paper, bool contrast, double width, double zoom)
+  {
+    RunOnSta(() =>
+    {
+      WorkbenchComposerView view = new();
+      Window host = Host(view, dark, contrast);
+      LoadProductionComposerStyles(host);
+      host.Width = width;
+      host.Height = 740;
+      view.LayoutTransform = new ScaleTransform(zoom, zoom);
+      try
+      {
+        host.Show();
+        view.SetPaperView(paper);
+        TextBox editor = view.PromptElement;
+        Button expand = view.ExpandPromptElement;
+        Button reading = Assert.IsType<Button>(view.FindName("ReadDocument"));
+        WrapPanel toolbar = Assert.IsType<WrapPanel>(expand.Parent);
+        Assert.Same(toolbar, reading.Parent);
+        Assert.Equal(toolbar.Children.IndexOf(reading) + 1, toolbar.Children.IndexOf(expand));
+        Assert.Equal(toolbar.Children.IndexOf(expand) + 1,
+          toolbar.Children.IndexOf(Assert.IsType<Button>(view.FindName("ExportChatButton"))));
+        foreach (string draft in new[] { "", "Short", new string('x', 121), "a\nb\nc", "Short", "" })
+        {
+          view.PromptText = draft;
+          Settle(host);
+          view.RefreshExpansionButton(false);
+          Assert.Equal(PromptExpansionPolicy.ShouldOfferExpansion(draft, editor.LineCount)
+            ? Visibility.Visible : Visibility.Collapsed, expand.Visibility);
+        }
+        view.PromptText = string.Join("\n", Enumerable.Range(1, 30).Select(i => $"Line {i}: a long editable draft नमस्ते"));
+        view.SetPendingFiles([ChatFileAttachment.Create("C:\\test\\notes.txt", "Pending context")]);
+        Settle(host);
+        editor.Select(4, 3);
+        editor.ScrollToVerticalOffset(20);
+        string text = editor.Text;
+        long revision = view.PromptRevision;
+        for (int phase = 0; phase < 3; phase++)
+        {
+          host.Width = phase == 1 ? width + 120 : width;
+          view.SetConversationActionState(true, phase != 0);
+          view.SetChatActionState(phase == 2, phase == 2, false, true, phase != 2, phase != 2,
+            false, false, phase == 1);
+          view.SetDictationState(WorkbenchViewModelFactory.Create(phase == 0 ? WorkbenchSessionState.Recording
+            : phase == 1 ? WorkbenchSessionState.Transcribing : WorkbenchSessionState.Idle, "", ""), phase == 0);
+          view.ApplyTypography(phase == 1 ? 30 : 15, new FontFamily(phase == 1 ? "Georgia" : "Segoe UI"));
+          view.RefreshExpansionButton(false);
+          Settle(host);
+          Assert.Equal(Visibility.Visible, expand.Visibility);
+          if (phase == 0 && width == 900 && !dark && !paper && !contrast)
+          {
+            // Recreate the original competing placement using the production controls.
+            Grid originalGrid = Assert.IsType<Grid>(toolbar.Parent);
+            toolbar.Children.Remove(expand);
+            originalGrid.Children.Add(expand);
+            Grid.SetRow(expand, 1); Grid.SetColumn(expand, 5);
+            Settle(host);
+            Button newChat = Assert.IsType<Button>(view.FindName("NewChatButton"));
+            Rect oldExpand = expand.TransformToAncestor(host).TransformBounds(new Rect(expand.RenderSize));
+            Rect oldNewChat = newChat.TransformToAncestor(host).TransformBounds(new Rect(newChat.RenderSize));
+            Assert.True(oldExpand.IntersectsWith(oldNewChat), "The original overlap was not reproduced.");
+            originalGrid.Children.Remove(expand);
+            expand.ClearValue(Grid.RowProperty); expand.ClearValue(Grid.ColumnProperty);
+            toolbar.Children.Insert(toolbar.Children.IndexOf(reading) + 1, expand);
+            Settle(host);
+          }
+          Button[] buttons = toolbar.Children.OfType<Button>().Concat(new[] { "Record", "Send", "StopChat" }
+            .Select(name => Assert.IsType<Button>(view.FindName(name)))).Where(button => button.IsVisible).ToArray();
+          Rect composer = Assert.IsType<Border>(view.FindName("CompactComposer"))
+            .TransformToAncestor(host).TransformBounds(new Rect(Assert.IsType<Border>(view.FindName("CompactComposer")).RenderSize));
+          Rect[] bounds = buttons.Select(button => button.TransformToAncestor(host).TransformBounds(new Rect(button.RenderSize))).ToArray();
+          for (int i = 0; i < bounds.Length; i++)
+          {
+            Assert.True(bounds[i].Left >= composer.Left - .5 && bounds[i].Right <= composer.Right + .5
+              && bounds[i].Top >= composer.Top - .5 && bounds[i].Bottom <= composer.Bottom + .5
+              && bounds[i].Right <= host.ActualWidth + .5 && bounds[i].Bottom <= host.ActualHeight + .5,
+              $"{buttons[i].Name} exceeds composer bounds at {width}/{zoom}.");
+            for (int j = i + 1; j < bounds.Length; j++)
+            {
+              Rect intersection = Rect.Intersect(bounds[i], bounds[j]);
+              Assert.True(intersection.IsEmpty || intersection.Width < .5 || intersection.Height < .5,
+                $"{buttons[i].Name} overlaps {buttons[j].Name} at {width}/{zoom}.");
+            }
+          }
+          Button[] flowing = toolbar.Children.OfType<Button>().Where(button => button.IsVisible).ToArray();
+          for (int i = 1; i < flowing.Length; i++)
+          {
+            Point previous = flowing[i - 1].TranslatePoint(new Point(), host);
+            Point current = flowing[i].TranslatePoint(new Point(), host);
+            Assert.True(current.Y > previous.Y + .5 || current.X > previous.X, "Toolbar flow order changed.");
+          }
+          Assert.Equal(text, editor.Text);
+          Assert.Equal(revision, view.PromptRevision);
+          Assert.Equal(4, editor.SelectionStart);
+          Assert.Equal(3, editor.SelectionLength);
+          double scroll = editor.VerticalOffset;
+          bool undo = editor.CanUndo;
+          view.RefreshExpansionButton(true);
+          Assert.Equal(Visibility.Collapsed, expand.Visibility);
+          view.RefreshExpansionButton(false);
+          Assert.Equal(scroll, editor.VerticalOffset);
+          Assert.Equal(undo, editor.CanUndo);
+        }
+        foreach (double dpiScale in new[] { 1d, 1.25d, 1.5d, 2d })
+        {
+          RenderTargetBitmap rendered = Render(host, dpiScale);
+          Assert.Equal((int)Math.Ceiling(host.ActualWidth * dpiScale), rendered.PixelWidth);
+          Assert.Equal((int)Math.Ceiling(host.ActualHeight * dpiScale), rendered.PixelHeight);
+          Capture(rendered, $"composer-expand-{dark}-{paper}-{contrast}-{width}-{zoom}-dpi{dpiScale}");
+        }
+      }
+      finally { view.DisposePresentation(); host.Close(); }
+    });
+  }
+
+  [Fact]
+  public void ComposerExpansion_HidingFocusedButtonPreservesDraftAndReturnsFocusWithoutStealingFromExpandedEditor()
+  {
+    RunOnSta(() =>
+    {
+      WorkbenchComposerView view = new();
+      WorkbenchExpandedPromptView expanded = new();
+      Grid panel = new(); panel.Children.Add(view); panel.Children.Add(expanded);
+      expanded.SetOpen(false);
+      Window host = Host(panel);
+      LoadProductionComposerStyles(host);
+      host.Width = 700;
+      try
+      {
+        host.Show();
+        TextBox editor = view.PromptElement;
+        view.PromptText = "First line\nSecond line";
+        Settle(host);
+        view.RefreshExpansionButton(false);
+        Button reading = Assert.IsType<Button>(view.FindName("ReadDocument"));
+        reading.Focus();
+        Assert.True(reading.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
+        Assert.True(view.ExpandPromptElement.IsKeyboardFocused);
+        Assert.True(view.ExpandPromptElement.MoveFocus(new TraversalRequest(FocusNavigationDirection.Previous)));
+        Assert.True(reading.IsKeyboardFocused);
+        view.ExpandPromptElement.Focus();
+        view.PromptText = "Short";
+        editor.Select(1, 2);
+        long revision = view.PromptRevision;
+        view.RefreshExpansionButton(false);
+        Assert.True(editor.IsKeyboardFocused);
+        Assert.Equal(1, editor.SelectionStart);
+        Assert.Equal(2, editor.SelectionLength);
+        Assert.Equal(revision, view.PromptRevision);
+        view.PromptText = "First line\nSecond line";
+        Settle(host);
+        view.RefreshExpansionButton(false);
+        int clicks = 0;
+        view.ExpandPromptClicked += (_, _) => clicks++;
+        view.ExpandPromptElement.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(1, clicks);
+        view.ExpandPromptElement.Focus();
+        foreach (Key key in new[] { Key.Space, Key.Enter })
+        {
+          PresentationSource source = PresentationSource.FromVisual(host)!;
+          view.ExpandPromptElement.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, key)
+            { RoutedEvent = Keyboard.KeyDownEvent });
+          view.ExpandPromptElement.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, key)
+            { RoutedEvent = Keyboard.KeyUpEvent });
+        }
+        Assert.Equal(3, clicks);
+        expanded.SetText(view.PromptText);
+        expanded.SetOpen(true);
+        Settle(host);
+        expanded.ShowAndFocus();
+        view.SetCompactComposerVisible(false);
+        view.RefreshExpansionButton(true);
+        Assert.True(expanded.PromptElement.IsKeyboardFocused);
+        Assert.False(editor.IsKeyboardFocused);
+        Assert.Equal("First line\nSecond line", expanded.Text);
+      }
+      finally { view.DisposePresentation(); host.Close(); }
+    });
+  }
+
+  private static void LoadProductionComposerStyles(Window host)
+  {
+    DirectoryInfo? root = new(AppContext.BaseDirectory);
+    while (root is not null && !File.Exists(Path.Combine(root.FullName, "DictateAnywhere.sln"))) root = root.Parent;
+    Assert.NotNull(root);
+    XNamespace wpf = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+    XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+    XElement markup = XElement.Load(Path.Combine(root.FullName, "src/DictateAnywhere.App/Workbench/TextboxWorkbenchWindow.xaml"));
+    XElement[] styles = markup.Descendants(wpf + "Style").Where(element => ((string?)element.Attribute(xaml + "Key")) is "ComposerIconButtonStyle" or "ComposerSubmitButtonStyle" or "ComposerStopButtonStyle" or "ComposerTextBoxStyle").ToArray();
+    Assert.Equal(4, styles.Length);
+    XElement dictionary = new(wpf + "ResourceDictionary", new XAttribute(XNamespace.Xmlns + "x", xaml),
+      new XElement(wpf + "ResourceDictionary.MergedDictionaries",
+        new XElement(wpf + "ResourceDictionary", new XAttribute("Source", "/DictateAnywhere.App;component/Theming/ControlStyles.xaml"))), styles);
+    host.Resources.MergedDictionaries.Add(Assert.IsType<ResourceDictionary>(XamlReader.Parse(dictionary.ToString())));
+  }
+
   private static Window Host(object content, bool dark = true, bool highContrast = false)
   {
     Window host = new()
     {
-      Content = content, Width = 360, Height = 520, Left = -10000, Top = -10000,
-      ShowInTaskbar = false, WindowStyle = WindowStyle.None, FontFamily = new FontFamily("Segoe UI"),
+      Content = content,
+      Width = 360,
+      Height = 520,
+      Left = -10000,
+      Top = -10000,
+      ShowInTaskbar = false,
+      WindowStyle = WindowStyle.None,
+      FontFamily = new FontFamily("Segoe UI"),
     };
     host.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/DictateAnywhere.App;component/Theming/DesignTokens.xaml", UriKind.Relative) });
     host.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/DictateAnywhere.App;component/Theming/ControlStyles.xaml", UriKind.Relative) });

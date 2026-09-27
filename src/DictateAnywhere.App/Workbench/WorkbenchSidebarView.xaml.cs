@@ -11,9 +11,24 @@ namespace DictateAnywhere.App.Workbench;
 /// <summary>Renders Workbench navigation and forwards user intent without owning workflow state.</summary>
 public partial class WorkbenchSidebarView : UserControl
 {
+  private bool refreshingHistory;
+
   public WorkbenchSidebarView()
   {
     InitializeComponent();
+    Style rows = new(typeof(ListBoxItem), TryFindResource("AppHistoryListBoxItemStyle") as Style);
+    rows.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(10, 3, 10, 3)));
+    rows.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 34d));
+    ChatHistoryListBox.ItemContainerStyle = rows;
+    HistoryListBox.ItemContainerStyle = rows;
+    HistoryListBox.SelectionChanged += (_, args) =>
+    {
+      if (!refreshingHistory) HistorySelectionChanged?.Invoke(this, args);
+    };
+    ChatHistoryListBox.SelectionChanged += (_, args) =>
+    {
+      if (!refreshingHistory) ChatHistorySelectionChanged?.Invoke(this, args);
+    };
   }
 
   public event TextChangedEventHandler HistorySearchTextChanged
@@ -22,16 +37,18 @@ public partial class WorkbenchSidebarView : UserControl
     remove => HistorySearchTextBox.TextChanged -= value;
   }
 
-  public event SelectionChangedEventHandler ChatHistorySelectionChanged
-  {
-    add => ChatHistoryListBox.SelectionChanged += value;
-    remove => ChatHistoryListBox.SelectionChanged -= value;
-  }
+  public event SelectionChangedEventHandler ChatHistorySelectionChanged = delegate { };
 
   public event MouseButtonEventHandler ChatHistoryPreviewMouseRightButtonDown
   {
     add => ChatHistoryListBox.PreviewMouseRightButtonDown += value;
     remove => ChatHistoryListBox.PreviewMouseRightButtonDown -= value;
+  }
+
+  public event MouseButtonEventHandler ChatHistoryPreviewMouseLeftButtonDown
+  {
+    add => ChatHistoryListBox.PreviewMouseLeftButtonDown += value;
+    remove => ChatHistoryListBox.PreviewMouseLeftButtonDown -= value;
   }
 
   public event KeyEventHandler ChatHistoryPreviewKeyDown
@@ -52,11 +69,7 @@ public partial class WorkbenchSidebarView : UserControl
     remove => DeleteSelectedChatsMenuItem.Click -= value;
   }
 
-  public event SelectionChangedEventHandler HistorySelectionChanged
-  {
-    add => HistoryListBox.SelectionChanged += value;
-    remove => HistoryListBox.SelectionChanged -= value;
-  }
+  public event SelectionChangedEventHandler HistorySelectionChanged = delegate { };
 
   public event MouseButtonEventHandler HistoryPreviewMouseRightButtonDown
   {
@@ -115,8 +128,12 @@ public partial class WorkbenchSidebarView : UserControl
   internal bool IsSelected(HistoryItemViewModel item) =>
     ReferenceEquals(HistoryListBox.SelectedItem, item);
 
+  internal bool IsSelected(ChatHistoryItemViewModel item) => ReferenceEquals(ChatHistoryListBox.SelectedItem, item);
+  internal ChatHistoryItemViewModel? GetChatAt(DependencyObject? source) =>
+    FindAncestor<Button>(source) is not null ? null : FindAncestor<ListBoxItem>(source)?.DataContext as ChatHistoryItemViewModel;
+
   internal HistoryItemViewModel? GetDictationGroupAt(DependencyObject? source) =>
-    FindAncestor<ListBoxItem>(source)?.DataContext as HistoryItemViewModel;
+    FindAncestor<Button>(source) is not null ? null : FindAncestor<ListBoxItem>(source)?.DataContext as HistoryItemViewModel;
 
   internal void ClearDictationSelection() => HistoryListBox.UnselectAll();
 
@@ -126,23 +143,55 @@ public partial class WorkbenchSidebarView : UserControl
     string? selectedChatConversationId)
   {
     ArgumentNullException.ThrowIfNull(state);
-    HistoryListBox.ItemsSource = state.DictationItems;
-    if (!string.IsNullOrWhiteSpace(selectedDictationEntryId))
+    string[]? dictationMenuTargets = HistoryListBox.ContextMenu?.IsOpen == true
+      ? HistoryListBox.SelectedItems.OfType<HistoryItemViewModel>().SelectMany(item => item.Records)
+        .Select(record => record.EntryId).ToArray() : null;
+    string[]? chatMenuTargets = ChatHistoryListBox.ContextMenu?.IsOpen == true
+      ? ChatHistoryListBox.SelectedItems.OfType<ChatHistoryItemViewModel>().Select(item => item.Record.ConversationId).ToArray() : null;
+    refreshingHistory = true;
+    try
     {
-      HistoryListBox.SelectedItem = state.DictationItems.FirstOrDefault(item => item.Records.Any(record =>
-        string.Equals(record.EntryId, selectedDictationEntryId, StringComparison.OrdinalIgnoreCase)));
-    }
+      HistoryListBox.ItemsSource = state.DictationItems;
+      if (!string.IsNullOrWhiteSpace(selectedDictationEntryId))
+      {
+        HistoryListBox.SelectedItem = state.DictationItems.FirstOrDefault(item => item.Records.Any(record =>
+          string.Equals(record.EntryId, selectedDictationEntryId, StringComparison.OrdinalIgnoreCase)));
+      }
 
-    ChatHistoryListBox.ItemsSource = state.ChatItems;
-    if (!string.IsNullOrWhiteSpace(selectedChatConversationId))
+      ChatHistoryListBox.ItemsSource = state.ChatItems;
+      if (!string.IsNullOrWhiteSpace(selectedChatConversationId))
+      {
+        ChatHistoryListBox.SelectedItem = state.ChatItems.FirstOrDefault(item =>
+          string.Equals(
+            item.Record.ConversationId,
+            selectedChatConversationId,
+            StringComparison.OrdinalIgnoreCase));
+      }
+
+      if (dictationMenuTargets is not null)
+      {
+        HistoryListBox.UnselectAll();
+        foreach (HistoryItemViewModel item in state.DictationItems.Where(item => item.Records.Any(record =>
+          dictationMenuTargets.Contains(record.EntryId, StringComparer.OrdinalIgnoreCase))))
+          HistoryListBox.SelectedItems.Add(item);
+        if (dictationMenuTargets.Any(id => !state.DictationItems.Any(item => item.Records.Any(record =>
+          string.Equals(record.EntryId, id, StringComparison.OrdinalIgnoreCase))))) HistoryListBox.ContextMenu!.IsOpen = false;
+      }
+      if (chatMenuTargets is not null)
+      {
+        ChatHistoryListBox.UnselectAll();
+        foreach (ChatHistoryItemViewModel item in state.ChatItems.Where(item =>
+          chatMenuTargets.Contains(item.Record.ConversationId, StringComparer.OrdinalIgnoreCase)))
+          ChatHistoryListBox.SelectedItems.Add(item);
+        if (chatMenuTargets.Any(id => !state.ChatItems.Any(item =>
+          string.Equals(item.Record.ConversationId, id, StringComparison.OrdinalIgnoreCase)))) ChatHistoryListBox.ContextMenu!.IsOpen = false;
+      }
+
+    }
+    finally
     {
-      ChatHistoryListBox.SelectedItem = state.ChatItems.FirstOrDefault(item =>
-        string.Equals(
-          item.Record.ConversationId,
-          selectedChatConversationId,
-          StringComparison.OrdinalIgnoreCase));
+      refreshingHistory = false;
     }
-
     HistoryListBox.Visibility = state.DictationItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     ChatHistoryListBox.Visibility = state.ChatItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     HistoryListBoxHeading.Visibility = HistoryListBox.Visibility;
@@ -227,7 +276,7 @@ public partial class WorkbenchSidebarView : UserControl
       : Visibility.Visible;
   }
 
-  private static bool PrepareContextMenuSelection(ListBox listBox, DependencyObject? source)
+  private bool PrepareContextMenuSelection(ListBox listBox, DependencyObject? source)
   {
     if (FindAncestor<ListBoxItem>(source) is not { } item)
     {
@@ -236,8 +285,14 @@ public partial class WorkbenchSidebarView : UserControl
 
     if (!item.IsSelected)
     {
-      listBox.SelectedItems.Clear();
-      item.IsSelected = true;
+      bool previous = refreshingHistory;
+      refreshingHistory = true;
+      try
+      {
+        listBox.SelectedItems.Clear();
+        item.IsSelected = true;
+      }
+      finally { refreshingHistory = previous; }
     }
 
     item.Focus();
@@ -255,7 +310,9 @@ public partial class WorkbenchSidebarView : UserControl
         return match;
       }
 
-      current = VisualTreeHelper.GetParent(current);
+      current = current is FrameworkContentElement content ? content.Parent
+        : current is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(current)
+        : LogicalTreeHelper.GetParent(current);
     }
 
     return null;

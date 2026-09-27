@@ -5,6 +5,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
         presentation:WindowThemeBehavior.IsEnabled="True"
+        presentation:WindowWorkAreaConstraintBehavior.IsEnabled="True"
         Title="Koncus Nai Settings"
         Width="1040"
         Height="760"

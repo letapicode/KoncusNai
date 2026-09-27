@@ -368,11 +368,15 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
         audioCaptureService: RuntimeServiceFactory.CreateAudioCaptureService(settings),
         transcriptionService: transcriptionServiceFactory?.Invoke(settings, diagnostics)
                               ?? RuntimeServiceFactory.CreateTranscriptionService(settings, registry: null, diagnostics: diagnostics),
-        textInsertionService: textInsertionService,
+        textInsertionService: new WorkbenchTextInsertionService(textInsertionService,
+          () => (settings.InsertionBlockedProcessNames ?? Array.Empty<string>()).Any(name =>
+            string.Equals(System.IO.Path.GetFileNameWithoutExtension(name),
+              System.IO.Path.GetFileNameWithoutExtension(Environment.ProcessPath), StringComparison.OrdinalIgnoreCase))
+            ? null : WorkbenchTextInsertionService.CaptureActiveComposer()),
         textTransformationService: RuntimeServiceFactory.CreateTextTransformationService(settings),
         overlayService: new FaultTolerantOverlayService(
           new WindowsOverlayService(
-            () => new WindowsOverlayPresenter(),
+            () => new OwnedOverlayPresenter(new WindowsOverlayPresenter()),
             overlayOptions,
             overlayAnchorProvider,
             diagnostics),

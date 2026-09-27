@@ -16,6 +16,7 @@ namespace DictateAnywhere.App.Workbench;
 
 internal enum WorkbenchChatSendProgressKind
 {
+  ReadinessStarted,
   OperationStarted,
   ReadinessChanged,
   LocalReplyAdded,
@@ -46,6 +47,7 @@ internal sealed class WorkbenchChatSendController
   private readonly Func<ChatModelSelection, CancellationToken, Task<WorkbenchChatModelReadinessState>> checkReadinessAsync;
   private readonly Func<AppSettings, ChatHistoryRecord, CancellationToken, Task<WorkbenchHistoryMutationResult>> saveChatAsync;
   private readonly IDiagnostics diagnostics;
+  private long readinessVersion;
 
   public WorkbenchChatSendController(
     WorkbenchChatController chatController,
@@ -64,14 +66,34 @@ internal sealed class WorkbenchChatSendController
     CancellationToken cancellationToken = default)
   {
     ChatModelSelection selection = chatController.Selection.Normalize();
-    WorkbenchChatModelReadinessState state = await checkReadinessAsync(selection, cancellationToken)
-      .ConfigureAwait(true);
-    if (!chatController.IsCurrentSelection(selection))
+    long selectionRevision = chatController.SelectionRevision;
+    long version = Interlocked.Increment(ref readinessVersion);
+    chatController.BeginReadinessCheck();
+    progress?.Invoke(new WorkbenchChatSendProgress(WorkbenchChatSendProgressKind.ReadinessStarted));
+    WorkbenchChatModelReadinessState state;
+    try
+    {
+      state = await checkReadinessAsync(selection, cancellationToken).ConfigureAwait(true);
+    }
+    catch
+    {
+      if (!chatController.IsDisposed && version == Volatile.Read(ref readinessVersion)
+          && selectionRevision == chatController.SelectionRevision)
+      {
+        chatController.SetReadiness(chatController.IsModelInstalled, false, chatController.IsInstallationKnown, checkFailed: true);
+        chatController.SetModelStatus("Could not check model availability. Retry or see Diagnostics.");
+      }
+      throw;
+    }
+    if (chatController.IsDisposed || version != Volatile.Read(ref readinessVersion)
+        || selectionRevision != chatController.SelectionRevision
+        || !chatController.IsCurrentSelection(selection))
     {
       return null;
     }
 
-    chatController.SetReadiness(state.IsInstalled, state.IsRuntimeReady);
+    chatController.SetReadiness(state.IsInstalled, state.IsRuntimeReady, state.IsInstallationKnown, state.Failure is not null);
+    chatController.SetModelStatus(state.Status);
     if (state.Failure is not null)
     {
       diagnostics.Warning($"Chat model readiness check failed: {state.Failure.Message}");
@@ -106,6 +128,9 @@ internal sealed class WorkbenchChatSendController
         identity);
     }
 
+    if (chatController.IsCheckingReadiness || !chatController.IsModelInstalled || !chatController.IsRuntimeReady)
+      return new WorkbenchChatSendResult(chatController.ModelStatus, currentTitle, false, false, identity);
+
     if (chatController.PendingFiles.Count == 0
         && (LocalGreetingResponder.IsStandaloneGreeting(normalizedPrompt) || LocalCalendarContext.CanAnswer(normalizedPrompt)))
     {
@@ -124,35 +149,6 @@ internal sealed class WorkbenchChatSendController
     }
 
     progress?.Invoke(new WorkbenchChatSendProgress(WorkbenchChatSendProgressKind.OperationStarted, Conversation: identity));
-
-    if (!chatController.IsModelInstalled || !chatController.IsRuntimeReady)
-    {
-      WorkbenchChatModelReadinessState? readiness = await RefreshReadinessAsync(progress).ConfigureAwait(true);
-      if (!chatController.IsCurrent(identity))
-      {
-        return StaleResult(currentTitle, identity);
-      }
-
-      if (readiness is null || !chatController.IsModelInstalled)
-      {
-        return new WorkbenchChatSendResult(
-          "Download the local model before sending.",
-          currentTitle,
-          ShouldRefreshHistory: false,
-          OperationAccepted: true,
-          identity);
-      }
-
-      if (!chatController.IsRuntimeReady)
-      {
-        return new WorkbenchChatSendResult(
-          "Update the local model runtime before sending.",
-          currentTitle,
-          ShouldRefreshHistory: false,
-          OperationAccepted: true,
-          identity);
-      }
-    }
 
     Stopwatch stopwatch = Stopwatch.StartNew();
     using OperationDiagnosticScope opScope = OperationDiagnosticScope.Begin(

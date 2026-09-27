@@ -20,6 +20,113 @@ public sealed class WorkbenchHistoryInteractionControllerTests : IDisposable
 {
   public void Dispose() => LastDictationSessionCache.Clear();
 
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task PendingDelete_NeverClearsAnEditedOrNewlyLoadedDraft(bool loadAnother)
+  {
+    TaskCompletionSource<int> deletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    await using Fixture fixture = new(deleteGate: deletion);
+    HistoryItemViewModel group = HistoryItemViewModel.FromRecords([CreateDictation("old", DateTimeOffset.UtcNow, "old")]);
+    fixture.Interaction.LoadDictationGroup(group);
+    Task<WorkbenchHistoryInteractionResult> pending = fixture.Interaction.DeleteDictationGroupsAsync(AppSettings.Default, [group]);
+    if (loadAnother) fixture.Interaction.LoadDictationGroup(HistoryItemViewModel.FromRecords([
+      CreateDictation("new", DateTimeOffset.UtcNow.AddDays(-1), "new")]));
+    else fixture.Interaction.NotifyComposerTextChanged(string.Empty);
+    deletion.SetResult(1);
+    WorkbenchHistoryInteractionResult result = await pending;
+    Xunit.Assert.Equal(WorkbenchHistoryComposerDirective.None, result.ComposerDirective);
+    if (loadAnother) Xunit.Assert.Equal("new", result.State.SelectedDictationRecord?.SessionId);
+  }
+
+  [Xunit.Fact]
+  public async Task CombinedDayEdit_IsBlockedWithoutChangingAnyConstituent()
+  {
+    await using Fixture fixture = new();
+    HistoryItemViewModel group = HistoryItemViewModel.FromRecords([
+      CreateDictation("first", DateTimeOffset.UtcNow, "first"),
+      CreateDictation("second", DateTimeOffset.UtcNow.AddMinutes(-1), "second")]);
+    WorkbenchHistoryInteractionResult loaded = fixture.Interaction.LoadDictationGroup(group);
+    Xunit.Assert.False(loaded.NeedsVisibleFeedback);
+    Xunit.Assert.False(loaded.State.CanEditSelectedDictation);
+    WorkbenchHistoryInteractionResult saved = await fixture.Interaction.SaveDictationEditAsync(AppSettings.Default, "combined edit");
+    Xunit.Assert.Equal(HistoryCommandStatus.Unavailable, saved.Status);
+    Xunit.Assert.Equal(0, fixture.UpdateCount);
+    Xunit.Assert.Equal(loaded.ComposerText, fixture.Interaction.LoadDictationGroup(group).ComposerText);
+  }
+
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task PendingEditOrRenameDoesNotRestoreAnOlderHistoryTarget(bool rename)
+  {
+    TaskCompletionSource<bool> update = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    await using Fixture fixture = new(updateGate: update);
+    fixture.Interaction.LoadDictationGroup(HistoryItemViewModel.FromRecords([CreateDictation("old", DateTimeOffset.UtcNow, "old")]));
+    Task<WorkbenchHistoryInteractionResult> pending = rename
+      ? fixture.Interaction.RenameDictationAsync(AppSettings.Default, "renamed")
+      : fixture.Interaction.SaveDictationEditAsync(AppSettings.Default, "edited");
+    fixture.Interaction.LoadDictationGroup(HistoryItemViewModel.FromRecords([CreateDictation("new", DateTimeOffset.UtcNow.AddDays(-1), "new")]));
+    update.SetResult(true);
+    WorkbenchHistoryInteractionResult result = await pending;
+    Xunit.Assert.Equal("new", result.State.SelectedDictationRecord?.SessionId);
+    Xunit.Assert.Equal(WorkbenchHistoryComposerDirective.None, result.ComposerDirective);
+  }
+
+  [Xunit.Fact]
+  public async Task DeletingInactiveChatPreservesCurrentConversationAndDraft()
+  {
+    await using Fixture fixture = new();
+    ChatHistoryRecord active = CreateChat("Active", DateTimeOffset.UtcNow);
+    fixture.Interaction.LoadChat(ChatHistoryItemViewModel.FromRecord(active));
+    fixture.Interaction.NotifyComposerTextChanged("unsent draft");
+    WorkbenchHistoryInteractionResult result = await fixture.Interaction.DeleteChatsAsync(AppSettings.Default,
+      [ChatHistoryItemViewModel.FromRecord(CreateChat("Other", DateTimeOffset.UtcNow))]);
+    Xunit.Assert.Equal(active.ConversationId, fixture.Chat.ConversationId);
+    Xunit.Assert.Equal(WorkbenchHistoryComposerDirective.None, result.ComposerDirective);
+  }
+
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task DeletingActiveChatPreservesUnsentDraftIncludingEditsDuringDeletion(bool editDuringDelete)
+  {
+    TaskCompletionSource<int> deletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    await using Fixture fixture = new(chatDeleteGate: deletion);
+    ChatHistoryRecord active = CreateChat("Active", DateTimeOffset.UtcNow);
+    fixture.Interaction.LoadChat(ChatHistoryItemViewModel.FromRecord(active));
+    if (!editDuringDelete) fixture.Interaction.NotifyComposerTextChanged("draft before deletion");
+    Task<WorkbenchHistoryInteractionResult> pending = fixture.Interaction.DeleteChatsAsync(AppSettings.Default,
+      [ChatHistoryItemViewModel.FromRecord(active)]);
+    if (editDuringDelete) fixture.Interaction.NotifyComposerTextChanged("typed while deletion was pending");
+    deletion.SetResult(1);
+    WorkbenchHistoryInteractionResult result = await pending;
+    Xunit.Assert.Equal(WorkbenchHistoryComposerDirective.None, result.ComposerDirective);
+    Xunit.Assert.Empty(fixture.Chat.Messages);
+  }
+
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task DelayedChatDeleteOrRenameCannotResetANewerConversation(bool rename)
+  {
+    TaskCompletionSource<int> deletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TaskCompletionSource<bool> save = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    await using Fixture fixture = new(chatDeleteGate: deletion, chatSaveGate: save);
+    ChatHistoryRecord old = CreateChat("Old", DateTimeOffset.UtcNow);
+    ChatHistoryRecord newer = CreateChat("Newer", DateTimeOffset.UtcNow);
+    fixture.Interaction.LoadChat(ChatHistoryItemViewModel.FromRecord(old));
+    Task<WorkbenchHistoryInteractionResult> pending = rename
+      ? fixture.Interaction.RenameChatAsync(AppSettings.Default, "Old renamed")
+      : fixture.Interaction.DeleteChatsAsync(AppSettings.Default, [ChatHistoryItemViewModel.FromRecord(old)]);
+    fixture.Interaction.LoadChat(ChatHistoryItemViewModel.FromRecord(newer));
+    if (rename) save.SetResult(true); else deletion.SetResult(1);
+    WorkbenchHistoryInteractionResult result = await pending;
+    Xunit.Assert.Equal(newer.ConversationId, fixture.Chat.ConversationId);
+    Xunit.Assert.Equal("Newer", result.State.ChatTitle);
+    Xunit.Assert.Equal(WorkbenchHistoryComposerDirective.None, result.ComposerDirective);
+  }
+
   [Xunit.Fact]
   public async Task LoadDeleteLoadedGroup_ClearsOnlyPristineHistoryComposerAndCache()
   {
@@ -29,6 +136,7 @@ public sealed class WorkbenchHistoryInteractionControllerTests : IDisposable
     HistoryItemViewModel group = HistoryItemViewModel.FromRecords([loaded]);
 
     WorkbenchHistoryInteractionResult loadedResult = fixture.Interaction.LoadDictationGroup(group);
+    fixture.Interaction.NotifyComposerTextChanged(loadedResult.ComposerText);
     WorkbenchHistoryInteractionResult deleted = await fixture.Interaction.DeleteDictationGroupsAsync(
       AppSettings.Default,
       [group]);
@@ -218,14 +326,18 @@ public sealed class WorkbenchHistoryInteractionControllerTests : IDisposable
   private sealed class Fixture : IAsyncDisposable
   {
     private readonly MutableDictationStore dictationStore;
-    private readonly MutableChatStore chatStore = new();
+    private readonly MutableChatStore chatStore;
     public WorkbenchHistoryController History { get; }
     public WorkbenchChatController Chat { get; }
     public WorkbenchHistoryInteractionController Interaction { get; }
 
-    public Fixture(int deleteCount = 1, Exception? deleteException = null)
+    public int UpdateCount => dictationStore.UpdateCount;
+    public Fixture(int deleteCount = 1, Exception? deleteException = null, TaskCompletionSource<int>? deleteGate = null,
+      TaskCompletionSource<bool>? updateGate = null, TaskCompletionSource<int>? chatDeleteGate = null,
+      TaskCompletionSource<bool>? chatSaveGate = null)
     {
-      dictationStore = new MutableDictationStore(deleteCount, deleteException);
+      dictationStore = new MutableDictationStore(deleteCount, deleteException, deleteGate, updateGate);
+      chatStore = new MutableChatStore(chatDeleteGate, chatSaveGate);
       History = new WorkbenchHistoryController(
         new WorkbenchHistoryQueryCoordinator(
           (_, _, _) => Task.FromResult<IReadOnlyList<DictationHistoryRecord>>([CreateDictation("selected", DateTimeOffset.UtcNow, "selected-session")]),
@@ -243,18 +355,21 @@ public sealed class WorkbenchHistoryInteractionControllerTests : IDisposable
     }
   }
 
-  private sealed class MutableDictationStore(int deleteCount, Exception? deleteException) : IDictationHistoryCommandStore
+  private sealed class MutableDictationStore(int deleteCount, Exception? deleteException, TaskCompletionSource<int>? deleteGate,
+    TaskCompletionSource<bool>? updateGate) : IDictationHistoryCommandStore
   {
+    public int UpdateCount { get; private set; }
     public Task RecordAsync(DictationHistoryRecord record, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    public Task<bool> UpdateAsync(DictationHistoryRecord record, CancellationToken cancellationToken = default) => Task.FromResult(true);
+    public Task<bool> UpdateAsync(DictationHistoryRecord record, CancellationToken cancellationToken = default)
+    { UpdateCount++; return updateGate?.Task ?? Task.FromResult(true); }
     public Task<int> DeleteSessionsAsync(IEnumerable<string> sessionIds, CancellationToken cancellationToken = default) =>
-      deleteException is null ? Task.FromResult(deleteCount) : Task.FromException<int>(deleteException);
+      deleteGate?.Task ?? (deleteException is null ? Task.FromResult(deleteCount) : Task.FromException<int>(deleteException));
   }
 
-  private sealed class MutableChatStore : IChatHistoryCommandStore
+  private sealed class MutableChatStore(TaskCompletionSource<int>? deleteGate, TaskCompletionSource<bool>? saveGate) : IChatHistoryCommandStore
   {
-    public Task SaveAsync(ChatHistoryRecord record, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    public Task<int> DeleteConversationsAsync(IEnumerable<string> conversationIds, CancellationToken cancellationToken = default) => Task.FromResult(1);
+    public Task SaveAsync(ChatHistoryRecord record, CancellationToken cancellationToken = default) => saveGate?.Task ?? Task.CompletedTask;
+    public Task<int> DeleteConversationsAsync(IEnumerable<string> conversationIds, CancellationToken cancellationToken = default) => deleteGate?.Task ?? Task.FromResult(1);
   }
 
   private sealed class Diagnostics : IDiagnostics

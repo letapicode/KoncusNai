@@ -24,7 +24,7 @@ internal static class RuntimeServiceFactory
       PreferredInputDeviceId = settings.PreferredAudioInputDeviceId,
     };
 
-    return new WasapiAudioCaptureService(new WasapiAudioInputSource(), options);
+    return new ExclusiveAudioCaptureService(new WasapiAudioCaptureService(new WasapiAudioInputSource(), options));
   }
 
   public static ITranscriptionService CreateTranscriptionService(AppSettings settings)
