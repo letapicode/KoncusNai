@@ -36,11 +36,11 @@ When a validated installer is published, use its setup package:
 The normal workflow uses toggle dictation:
 1. Press hotkey once to start.
 2. Press hotkey again to stop and insert.
-3. Follow the bottom-center recording, transcribing, and completion indicator.
+3. Follow the recording, transcribing, and brief completion overlay.
 
 The first few dictations after opening the app may take longer than later ones, even for a short phrase. Koncus Nai checks readiness in the background, and a model or worker may need time to load. Open the tray menu to see the selected model's **Warming**, **Ready**, or **Failed** state. Do not judge steady-state speed from the first attempt alone: use the same model and similar speech length for several attempts after it reports **Ready**. A faster third attempt is possible but is not guaranteed; persistent delays should be investigated with the privacy-safe stage timings described in the [README](../../README.md#first-use-dictation-speed-and-timing).
 
-Koncus Nai remembers the application where recording began and attempts to restore it before insertion. If an ordinary focus change prevents insertion, the transcript is copied to the clipboard and is also saved to local history. Secure or blocked destinations remain protected and are reported as errors.
+Koncus Nai remembers the application where recording began and attempts to restore it before insertion. If an ordinary focus change prevents insertion, the transcript is copied to the clipboard for recovery. History is saved when storage is available. Secure or blocked destinations remain protected and are reported as errors.
 
 ## Koncus Nai Global Toggle Preset
 Use this when you want the rollout configuration for cross-app dictation.
@@ -54,9 +54,23 @@ If `Alt + Space` is blocked by Windows or another app:
 ## Main Workspace
 The main Koncus Nai window provides local chat, saved chat and dictation history, unified file import, and Reading Studio. Use the single plus button in the **Just Ask** composer: audio/video is transcribed into the composer, while supported documents and images are read locally and attached to your next message. The compact Settings menu contains theme, chat text size, chat model, and speech choices. The selected chat typeface applies to replies, the normal and expanded composer, and the animated request status. Text size uses a live 12-30 px slider and saves automatically.
 
+
+### Workbench dictation, history, and recovery
+Select the microphone in **Just Ask** to start, then select the stop icon to finish. Its faint circular background means recording; the keyboard-focus circle is separate. Microphone and Alt+Space dictation use the same recording/transcribing/completion overlay. Recording into the compact or expanded editor inserts at the captured selection in one undo step. Changing the draft, conversation, editor, or permitted foreground target prevents stale insertion.
+
+Recording does not open dictation history. Select a day under **Dictations** to load its records intentionally. A combined day is for reading; open **Manage Dictation History** to edit an individual record. The app attempts to save dictation history locally and reports storage failures. Settings offers Manage Dictation History for reviewing, editing, or deleting individual records. Successful insertion and successful saving are separate outcomes.
+
+A recovery notice above **Just Ask** offers **Copy dictation** and **Dismiss**. Dismiss restores the applicable model notice. If history was not saved, **Recover dictation** retains each dismissed transcript separately for the current Workbench window, including after another recording. Select an entry to copy it. Copy succeeds only when the clipboard is available; failure keeps the entry for another attempt. Recovery kept in memory is not durable: copy unsaved entries before closing the Workbench or exiting the app.
+
+### Chat readiness and appearance
+Model notices share the composer’s width in normal and expanded views. They distinguish checking, a stopped runtime, a missing model, runtime trust/repair requirements, and failed checks. Selecting a model does not start a service or download it. Use the notice’s Start/setup, Download, Review/repair, or Retry action as appropriate. Send and keyboard submission require a verified ready model, including greetings and calendar requests; blocked submission keeps the draft. Dictation is independent of chat setup.
+
+Paper view applies across the sidebar, header, conversation, composer, and inline Settings. Turning it off restores the ordinary light or dark theme. Code’s **Wrap lines** checkbox changes display only; **Copy code** retains original text, tabs, whitespace, and line breaks.
+
 ## Settings Quick Reference
 - Compact menu: theme, chat text size, chat model, and speech model.
 - Advanced settings: dictation shortcut, microphone, transcription provider/model/language, spoken formatting commands, insertion safety, and chat typeface. **Manage Dictation History** opens the local history workspace directly.
+- In inline or standalone Settings, Home/End and Ctrl+Home/Ctrl+End navigate the page outside controls that own those keys. Text fields retain caret shortcuts, and shortcut capture/dropdowns retain their key handling. Ctrl+plus/minus zoom; Ctrl+0 resets zoom.
 - Settings save automatically. The recording/status overlay and its indicator are part of the standard dictation workflow rather than optional appearance settings.
 - Chat typeface choices are System, Book Serif, Literary Serif, Modern Serif, Excalifont, and Kalam.
 
@@ -121,7 +135,7 @@ High latency:
 - Compare a cold run with repeated warm runs and select the faster supported provider/model only if its accuracy remains acceptable.
 
 Text was transcribed but could not be inserted:
-- Look for the bottom-center recovery message.
+- Look for the recovery message in the dictation overlay.
 - Paste the recovery copy from the clipboard, or open the current day in Dictation History.
 - Koncus Nai does not bypass secure fields, blocked applications, or Windows privilege boundaries.
 
