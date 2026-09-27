@@ -9,6 +9,7 @@ using Xunit;
 
 namespace DictateAnywhere.App.Tests;
 
+[Collection(WpfApplicationCollection.Name)]
 public sealed class ChatPresentationRegressionTests
 {
   [Theory]
@@ -40,68 +41,50 @@ public sealed class ChatPresentationRegressionTests
   }
 
   [Fact]
-  [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "STA boundary captures and rethrows the test failure on the test thread.")]
+  [Trait("Category", "WindowsWpf")]
   public void Markdown_PreservesCodeAndRendersProseWithoutBlankParagraphs()
   {
-    Exception? failure = null;
-    Thread thread = new(() =>
+    WpfTestSta.Run(() =>
     {
-      try
-      {
-        FlowDocument document = new();
-        ChatMarkdownRenderer.Append(document, "# Title\n\nLearn *how* and **why**.\nsoft break\n\n---\n\n- First\n- Second\n\n```python\na = 2 * 3\n```", Brushes.Black);
-        Section section = Assert.IsType<Section>(document.Blocks.FirstBlock);
-        var paragraphs = section.Blocks.OfType<Paragraph>().ToArray();
-        Assert.Equal(2, paragraphs.Length);
-        Assert.Contains(paragraphs[1].Inlines, inline => inline is Italic);
-        Assert.Contains(paragraphs[1].Inlines, inline => inline is Bold);
-        Assert.Contains(section.Blocks, block => block is System.Windows.Documents.List);
-        Assert.Equal("a = 2 * 3", ChatMarkdownRenderer.ExtractFencedCode("```python\na = 2 * 3\n```"));
-        Assert.Contains("Learn how", ChatMarkdownRenderer.ToSpeechText("Learn *how*."));
-        Assert.DoesNotContain("*", ChatMarkdownRenderer.ToSpeechText("Learn *how*."));
-      }
-      catch (Exception ex) { failure = ex; }
+      FlowDocument document = new();
+      ChatMarkdownRenderer.Append(document, "# Title\n\nLearn *how* and **why**.\nsoft break\n\n---\n\n- First\n- Second\n\n```python\na = 2 * 3\n```", Brushes.Black);
+      Section section = Assert.IsType<Section>(document.Blocks.FirstBlock);
+      var paragraphs = section.Blocks.OfType<Paragraph>().ToArray();
+      Assert.Equal(2, paragraphs.Length);
+      Assert.Contains(paragraphs[1].Inlines, inline => inline is Italic);
+      Assert.Contains(paragraphs[1].Inlines, inline => inline is Bold);
+      Assert.Contains(section.Blocks, block => block is System.Windows.Documents.List);
+      Assert.Equal("a = 2 * 3", ChatMarkdownRenderer.ExtractFencedCode("```python\na = 2 * 3\n```"));
+      Assert.Contains("Learn how", ChatMarkdownRenderer.ToSpeechText("Learn *how*."));
+      Assert.DoesNotContain("*", ChatMarkdownRenderer.ToSpeechText("Learn *how*."));
     });
-    thread.SetApartmentState(ApartmentState.STA);
-    thread.Start();
-    Assert.True(thread.Join(TimeSpan.FromSeconds(15)));
-    if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
   }
 
   [Fact]
-  [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "STA boundary captures and rethrows the test failure on the test thread.")]
+  [Trait("Category", "WindowsWpf")]
   public void Markdown_PaperCodeStaysSelectableScrollableAndCopiesOriginalSource()
   {
-    Exception? failure = null;
-    Thread thread = new(() =>
+    WpfTestSta.Run(() =>
     {
-      try
-      {
-        string? copied = null;
-        FlowDocument document = new();
-        ChatMarkdownRenderer.Append(document, "```java\npublic class Demo { int n = 12; }\n```",
-          Brushes.Black, onCopyCode: code => copied = code, isPaper: true);
-        Section section = Assert.IsType<Section>(document.Blocks.FirstBlock);
-        Border border = Assert.IsType<Border>(Assert.IsType<BlockUIContainer>(section.Blocks.FirstBlock).Child);
-        Grid grid = Assert.IsType<Grid>(border.Child);
-        RichTextBox codeBox = Assert.Single(grid.Children.OfType<RichTextBox>());
-        Button copyButton = Assert.Single(grid.Children.OfType<Button>());
-        Assert.Equal(System.Windows.Controls.ScrollBarVisibility.Auto, codeBox.HorizontalScrollBarVisibility);
-        Assert.InRange(codeBox.Document.PageWidth, 100, 700);
-        Assert.Equal(Brushes.Transparent, border.Background);
-        Assert.Equal(new Thickness(0), border.BorderThickness);
-        Paragraph codeParagraph = Assert.IsType<Paragraph>(Assert.Single(codeBox.Document.Blocks.Cast<Block>()));
-        Assert.Equal("public class Demo { int n = 12; }", new TextRange(codeParagraph.ContentStart, codeParagraph.ContentEnd).Text);
-        Assert.Equal(FontWeights.Normal, codeBox.FontWeight);
-        Assert.Equal(15 * 1.55, codeBox.Document.LineHeight);
-        copyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Assert.Equal("public class Demo { int n = 12; }", copied);
-      }
-      catch (Exception ex) { failure = ex; }
+      string? copied = null;
+      FlowDocument document = new();
+      ChatMarkdownRenderer.Append(document, "```java\npublic class Demo { int n = 12; }\n```",
+        Brushes.Black, onCopyCode: code => copied = code, isPaper: true);
+      Section section = Assert.IsType<Section>(document.Blocks.FirstBlock);
+      Border border = Assert.IsType<Border>(Assert.IsType<BlockUIContainer>(section.Blocks.FirstBlock).Child);
+      Grid grid = Assert.IsType<Grid>(border.Child);
+      RichTextBox codeBox = Assert.Single(grid.Children.OfType<RichTextBox>());
+      Button copyButton = Assert.Single(grid.Children.OfType<Button>());
+      Assert.Equal(System.Windows.Controls.ScrollBarVisibility.Auto, codeBox.HorizontalScrollBarVisibility);
+      Assert.InRange(codeBox.Document.PageWidth, 100, 700);
+      Assert.Equal(Brushes.Transparent, border.Background);
+      Assert.Equal(new Thickness(0), border.BorderThickness);
+      Paragraph codeParagraph = Assert.IsType<Paragraph>(Assert.Single(codeBox.Document.Blocks.Cast<Block>()));
+      Assert.Equal("public class Demo { int n = 12; }", new TextRange(codeParagraph.ContentStart, codeParagraph.ContentEnd).Text);
+      Assert.Equal(FontWeights.Normal, codeBox.FontWeight);
+      Assert.Equal(15 * 1.55, codeBox.Document.LineHeight);
+      copyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+      Assert.Equal("public class Demo { int n = 12; }", copied);
     });
-    thread.SetApartmentState(ApartmentState.STA);
-    thread.Start();
-    Assert.True(thread.Join(TimeSpan.FromSeconds(15)));
-    if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
   }
 }

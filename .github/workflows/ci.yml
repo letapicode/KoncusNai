@@ -63,7 +63,11 @@ jobs:
 
       - name: Deterministic Focused Tests
         shell: pwsh
-        run: ./scripts/run-focused-tests.ps1 -Suite Deterministic -NoBuild
+        run: ./scripts/run-focused-tests.ps1 -Suite Deterministic -NoBuild -Diagnostics
+
+      - name: Windows WPF Focused Tests
+        shell: pwsh
+        run: ./scripts/run-focused-tests.ps1 -Suite WindowsWpf -NoBuild -Diagnostics
 
       - name: Deterministic Coverage Threshold Gate
         id: coverage
