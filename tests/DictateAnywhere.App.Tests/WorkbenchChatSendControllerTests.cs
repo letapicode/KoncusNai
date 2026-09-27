@@ -11,6 +11,80 @@ namespace DictateAnywhere.App.Tests;
 public sealed class WorkbenchChatSendControllerTests
 {
   [Xunit.Theory]
+  [Xunit.InlineData("Hey")]
+  [Xunit.InlineData("What time is it?")]
+  [Xunit.InlineData("Explain binary search")]
+  public async Task UnreadyModelBlocksEverySubmissionWithoutMutationOrSaving(string prompt)
+  {
+    await using WorkbenchChatController chat = new(_ => throw new InvalidOperationException("Must not load a model"));
+    WorkbenchChatSendController sender = new(chat, (_, _) => throw new InvalidOperationException("Explicit checks only"),
+      (_, _, _) => throw new InvalidOperationException("Must not save"), new RecordingDiagnostics());
+    WorkbenchChatSendResult result = await sender.SendAsync(prompt, "New chat", "Gemma", AppSettings.Default);
+    Xunit.Assert.False(result.OperationAccepted);
+    Xunit.Assert.False(result.ShouldRefreshHistory);
+    Xunit.Assert.Empty(chat.Messages);
+  }
+
+  [Xunit.Fact]
+  public async Task LoadingDifferentModelHistoryInvalidatesPreviousReadiness()
+  {
+    await using WorkbenchChatController chat = new(_ => throw new InvalidOperationException());
+    chat.SetReadiness(true, true);
+    long revision = chat.SelectionRevision;
+    chat.Load(new ChatHistoryRecord("old-chat", "Saved chat", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
+      ChatProviderIds.OllamaLocal, "gemma4:e4b", []));
+    Xunit.Assert.False(chat.IsRuntimeReady);
+    Xunit.Assert.False(chat.IsInstallationKnown);
+    Xunit.Assert.True(chat.SelectionRevision > revision);
+  }
+  [Xunit.Fact]
+  public async Task Readiness_CompletionAfterDisposalIsIgnored()
+  {
+    await using WorkbenchChatController chat = new(_ => throw new InvalidOperationException());
+    TaskCompletionSource<WorkbenchChatModelReadinessState> check = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    WorkbenchChatSendController sender = new(chat, (_, _) => check.Task,
+      (_, record, _) => Task.FromResult(Saved(record)), new RecordingDiagnostics());
+    Task<WorkbenchChatModelReadinessState?> pending = sender.RefreshReadinessAsync();
+    await chat.DisposeAsync();
+    check.SetResult(new(true, true, 100, "Ready", "Ready"));
+    Xunit.Assert.Null(await pending);
+  }
+  [Xunit.Fact]
+  public async Task Readiness_OutOfOrderChecksCannotOverwriteNewerResult()
+  {
+    await using WorkbenchChatController chat = new(_ => throw new InvalidOperationException());
+    List<TaskCompletionSource<WorkbenchChatModelReadinessState>> checks = [];
+    WorkbenchChatSendController sender = new(chat, (_, _) =>
+    {
+      TaskCompletionSource<WorkbenchChatModelReadinessState> check = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      checks.Add(check);
+      return check.Task;
+    }, (_, record, _) => Task.FromResult(Saved(record)), new RecordingDiagnostics());
+    Task<WorkbenchChatModelReadinessState?> old = sender.RefreshReadinessAsync();
+    Task<WorkbenchChatModelReadinessState?> latest = sender.RefreshReadinessAsync();
+    checks[1].SetResult(new(true, true, 100, "Ready", "Ready"));
+    await latest;
+    checks[0].SetResult(new(false, false, 0, "Missing", "Missing"));
+    Xunit.Assert.Null(await old);
+    Xunit.Assert.True(chat.IsRuntimeReady);
+  }
+
+  [Xunit.Fact]
+  public async Task Readiness_SwitchingAwayAndBackInvalidatesOldCheck()
+  {
+    await using WorkbenchChatController chat = new(_ => throw new InvalidOperationException());
+    ChatModelSelection original = chat.Selection;
+    TaskCompletionSource<WorkbenchChatModelReadinessState> check = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    WorkbenchChatSendController sender = new(chat, (_, _) => check.Task,
+      (_, record, _) => Task.FromResult(Saved(record)), new RecordingDiagnostics());
+    Task<WorkbenchChatModelReadinessState?> pending = sender.RefreshReadinessAsync();
+    chat.SelectModel(new ChatModelSelection(ChatProviderIds.GemmaLocal, "another-model"));
+    chat.SelectModel(original);
+    check.SetResult(new(true, true, 100, "Ready", "Ready"));
+    Xunit.Assert.Null(await pending);
+    Xunit.Assert.False(chat.IsInstallationKnown);
+  }
+  [Xunit.Theory]
   [Xunit.InlineData("rejected", "rejected the request format")]
   [Xunit.InlineData("connection", "connection to the local model failed")]
   [Xunit.InlineData("timeout", "response time limit")]
@@ -60,6 +134,7 @@ public sealed class WorkbenchChatSendControllerTests
         saved = record;
         return Task.FromResult(Saved(record));
       });
+    chat.SetReadiness(true, true);
     List<WorkbenchChatSendProgressKind> progress = [];
 
     WorkbenchChatSendResult result = await sender.SendAsync(
@@ -206,7 +281,7 @@ public sealed class WorkbenchChatSendControllerTests
   }
 
   [Xunit.Fact]
-  public async Task SendAsync_HoldsOperationLockWhileRefreshingReadiness()
+  public async Task SendAsync_CheckingReadinessCannotSubmitOrCreateMessages()
   {
     TaskCompletionSource<bool> readinessStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
     TaskCompletionSource<WorkbenchChatModelReadinessState> readiness = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -221,19 +296,19 @@ public sealed class WorkbenchChatSendControllerTests
       (_, record, _) => Task.FromResult(Saved(record)),
       new RecordingDiagnostics());
 
-    Task<WorkbenchChatSendResult> send = sender.SendAsync(
+    Task<WorkbenchChatModelReadinessState?> check = sender.RefreshReadinessAsync();
+    await readinessStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    WorkbenchChatSendResult blocked = await sender.SendAsync(
       "Explain this.",
       "New chat",
       "Local model",
       AppSettings.Default);
-    await readinessStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
-
-    Xunit.Assert.True(chat.IsBusy);
-    Xunit.Assert.Null(chat.TryBeginOperation(WorkbenchChatOperationKind.LocalReply));
+    Xunit.Assert.False(blocked.OperationAccepted);
+    Xunit.Assert.Empty(chat.Messages);
 
     readiness.SetResult(Ready());
-    WorkbenchChatSendResult result = await send.WaitAsync(TimeSpan.FromSeconds(2));
-    Xunit.Assert.True(result.ShouldRefreshHistory);
+    await check.WaitAsync(TimeSpan.FromSeconds(2));
+    Xunit.Assert.True(chat.IsRuntimeReady);
     Xunit.Assert.False(chat.IsBusy);
   }
 

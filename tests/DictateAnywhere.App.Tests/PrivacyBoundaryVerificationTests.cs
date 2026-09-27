@@ -40,7 +40,7 @@ public sealed class PrivacyBoundaryVerificationTests
     string privacyCopy = privacyCopyElement.Attribute("Text")?.Value
       ?? throw new InvalidOperationException("About privacy copy must use the Text attribute.");
 
-    Assert.Contains("always saved as local plaintext", privacyCopy, StringComparison.OrdinalIgnoreCase);
+    Assert.Contains("history are local plaintext", privacyCopy, StringComparison.OrdinalIgnoreCase);
     Assert.Contains("Windows account and file permissions", privacyCopy, StringComparison.OrdinalIgnoreCase);
     Assert.Contains("never stores raw microphone audio", privacyCopy, StringComparison.OrdinalIgnoreCase);
     Assert.DoesNotContain("encrypted", privacyCopy, StringComparison.OrdinalIgnoreCase);

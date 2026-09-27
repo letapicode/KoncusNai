@@ -19,6 +19,9 @@ internal static class PaperChatResources
     ["Brush.Control.Muted"] = "Brush.Paper.Control",
     ["Brush.Control.Hover"] = "Brush.Paper.Hover",
     ["Brush.Control.Pressed"] = "Brush.Paper.Hover",
+    ["Brush.Surface.Canvas"] = "Brush.Paper.Page",
+    ["Brush.Surface.Sidebar"] = "Brush.Paper.Page",
+    ["Brush.Surface.Composer"] = "Brush.Paper.Composer",
   };
 
   internal static void Apply(FrameworkElement surface, bool enabled)

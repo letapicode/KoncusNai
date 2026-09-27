@@ -19,8 +19,11 @@ using System.Windows.Threading;
 using DictateAnywhere.Benchmark;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Core.Domain;
+using DictateAnywhere.Core.Services;
 using DictateAnywhere.Hotkeys;
 using DictateAnywhere.Models;
+using DictateAnywhere.Overlay;
+using DictateAnywhere.Insertion;
 using DictateAnywhere.Settings;
 
 namespace DictateAnywhere.App.Composition;
@@ -176,7 +179,16 @@ internal sealed class ApplicationComposition
       Diagnostics,
       RuntimeServiceFactory.CreateAudioCaptureService,
       effectiveTranscriptionFactory,
-      () => RuntimeServiceFactory.CreateHotkeyService());
+      () => RuntimeServiceFactory.CreateHotkeyService(),
+      settings => new FaultTolerantOverlayService(new WindowsOverlayService(
+        () => new OwnedOverlayPresenter(new WindowsOverlayPresenter()),
+        OverlayServiceOptions.Default with
+        {
+          Enabled = settings.OverlayEnabled,
+          CaretIndicatorEnabled = settings.CaretIndicatorEnabled,
+          FallbackToCornerOverlay = settings.FallbackToCornerOverlay
+        },
+        new WindowsOverlayAnchorProvider(new WindowsWindowFocusProvider()), Diagnostics), Diagnostics));
     WorkbenchChatController chatController = new(
       selection => RuntimeServiceFactory.CreateChatCompletionService(selection, ChatProviderRegistry));
     WorkbenchChatModelController chatModelController = new(

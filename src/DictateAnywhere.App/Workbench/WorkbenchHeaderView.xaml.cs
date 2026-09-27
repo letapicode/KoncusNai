@@ -58,4 +58,12 @@ public partial class WorkbenchHeaderView : UserControl
       state.CanDeleteSelectedDictation);
   }
 
+  internal void SetGroupEditGuidance(bool combinedGroup)
+  {
+    SaveHistoryEdits.ToolTip = combinedGroup
+      ? "Open History to edit an individual dictation from this day."
+      : "Save dictation edits";
+    ToolTipService.SetShowOnDisabled(SaveHistoryEdits, true);
+  }
+
 }

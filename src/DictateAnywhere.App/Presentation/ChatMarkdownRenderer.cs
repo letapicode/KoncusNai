@@ -75,7 +75,8 @@ internal static partial class ChatMarkdownRenderer
           {
             MarkerStyle = list.IsOrdered ? TextMarkerStyle.Decimal : TextMarkerStyle.Disc,
             StartIndex = int.TryParse(list.OrderedStart, out int start) && start > 0 ? start : 1,
-            Padding = new Thickness(24, 0, 0, 0), Margin = new Thickness(0, 0, 0, 10),
+            Padding = new Thickness(24, 0, 0, 0),
+            Margin = new Thickness(0, 0, 0, 10),
           };
           foreach (var item in list.OfType<ListItemBlock>())
           {
@@ -162,13 +163,13 @@ internal static partial class ChatMarkdownRenderer
     }
     if (onCopyReply is not null)
     {
-      actions.Children.Add(CreateIconButton("Copy reply", "\uE8C8", () => onCopyReply(markdown), "Copied", isPaper));
+      actions.Children.Add(CreateIconButton("Copy reply", "\uE8C8", () => onCopyReply(markdown), isPaper: isPaper));
     }
 
     return new BlockUIContainer(actions) { Margin = new Thickness(0) };
   }
 
-  private static Button CreateIconButton(string toolTip, string icon, Action action, string? postClickToolTip = null, bool isPaper = false, bool isCode = false)
+  internal static Button CreateIconButton(string toolTip, string icon, Action action, bool isPaper = false, bool isCode = false)
   {
     Button button = new()
     {
@@ -191,6 +192,8 @@ internal static partial class ChatMarkdownRenderer
       new System.Windows.Data.Binding(nameof(Control.Foreground)) { Source = button });
     System.Windows.Automation.AutomationProperties.SetName(button, toolTip);
     Style style = new(typeof(Button));
+    // Transparent properties alone do not replace the system Button chrome.
+    style.Setters.Add(new Setter(Control.TemplateProperty, CreateIconTemplate()));
     style.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(isPaper ? "Brush.Paper.Comment" : isCode ? "Brush.Code.Icon" : "Brush.Text.Secondary")));
     foreach (DependencyProperty property in new[] { UIElement.IsMouseOverProperty, UIElement.IsKeyboardFocusWithinProperty })
     {
@@ -202,12 +205,35 @@ internal static partial class ChatMarkdownRenderer
     button.Click += (_, _) =>
     {
       action();
-      if (!string.IsNullOrWhiteSpace(postClickToolTip))
-      {
-        button.ToolTip = postClickToolTip;
-      }
+      // The clipboard callback owns truthful success/failure feedback. Keep the
+      // action tooltip stable, including when another process holds the clipboard.
     };
     return button;
+  }
+
+  private static ControlTemplate CreateIconTemplate()
+  {
+    FrameworkElementFactory chrome = new(typeof(Border), "Chrome");
+    chrome.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+    chrome.SetValue(Border.BorderBrushProperty, Brushes.Transparent);
+    chrome.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+    chrome.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
+    FrameworkElementFactory content = new(typeof(ContentPresenter));
+    content.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+    content.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+    chrome.AppendChild(content);
+    ControlTemplate template = new(typeof(Button)) { VisualTree = chrome };
+    Trigger focus = new() { Property = UIElement.IsKeyboardFocusedProperty, Value = true };
+    focus.Setters.Add(new Setter(Border.BorderBrushProperty,
+      new DynamicResourceExtension("Brush.Text.Primary"), "Chrome"));
+    template.Triggers.Add(focus);
+    Trigger pressed = new() { Property = Button.IsPressedProperty, Value = true };
+    pressed.Setters.Add(new Setter(UIElement.OpacityProperty, 0.7d, "Chrome"));
+    template.Triggers.Add(pressed);
+    Trigger disabled = new() { Property = UIElement.IsEnabledProperty, Value = false };
+    disabled.Setters.Add(new Setter(UIElement.OpacityProperty, 0.42d, "Chrome"));
+    template.Triggers.Add(disabled);
+    return template;
   }
 
   private static BlockUIContainer CreateCodeBlock(
@@ -218,10 +244,15 @@ internal static partial class ChatMarkdownRenderer
   {
     RichTextBox code = new()
     {
-      IsReadOnly = true, IsDocumentEnabled = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent,
-      FontFamily = CodeFont, FontWeight = FontWeights.Normal,
+      IsReadOnly = true,
+      IsDocumentEnabled = true,
+      BorderThickness = new Thickness(0),
+      Background = Brushes.Transparent,
+      FontFamily = CodeFont,
+      FontWeight = FontWeights.Normal,
       VerticalContentAlignment = VerticalAlignment.Top,
-      Padding = new Thickness(14, 12, 14, 14), VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+      Padding = new Thickness(14, 12, 14, 14),
+      VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
       HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
     };
     code.SetResourceReference(Control.ForegroundProperty, isPaper ? "Brush.Paper.Ink" : "Brush.Code.Text");
@@ -252,7 +283,8 @@ internal static partial class ChatMarkdownRenderer
     TextBlock languageLabel = new()
     {
       Text = ChatCodeHighlighter.NormalizeLanguage(language),
-      FontSize = 12, FontWeight = FontWeights.SemiBold,
+      FontSize = 12,
+      FontWeight = FontWeights.SemiBold,
       Margin = new Thickness(14, 8, 0, 8),
       HorizontalAlignment = HorizontalAlignment.Left,
       TextTrimming = TextTrimming.CharacterEllipsis,
@@ -265,25 +297,27 @@ internal static partial class ChatMarkdownRenderer
     content.Children.Add(code);
     CheckBox wrap = new()
     {
-      Content = "Wrap lines", FontSize = 12,
+      Content = "Wrap lines",
+      FontSize = 12,
       HorizontalAlignment = HorizontalAlignment.Right,
       VerticalAlignment = VerticalAlignment.Center,
       Margin = new Thickness(12, 4, 14, 4),
-      ToolTip = "Wrap long lines for reading. Copy keeps the original code and line breaks.",
+      ToolTip = "Wrap long lines.",
     };
     System.Windows.Automation.AutomationProperties.SetName(wrap, "Wrap code lines");
     wrap.SetResourceReference(Control.ForegroundProperty, isPaper ? "Brush.Paper.Ink" : "Brush.Code.Label");
     wrap.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
       new System.Windows.Data.Binding
       {
-        Source = code, Path = new PropertyPath(ChatCodeWrapping.IsWrappedProperty),
+        Source = code,
+        Path = new PropertyPath(ChatCodeWrapping.IsWrappedProperty),
         Mode = System.Windows.Data.BindingMode.TwoWay,
       });
     Grid.SetColumn(wrap, 1);
     content.Children.Add(wrap);
     if (onCopyCode is not null)
     {
-      Button copyCode = CreateIconButton("Copy code", "\uE8C8", () => onCopyCode(source), "Copied", isPaper, isCode: true);
+      Button copyCode = CreateIconButton("Copy code", "\uE8C8", () => onCopyCode(source), isPaper, isCode: true);
       copyCode.HorizontalAlignment = HorizontalAlignment.Right;
       copyCode.VerticalAlignment = VerticalAlignment.Top;
       copyCode.Margin = new Thickness(0, 4, 4, 0);

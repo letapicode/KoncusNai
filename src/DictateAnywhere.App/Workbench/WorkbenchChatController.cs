@@ -40,8 +40,15 @@ internal sealed class WorkbenchChatController : IAsyncDisposable
   public ChatHistoryRecord? SelectedRecord => selectedRecord;
   public bool IsModelInstalled { get; private set; }
   public bool IsRuntimeReady { get; private set; }
+  public bool IsInstallationKnown { get; private set; }
+  public bool IsCheckingReadiness { get; private set; }
+  public bool ModelCheckFailed { get; private set; }
+  public string ModelStatus { get; private set; } = "Model availability has not been checked.";
+  public long SelectionRevision { get; private set; }
   public bool IsBusy => operationSession.IsBusy;
+  internal bool IsDisposed => disposed;
   public bool CanCancel => operationSession.CanCancel;
+  internal bool IsModelSetupActive => operationSession.IsModelSetupActive;
 
   public WorkbenchChatIdentity CaptureIdentity() => new(ConversationId, conversationRevision);
 
@@ -71,27 +78,46 @@ internal sealed class WorkbenchChatController : IAsyncDisposable
     pendingFiles.Clear();
     ConversationId = normalized.ConversationId;
     selectedRecord = normalized;
-    Selection = new ChatModelSelection(normalized.ProviderId, normalized.ModelId).Normalize();
+    SelectModel(new ChatModelSelection(normalized.ProviderId, normalized.ModelId));
     messages = normalized.Messages.Select(message => message.Normalize()).ToList();
   }
 
   public void SelectModel(ChatModelSelection selection)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
-    Selection = (selection ?? throw new ArgumentNullException(nameof(selection))).Normalize();
+    ChatModelSelection normalized = (selection ?? throw new ArgumentNullException(nameof(selection))).Normalize();
+    if (SelectionsEqual(Selection, normalized)) return;
+    Selection = normalized;
+    SelectionRevision++;
+    IsInstallationKnown = false;
     IsModelInstalled = false;
     IsRuntimeReady = false;
+    ModelStatus = "Model availability has not been checked.";
+    IsCheckingReadiness = false;
+    ModelCheckFailed = false;
   }
 
   public bool IsCurrentSelection(ChatModelSelection selection) =>
     SelectionsEqual(Selection, selection);
 
-  public void SetReadiness(bool isInstalled, bool isRuntimeReady)
+  public void SetReadiness(bool isInstalled, bool isRuntimeReady, bool isInstallationKnown = true, bool checkFailed = false)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
     IsModelInstalled = isInstalled;
+    IsInstallationKnown = isInstallationKnown;
     IsRuntimeReady = isInstalled && isRuntimeReady;
+    IsCheckingReadiness = false;
+    ModelCheckFailed = checkFailed;
   }
+
+  internal void BeginReadinessCheck()
+  {
+    IsCheckingReadiness = true;
+    ModelCheckFailed = false;
+    ModelStatus = "Checking model availability…";
+  }
+
+  internal void SetModelStatus(string status) => ModelStatus = status;
 
   public void MarkRuntimeNotReady()
   {

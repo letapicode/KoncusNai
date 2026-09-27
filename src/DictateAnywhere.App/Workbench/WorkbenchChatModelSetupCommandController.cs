@@ -58,6 +58,7 @@ internal sealed class WorkbenchChatModelSetupCommandController
       if (!setup.RefreshReadiness)
       {
         chatController.MarkRuntimeNotReady();
+        await chatSendController.RefreshReadinessAsync(readinessProgress, operation.CancellationToken).ConfigureAwait(true);
         string status = setup.Failure is null
           ? setup.Status
           : "Model setup failed. See Diagnostics.";

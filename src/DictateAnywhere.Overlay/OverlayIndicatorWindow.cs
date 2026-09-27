@@ -143,6 +143,7 @@ internal sealed class OverlayIndicatorWindow : Form
   private void ConfigureAnimation(OverlayPresentation presentation)
   {
     animationTimer.Stop();
+    if (SystemParametersInfo(0x1042, 0, out bool enabled, 0) && !enabled) return;
 
     int? intervalMilliseconds = presentation.AnimationState switch
     {
@@ -160,6 +161,11 @@ internal sealed class OverlayIndicatorWindow : Form
     animationTimer.Interval = intervalMilliseconds.Value;
     animationTimer.Start();
   }
+
+  [DllImport("user32.dll", SetLastError = true)]
+  [return: MarshalAs(UnmanagedType.Bool)]
+  private static extern bool SystemParametersInfo(uint action, uint parameter,
+    [MarshalAs(UnmanagedType.Bool)] out bool value, uint flags);
 
   private void DrawRecordingIndicator(Graphics graphics, Rectangle bounds)
   {

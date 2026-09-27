@@ -62,7 +62,7 @@
                 Grid.Row="1"
                 ClipToBounds="True"
                 VerticalScrollBarVisibility="Auto"
-                HorizontalScrollBarVisibility="Disabled">
+                HorizontalScrollBarVisibility="Auto">
    <AdornerDecorator ClipToBounds="True">
    <Grid MaxWidth="960" Margin="36,30,36,42" HorizontalAlignment="Stretch">
     <StackPanel>

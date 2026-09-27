@@ -8,16 +8,30 @@ public sealed class WorkbenchPresentationReducerTests
   [Xunit.InlineData(false, false)]
   [Xunit.InlineData(true, false)]
   [Xunit.InlineData(true, true)]
-  public void Reduce_NonemptyIdleDraft_AllowsSubmitToRefreshReadiness(bool installed, bool ready)
+  public void Reduce_NonemptyIdleDraft_RequiresReadyModel(bool installed, bool ready)
   {
     WorkbenchPresentationState state = WorkbenchPresentationReducer.Reduce(CreateSnapshot(
       hasPrompt: true, isChatModelInstalled: installed, isChatRuntimeReady: ready));
-    Xunit.Assert.True(state.Composer.CanSend);
+    Xunit.Assert.Equal(installed && ready, state.Composer.CanSend);
     Xunit.Assert.False(WorkbenchPresentationReducer.Reduce(CreateSnapshot(
       hasPrompt: true, isImportingFiles: true, isChatModelInstalled: installed, isChatRuntimeReady: ready)).Composer.CanSend);
     Xunit.Assert.False(WorkbenchPresentationReducer.Reduce(CreateSnapshot(
       hasPrompt: false, isChatModelInstalled: installed, isChatRuntimeReady: ready)).Composer.CanSend);
   }
+  [Xunit.Fact]
+  public void CheckingDisablesSubmissionAndRecordingHasNoDuplicateStatus()
+  {
+    WorkbenchPresentationSnapshot ready = CreateSnapshot(hasPrompt: true, canUseQuickLocalReply: true,
+      isChatModelInstalled: true, isChatRuntimeReady: true);
+    WorkbenchPresentationState checking = WorkbenchPresentationReducer.Reduce(ready with { IsCheckingChatReadiness = true });
+    Xunit.Assert.False(checking.Composer.CanSend);
+    Xunit.Assert.False(checking.Composer.CanUseQuickLocalReply);
+    Xunit.Assert.False(WorkbenchPresentationReducer.Reduce(ready with
+    { DictationState = WorkbenchSessionState.Recording }).OperationalStatus.IsVisible);
+    Xunit.Assert.False(WorkbenchPresentationReducer.Reduce(ready with
+    { DictationState = WorkbenchSessionState.Transcribing }).OperationalStatus.IsVisible);
+  }
+
   [Xunit.Fact]
   public void Reduce_IdleReadyWorkbench_EnablesExpectedActions()
   {

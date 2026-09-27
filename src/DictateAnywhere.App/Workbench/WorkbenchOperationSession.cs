@@ -33,6 +33,11 @@ internal sealed class WorkbenchOperationSession : IAsyncDisposable
     }
   }
 
+  public bool IsDictationOperation
+  {
+    get { lock (sync) return activeOperation?.Kind is WorkbenchOperationKind.RecordingStart or WorkbenchOperationKind.Transcription; }
+  }
+
   public bool IsImportingFiles
   {
     get

@@ -40,7 +40,8 @@ internal sealed record WorkbenchQuickSettingsPresentation(
   bool CanInteract,
   bool IsChatModelInstalled,
   bool IsChatRuntimeReady,
-  bool UsesExternalRuntime);
+  bool UsesExternalRuntime,
+  bool IsInstallationKnown = true);
 
 internal sealed record WorkbenchSidebarPresentation(
   bool IsVisible,
@@ -67,7 +68,10 @@ internal sealed record WorkbenchPresentationSnapshot(
   bool IsTransientOutcomeVisible,
   bool UsesExternalChatRuntime,
   string SessionStatusText,
-  string HotkeyStatusText);
+  string HotkeyStatusText,
+  bool IsChatModelStatusKnown = true,
+  bool IsCheckingChatReadiness = false,
+  bool IsDictationOperation = false);
 
 internal static class WorkbenchPresentationReducer
 {
@@ -83,18 +87,15 @@ internal static class WorkbenchPresentationReducer
     bool isChatRuntimeReady = snapshot.IsChatModelInstalled && snapshot.IsChatRuntimeReady;
     bool canStartOperation = isIdle && !snapshot.IsOperationBusy;
     bool canInteractWithChat = isIdle && !snapshot.IsChatBusy && !snapshot.IsOperationBusy;
-    bool canEditPrompt = !snapshot.IsOperationBusy && !snapshot.IsImportingFiles;
+    bool canEditPrompt = (!snapshot.IsOperationBusy || snapshot.IsDictationOperation) && !snapshot.IsImportingFiles;
     bool canManageConversation = canInteractWithChat && !snapshot.IsImportingFiles;
-    bool canUseQuickLocalReply = snapshot.CanUseQuickLocalReply && !snapshot.IsImportingFiles;
-    // Submission refreshes readiness itself. Stale readiness must not disable the
-    // pointer affordance while the keyboard can run the same submission command.
+    bool canUseQuickLocalReply = snapshot.CanUseQuickLocalReply && !snapshot.IsImportingFiles
+      && isChatRuntimeReady && !snapshot.IsCheckingChatReadiness;
     bool canSend = canInteractWithChat
       && snapshot.HasComposerText
+      && isChatRuntimeReady && !snapshot.IsCheckingChatReadiness
       && !snapshot.IsImportingFiles;
     bool showOperationalStatus = snapshot.IsImportingFiles
-      || !snapshot.IsChatModelInstalled
-      || !isChatRuntimeReady
-      || snapshot.DictationState == WorkbenchSessionState.Recording
       || snapshot.IsTransientOutcomeVisible;
 
     return new WorkbenchPresentationState(
@@ -122,7 +123,8 @@ internal static class WorkbenchPresentationReducer
         CanInteract: canInteractWithChat,
         IsChatModelInstalled: snapshot.IsChatModelInstalled,
         IsChatRuntimeReady: isChatRuntimeReady,
-        UsesExternalRuntime: snapshot.UsesExternalChatRuntime),
+        UsesExternalRuntime: snapshot.UsesExternalChatRuntime,
+        IsInstallationKnown: snapshot.IsChatModelStatusKnown),
       new WorkbenchSidebarPresentation(
         snapshot.SidebarVisible,
         canManageConversation),

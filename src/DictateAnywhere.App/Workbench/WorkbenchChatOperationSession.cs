@@ -43,6 +43,11 @@ internal sealed class WorkbenchChatOperationSession : IAsyncDisposable
     }
   }
 
+  internal bool IsModelSetupActive
+  {
+    get { lock (sync) return activeOperation?.Kind == WorkbenchChatOperationKind.ModelSetup; }
+  }
+
   [SuppressMessage(
     "Reliability",
     "CA2000:Dispose objects before losing scope",

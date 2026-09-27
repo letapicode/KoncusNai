@@ -235,6 +235,11 @@
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
+      <Border x:Name="PaperSurface" Grid.ColumnSpan="2" IsHitTestVisible="False" Visibility="Collapsed"
+              Background="{DynamicResource Brush.Paper.Page}">
+        <presentation:PaperTexture />
+      </Border>
+
     <Grid Grid.ColumnSpan="2" Panel.ZIndex="30" Margin="18,12,0,0"
           VerticalAlignment="Top">
       <Grid.ColumnDefinitions>
@@ -258,6 +263,7 @@
                                     Grid.Column="0"
                                     HistorySearchTextChanged="OnHistorySearchTextChanged"
                                     ChatHistorySelectionChanged="OnChatHistorySelectionChanged"
+                                    ChatHistoryPreviewMouseLeftButtonDown="OnChatHistoryPreviewMouseLeftButtonDown"
                                     ChatHistoryPreviewMouseRightButtonDown="OnChatHistoryPreviewMouseRightButtonDown"
                                     ChatHistoryPreviewKeyDown="OnChatHistoryPreviewKeyDown"
                                     RenameChatClicked="OnRenameChatClicked"
@@ -286,19 +292,6 @@
                                         SaveHistoryEditsClicked="OnSaveHistoryEditsClicked"
                                         DeleteHistorySessionClicked="OnDeleteHistorySessionClicked" />
 
-        <Border x:Name="PaperSurface" Grid.Row="1" Grid.RowSpan="2"
-                Margin="18,0,18,0" MaxWidth="1060" CornerRadius="8" ClipToBounds="True"
-                BorderBrush="{DynamicResource Brush.Paper.Border}" BorderThickness="1"
-                IsHitTestVisible="False" Visibility="Collapsed">
-          <Grid>
-            <Border CornerRadius="8" Background="{DynamicResource Brush.Paper.Page}" />
-            <presentation:PaperTexture />
-          </Grid>
-          <Border.Effect>
-            <DropShadowEffect Color="#000000" Opacity="0.12" BlurRadius="16" ShadowDepth="3" />
-          </Border.Effect>
-        </Border>
-
         <Grid x:Name="ConversationLayout" Grid.Row="1" Grid.RowSpan="2" Margin="0,12,0,0" VerticalAlignment="Center">
           <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
           <Grid Margin="0,0,0,24">
@@ -310,8 +303,10 @@
 
 
 
+        <StackPanel Grid.Row="1" MaxWidth="{Binding MaxWidth, ElementName=ComposerView}" Margin="24,0,24,18">
+          <workbench:WorkbenchOperationalStatusView x:Name="OperationalStatusView" />
+          <workbench:WorkbenchModelNoticeView x:Name="ModelNotice" ActionRequested="OnDownloadChatModelClicked" />
         <workbench:WorkbenchComposerView x:Name="ComposerView"
-                                          Grid.Row="1"
                                           NewChatClicked="OnNewChatClicked"
                                           AddFileClicked="OnAddFileClicked"
                                           ReadDocumentClicked="OnReadDocumentClicked"
@@ -325,10 +320,8 @@
                                           SendClicked="OnSendChatClicked"
                                           StopChatClicked="OnStopChatClicked"
                                           RemovePendingFileClicked="OnRemovePendingFileClicked" />
+        </StackPanel>
         </Grid>
-        <workbench:WorkbenchOperationalStatusView x:Name="OperationalStatusView"
-                                                   Grid.Row="3"
-                                                   Margin="0,12,0,0" />
       </Grid>
     </Grid>
 

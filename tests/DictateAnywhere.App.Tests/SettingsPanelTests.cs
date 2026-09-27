@@ -20,6 +20,65 @@ namespace DictateAnywhere.App.Tests;
 public sealed class SettingsPanelTests
 {
   [Fact]
+  public void PageNavigation_RoutedHomeEndScrollAtZoomWithoutOwningTextKeys()
+  {
+    RunOnSta(() =>
+    {
+      SettingsOperationController controller = new(new TestSettingsStore(AppSettings.Default),
+        new TestFileTransferService(), new TestModelManager(), new TestAudioDeviceService(),
+        new TestBenchmarkService(), new TestDiagnostics());
+      SettingsPanel panel = new(controller, new TestHotkeyValidator(), new TestFileDialogService(),
+        LocalTranscriptionProviderRegistry.CreateDefault(), new TestDiagnostics());
+      panel.LayoutTransform = new System.Windows.Media.ScaleTransform(1.5, 1.5);
+      Window host = new()
+      {
+        Content = panel,
+        Width = 1040,
+        Height = 680,
+        Left = -10000,
+        Top = -10000,
+        ShowInTaskbar = false
+      };
+      try
+      {
+        host.Show();
+        host.UpdateLayout();
+        System.Windows.Controls.ScrollViewer scroll = Assert.IsType<System.Windows.Controls.ScrollViewer>(panel.FindName("SettingsScrollViewer"));
+        System.Windows.Controls.Button button = new();
+        // Attach a focus target to the real settings page so the preview route
+        // runs through SettingsPanel before ScrollViewer's native key handling.
+        System.Windows.Controls.StackPanel target = new();
+        object original = scroll.Content;
+        scroll.Content = null;
+        target.Children.Add((UIElement)original);
+        target.Children.Add(button);
+        scroll.Content = target;
+        host.UpdateLayout();
+        System.Windows.Input.KeyEventArgs end = new(System.Windows.Input.Keyboard.PrimaryDevice,
+          PresentationSource.FromVisual(host), 0, System.Windows.Input.Key.End)
+        { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent };
+        button.RaiseEvent(end);
+        host.UpdateLayout();
+        Assert.True(end.Handled);
+        Assert.True(scroll.VerticalOffset > 0);
+        Assert.Equal(scroll.ScrollableHeight, scroll.VerticalOffset);
+        System.Windows.Input.KeyEventArgs home = new(System.Windows.Input.Keyboard.PrimaryDevice,
+          PresentationSource.FromVisual(host), 0, System.Windows.Input.Key.Home)
+        { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent };
+        button.RaiseEvent(home);
+        host.UpdateLayout();
+        Assert.True(home.Handled);
+        Assert.Equal(0, scroll.VerticalOffset);
+      }
+      finally
+      {
+        host.Close();
+        panel.DisposeAsync().AsTask().GetAwaiter().GetResult();
+      }
+    });
+  }
+
+  [Fact]
   public void SettingsPanel_ConstructedWithController_ReflectsDraftInControls()
   {
     RunOnSta(() =>

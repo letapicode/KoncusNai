@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+  <sys:Double x:Key="Layout.Workbench.ComposerMaxWidth">900</sys:Double>
   <SolidColorBrush x:Key="Brush.Text.Primary" Color="#FF111827" />
   <SolidColorBrush x:Key="Brush.Text.Secondary" Color="#FF6B7280" />
   <SolidColorBrush x:Key="Brush.Text.Inverse" Color="#FFFFFFFF" />

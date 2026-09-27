@@ -42,11 +42,11 @@ internal static class LocalOllamaRuntimeReadiness
       bool installed = IsPinnedModelPresent(document.RootElement, modelId);
       return installed
         ? LocalChatRuntimeReadiness.Ready with { StatusMessage = $"Ollama is ready with {modelId}." }
-        : new LocalChatRuntimeReadiness(false, $"Ollama is ready. Pull {modelId} to start chatting.", [], []);
+        : new LocalChatRuntimeReadiness(false, $"Ollama is ready. Pull {modelId} to start chatting.", [], []) { IsInstalled = false };
     }
     catch (HttpRequestException)
     {
-      return Unavailable("Ollama is not running. Start Ollama, then pull Gemma 4 from this screen.");
+      return Unavailable("Ollama is not running. Start Ollama to check the installed model.");
     }
   }
 

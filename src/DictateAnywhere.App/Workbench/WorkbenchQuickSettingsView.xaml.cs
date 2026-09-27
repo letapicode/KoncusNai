@@ -200,14 +200,17 @@ public partial class WorkbenchQuickSettingsView : UserControl
     bool canInteract,
     bool isInstalled,
     bool isRuntimeReady,
-    bool usesExternalRuntime)
+    bool usesExternalRuntime,
+    bool isInstallationKnown = true)
   {
     ChatModel.IsEnabled = canInteract;
-    DownloadChatModel.Content = usesExternalRuntime
+    DownloadChatModel.Content = !isInstallationKnown && !usesExternalRuntime
+      ? "Check model status"
+      : usesExternalRuntime
       ? "Start / set up Ollama"
       : isInstalled && !isRuntimeReady
-        ? "Update Runtime"
-        : "Download Model";
+        ? "Repair model / runtime"
+        : isInstalled ? "Ready" : "Download Model";
     bool needsSetup = !isInstalled || !isRuntimeReady;
     DownloadChatModel.IsEnabled = canInteract && needsSetup;
     DownloadChatModel.Visibility = canInteract && needsSetup
@@ -222,7 +225,8 @@ public partial class WorkbenchQuickSettingsView : UserControl
       state.CanInteract,
       state.IsChatModelInstalled,
       state.IsChatRuntimeReady,
-      state.UsesExternalRuntime);
+      state.UsesExternalRuntime,
+      state.IsInstallationKnown);
   }
 
   internal void DisposePresentation()

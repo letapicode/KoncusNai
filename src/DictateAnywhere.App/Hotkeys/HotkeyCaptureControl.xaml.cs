@@ -18,6 +18,11 @@ public partial class HotkeyCaptureControl : UserControl
     InitializeComponent();
     SetBinding(AppSettings.Default.Hotkey);
     SetStatus(string.Empty);
+    LostKeyboardFocus += (_, _) =>
+    {
+      if (!IsKeyboardFocusWithin) CancelCapture();
+    };
+    Unloaded += (_, _) => CancelCapture();
   }
 
   public HotkeyBinding CurrentBinding { get; private set; } = AppSettings.Default.Hotkey;
@@ -25,6 +30,8 @@ public partial class HotkeyCaptureControl : UserControl
   public IHotkeyRegistrationValidator? RegistrationValidator { get; set; }
 
   public event EventHandler<HotkeyBinding>? HotkeyChanged;
+
+  internal bool IsCapturing => isCapturing;
 
   public void SetBinding(HotkeyBinding binding)
   {
@@ -50,6 +57,11 @@ public partial class HotkeyCaptureControl : UserControl
     e.Handled = true;
 
     Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+    if (key == Key.Escape)
+    {
+      CancelCapture();
+      return;
+    }
     if (!HotkeyCaptureUtility.TryCreateBinding(key, Keyboard.Modifiers, out HotkeyBinding binding, out string? errorMessage))
     {
       SetStatus(errorMessage ?? "Invalid hotkey.");
@@ -93,5 +105,14 @@ public partial class HotkeyCaptureControl : UserControl
     StatusTextBlock.Visibility = string.IsNullOrWhiteSpace(message)
       ? System.Windows.Visibility.Collapsed
       : System.Windows.Visibility.Visible;
+  }
+
+  private void CancelCapture()
+  {
+    if (!isCapturing) return;
+    Interlocked.Increment(ref validationVersion);
+    isCapturing = false;
+    CaptureButton.Content = "Change";
+    SetStatus(string.Empty);
   }
 }

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -23,6 +24,7 @@ using DictateAnywhere.App.Settings;
 using DictateAnywhere.App.Workbench.Reading;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Core.Services;
+using DictateAnywhere.Insertion;
 
 namespace DictateAnywhere.App.Workbench;
 
@@ -39,6 +41,8 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
   private readonly WorkbenchHistoryInteractionController historyInteractionController;
   private readonly WorkbenchDictationController dictationController;
   private readonly WorkbenchDictationCommandController dictationCommandController;
+  private WorkbenchDictationTarget? recordingTarget;
+  private readonly WorkbenchRecoveryStore recoveries = new();
   private readonly LocalChatProviderRegistry chatProviderRegistry;
   private readonly WorkbenchFileImportCommandController fileImportCommandController;
   private readonly WorkbenchChatController chatController;
@@ -99,6 +103,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     dictationController.ToggleRequested += OnDictationToggleRequested;
     AppThemeManager.ApplyThemeResources(AppThemeManager.CurrentPreference);
     InitializeComponent();
+    ComposerView.DraftChanged += historyInteractionController.NotifyComposerTextChanged;
     PreviewKeyDown += OnWorkbenchZoomKeyDown;
     QuickSettingsView.ZoomRequested += ChangeWorkbenchZoom;
     QuickSettingsView.PaperViewToggleRequested += OnPaperViewToggleRequested;
@@ -107,6 +112,11 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     QuickSettingsView.ChatTextSizePreviewRequested += OnChatTextSizePreviewRequested;
     QuickSettingsView.ChatTextSizeCommitRequested += OnChatTextSizeCommitRequested;
     OperationalStatusView.TransientOutcomeExpired += OnTransientOutcomeExpired;
+    ExpandedPromptView.Notice.ActionRequested += OnDownloadChatModelClicked;
+    ModelNotice.RecoveryDismissRequested += DismissRecovery;
+    ExpandedPromptView.Notice.RecoveryDismissRequested += DismissRecovery;
+    ModelNotice.RecoverySelected += SelectRecovery;
+    ExpandedPromptView.Notice.RecoverySelected += SelectRecovery;
     StateChanged += OnWindowStateChanged;
     SizeChanged += OnWindowSizeChanged;
     themeChangeSubscription = AppThemeManager.SubscribeToSystemThemeChanges(Dispatcher);
@@ -251,16 +261,21 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     QuickSettingsView.DisposePresentation();
     ComposerView.DisposePresentation();
     OperationalStatusView.TransientOutcomeExpired -= OnTransientOutcomeExpired;
+    ComposerView.DraftChanged -= historyInteractionController.NotifyComposerTextChanged;
+    ExpandedPromptView.Notice.ActionRequested -= OnDownloadChatModelClicked;
+    ModelNotice.RecoveryDismissRequested -= DismissRecovery;
+    ExpandedPromptView.Notice.RecoveryDismissRequested -= DismissRecovery;
+    ModelNotice.RecoverySelected -= SelectRecovery;
+    ExpandedPromptView.Notice.RecoverySelected -= SelectRecovery;
     OperationalStatusView.DisposePresentation();
     CancelActiveChatRequest();
     ValueTask settingsApplicationDisposal = settingsApplicationController.DisposeAsync();
     ValueTask quickSettingsDisposal = quickSettingsController.DisposeAsync();
-    ValueTask historyControllerDisposal = historyController.DisposeAsync();
     ValueTask operationDisposal = operationSession.DisposeAsync();
     await settingsApplicationDisposal.ConfigureAwait(true);
     await quickSettingsDisposal.ConfigureAwait(true);
-    await historyControllerDisposal.ConfigureAwait(true);
     await operationDisposal.ConfigureAwait(true);
+    await historyController.DisposeAsync().ConfigureAwait(true);
     dictationController.ToggleRequested -= OnDictationToggleRequested;
     await dictationController.DisposeAsync().ConfigureAwait(true);
     await chatController.DisposeAsync().ConfigureAwait(true);
@@ -338,7 +353,8 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private void OnHistorySelectionChanged(object sender, SelectionChangedEventArgs e)
   {
-    if (!IsConversationNavigationAvailable() || SidebarView.SelectedDictationGroup is not { } selected)
+    if (!IsConversationNavigationAvailable() || Keyboard.Modifiers != ModifierKeys.None
+        || SidebarView.SelectedDictationCount != 1 || SidebarView.SelectedDictationGroup is not { } selected)
     {
       return;
     }
@@ -348,7 +364,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private void OnHistoryPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
   {
-    if (IsConversationNavigationAvailable()
+    if (IsConversationNavigationAvailable() && Keyboard.Modifiers == ModifierKeys.None
         && SidebarView.GetDictationGroupAt(e.OriginalSource as DependencyObject) is { } selected
         && SidebarView.IsSelected(selected))
     {
@@ -443,12 +459,21 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private void OnChatHistorySelectionChanged(object sender, SelectionChangedEventArgs e)
   {
-    if (!IsConversationNavigationAvailable() || SidebarView.SelectedChat is not { } selected)
+    if (!IsConversationNavigationAvailable() || Keyboard.Modifiers != ModifierKeys.None
+        || SidebarView.SelectedChatCount != 1 || SidebarView.SelectedChat is not { } selected)
     {
       return;
     }
 
     ApplyHistoryInteractionResult(historyInteractionController.LoadChat(selected), chatStatus: true);
+  }
+
+  private void OnChatHistoryPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+  {
+    if (IsConversationNavigationAvailable() && Keyboard.Modifiers == ModifierKeys.None
+        && SidebarView.GetChatAt(e.OriginalSource as DependencyObject) is { } selected
+        && SidebarView.IsSelected(selected))
+      ApplyHistoryInteractionResult(historyInteractionController.LoadChat(selected), chatStatus: true);
   }
 
   private void OnNewChatClicked(object sender, RoutedEventArgs e)
@@ -460,7 +485,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
     NewSession();
     NewChat();
-    SetChatStatus("New chat ready.");
+    RenderPresentation();
   }
 
   private async void OnRenameChatClicked(object sender, RoutedEventArgs e)
@@ -534,7 +559,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
     chatController.SelectModel(selected.Selection);
     RefreshChatModelDetail();
-    SetChatStatus($"{selected.Label} selected.");
+    RenderPresentation();
     try
     {
       await RefreshChatModelReadinessAsync().ConfigureAwait(true);
@@ -546,7 +571,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     catch (Exception ex)
     {
       diagnostics.Error("Unexpected chat model readiness failure.", ex);
-      SetChatStatus("Could not check the selected chat model. The error was recorded in Diagnostics.");
+      SetChatStatus("Could not check the selected chat model. The error was recorded in Diagnostics.", modelStatus: true);
     }
   }
 
@@ -596,6 +621,13 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private void OnChatHistoryPreviewKeyDown(object sender, KeyEventArgs e)
   {
+    if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None && IsConversationNavigationAvailable()
+        && SidebarView.SelectedChatCount == 1 && SidebarView.SelectedChat is { } selected)
+    {
+      e.Handled = true;
+      ApplyHistoryInteractionResult(historyInteractionController.LoadChat(selected), chatStatus: true);
+      return;
+    }
     if (e.Key != Key.Delete || SidebarView.SelectedChatCount == 0)
     {
       return;
@@ -607,6 +639,13 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private void OnHistoryPreviewKeyDown(object sender, KeyEventArgs e)
   {
+    if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None && IsConversationNavigationAvailable()
+        && SidebarView.SelectedDictationCount == 1 && SidebarView.SelectedDictationGroup is { } selected)
+    {
+      e.Handled = true;
+      LoadHistoryGroup(selected);
+      return;
+    }
     if (e.Key != Key.Delete || SidebarView.SelectedDictationCount == 0)
     {
       return;
@@ -618,11 +657,42 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private async void OnDownloadChatModelClicked(object sender, RoutedEventArgs e)
   {
+    if (sender is WorkbenchModelNoticeView pressedNotice && pressedNotice.RecoveryIdentity is Guid pressedId
+        && recoveries.Current?.Id != pressedId) return;
+    if (sender is WorkbenchModelNoticeView && OperationalStatusView.IsTransientOutcomeVisible)
+    {
+      if (recoveries.Current is { } recovery)
+      {
+        if (((WorkbenchModelNoticeView)sender).RecoveryIdentity != recovery.Id) return;
+        try { Clipboard.SetText(recovery.Text); }
+        catch (COMException ex)
+        {
+          diagnostics.Warning($"Could not copy recovered dictation: {ex.Message}");
+          if (recoveries.Current?.Id != recovery.Id) return;
+          ShowTransientSessionOutcome("Could not copy dictation; another app is using the clipboard. Try again.", autoExpire: false, recoveryNotice: true);
+          return;
+        }
+        if (!recoveries.Dismiss(recovery.Id, copied: true)) return;
+      }
+      ClearTransientSessionOutcome();
+      return;
+    }
+    if (operationSession.IsBusy || dictationController.State != WorkbenchSessionState.Idle) return;
     try
     {
+      if (chatController.ModelCheckFailed || (!chatController.IsInstallationKnown
+          && !string.Equals(chatController.Selection.ProviderId, ChatProviderIds.OllamaLocal, StringComparison.OrdinalIgnoreCase)))
+      {
+        await RefreshChatModelReadinessAsync().ConfigureAwait(true);
+        RenderPresentation();
+        return;
+      }
       Progress<WorkbenchChatModelSetupProgress> progress = new(update =>
       {
-        SetChatStatus(update.Status);
+        if (disposed || !chatController.IsModelSetupActive) return;
+        ModelNotice.SetProgress(update.Completion);
+        ExpandedPromptView.Notice.SetProgress(update.Completion);
+        SetChatStatus(update.Status, modelStatus: true);
         OperationalStatusView.SetProgress(update.Completion is null or <= 0
           ? null
           : update.Completion.Value * 100);
@@ -631,7 +701,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
         .SetupAsync(progress, ApplyChatSendProgress, () => RenderPresentation())
         .ConfigureAwait(true);
       OperationalStatusView.StopProgress();
-      SetChatStatus(result.StatusMessage);
+      SetChatStatus(result.StatusMessage, modelStatus: true);
     }
     finally
     {
@@ -851,19 +921,21 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private async Task StartRecordingAsync(string source)
   {
+    if (operationSession.IsBusy || dictationController.State != WorkbenchSessionState.Idle) return;
+    recordingTarget = CaptureComposerDictationTarget(requireKeyboardFocus: false);
     WorkbenchDictationCommandResult result = await dictationCommandController
       .StartAsync(source, progress => ApplyDictationCommandProgress(progress, source))
       .ConfigureAwait(true);
     try
     {
-      if (result.Status == WorkbenchDictationCommandStatus.RecordingStarted)
+      if (!disposed && result.Status == WorkbenchDictationCommandStatus.RecordingStarted)
       {
         ClearTransientSessionOutcome();
       }
 
-      if (!disposed && !string.IsNullOrWhiteSpace(result.StatusMessage))
+      if (!disposed && result.Status == WorkbenchDictationCommandStatus.Failed)
       {
-        UpdateVisualState(result.StatusMessage);
+        ShowTransientSessionOutcome(result.StatusMessage, autoExpire: false);
       }
     }
     finally
@@ -886,13 +958,16 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
         sourceSessionId,
         CurrentSettings,
         sourceComposerRevision,
-        progress => ApplyDictationCommandProgress(progress, source))
+        progress => ApplyDictationCommandProgress(progress, source),
+        insertOutcome: text => disposed ? WorkbenchInsertionOutcome.ShuttingDown
+          : recordingTarget?.Insert(text) ?? WorkbenchInsertionOutcome.TargetUnavailable)
       .ConfigureAwait(true);
     try
     {
+      if (disposed) return;
       if (result.Status == WorkbenchDictationCommandStatus.NoAudibleSpeech)
       {
-        ShowTransientSessionOutcome(result.StatusMessage);
+        ShowTransientSessionOutcome(result.StatusMessage, autoExpire: false);
         return;
       }
 
@@ -902,16 +977,6 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
           result.SourceSessionId,
           historyInteractionController.DictationSessionId,
           StringComparison.Ordinal);
-        if (isSourceSessionCurrent)
-        {
-          ComposerView.PromptText = result.ReconcileComposerText(
-              ComposerView.PromptText,
-              historyInteractionController.DictationSessionId,
-              ComposerView.PromptRevision)
-            ?? ComposerView.PromptText;
-          ComposerView.FocusPromptAtEnd();
-        }
-
         if (isSourceSessionCurrent && result.HistoryWrite is not null)
         {
           ApplyDictationHistoryWrite(result.HistoryWrite);
@@ -923,22 +988,19 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
         }
       }
 
-      if (!disposed && !string.IsNullOrWhiteSpace(result.StatusMessage))
+      if (!disposed && result.NeedsAttention && !string.IsNullOrWhiteSpace(result.StatusMessage))
       {
-        string status = result.Status == WorkbenchDictationCommandStatus.TranscriptionCompleted
-                        && !string.Equals(
-                          result.SourceSessionId,
-                          historyInteractionController.DictationSessionId,
-                          StringComparison.Ordinal)
-          ? $"{result.StatusMessage} Saved to history; the newer session was left unchanged."
-          : result.StatusMessage;
-        UpdateVisualState(status);
+        if (result.TranscribedText is { } text)
+          recoveries.Add(text, result.StatusMessage, result.HistoryWrite?.Status == HistoryCommandStatus.Succeeded);
+        else recoveries.Hide();
+        ShowTransientSessionOutcome(result.StatusMessage, autoExpire: false, recoveryNotice: true);
       }
     }
     finally
     {
       if (result.OperationAccepted)
       {
+        recordingTarget = null;
         await FinishWorkbenchOperationAsync().ConfigureAwait(true);
       }
     }
@@ -946,13 +1008,38 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private void ApplyDictationCommandProgress(WorkbenchDictationCommandProgress progress, string source)
   {
-    if (progress == WorkbenchDictationCommandProgress.Transcribing)
-    {
-      UpdateVisualState($"Transcribing ({source})...");
-      return;
-    }
-
+    if (disposed) return;
     RenderPresentation();
+  }
+
+  internal WorkbenchDictationTarget? CaptureComposerDictationTarget(bool requireKeyboardFocus)
+  {
+    Dispatcher.VerifyAccess();
+    TextBox editor = ExpandedPromptView.IsOpen ? ExpandedPromptView.PromptElement : ComposerView.PromptElement;
+    if (disposed || !HasForegroundOwnership || !editor.IsVisible || editor.IsReadOnly || !editor.IsEnabled
+        || (requireKeyboardFocus && !editor.IsKeyboardFocused)) return null;
+    string session = historyInteractionController.DictationSessionId;
+    WorkbenchChatIdentity conversation = chatController.CaptureIdentity();
+    long revision = ComposerView.PromptRevision;
+    return new WorkbenchDictationTarget(editor, () =>
+    {
+      if (disposed) return WorkbenchInsertionOutcome.ShuttingDown;
+      if (!HasForegroundOwnership) return WorkbenchInsertionOutcome.FocusLost;
+      if (!editor.IsVisible || !editor.IsEnabled || InlineSettingsView.IsOpen) return WorkbenchInsertionOutcome.TargetUnavailable;
+      if (!ReferenceEquals(editor, ExpandedPromptView.IsOpen ? ExpandedPromptView.PromptElement : ComposerView.PromptElement)
+          || !string.Equals(session, historyInteractionController.DictationSessionId, StringComparison.Ordinal)
+          || !chatController.IsCurrent(conversation)) return WorkbenchInsertionOutcome.ConversationChanged;
+      return revision == ComposerView.PromptRevision ? WorkbenchInsertionOutcome.Inserted : WorkbenchInsertionOutcome.DraftChanged;
+    });
+  }
+
+  internal bool HasForegroundOwnership
+  {
+    get
+    {
+      nint handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+      return handle != 0 && new WindowsWindowFocusProvider().GetForegroundWindowHandle() == handle;
+    }
   }
 
   private async Task FinishWorkbenchOperationAsync()
@@ -1021,6 +1108,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     Justification = "An async UI command must surface unexpected local-runtime failures instead of terminating the dispatcher.")]
   private async Task SendChatAsync()
   {
+    if (!CanSubmitChat(ComposerView.PromptText)) return;
     bool operationAccepted = false;
     try
     {
@@ -1067,8 +1155,20 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     }
   }
 
+  private bool CanSubmitChat(string text) => !disposed
+    && dictationController.State == WorkbenchSessionState.Idle
+    && !operationSession.IsBusy && !chatController.IsBusy
+    && !chatController.IsCheckingReadiness && chatController.IsModelInstalled && chatController.IsRuntimeReady
+    && !string.IsNullOrWhiteSpace(text);
+
   private void ApplyChatSendProgress(WorkbenchChatSendProgress progress)
   {
+    if (disposed) return;
+    if (progress.Kind == WorkbenchChatSendProgressKind.ReadinessStarted)
+    {
+      RenderPresentation();
+      return;
+    }
     if (progress.Conversation is { } identity && !chatController.IsCurrent(identity))
     {
       return;
@@ -1251,14 +1351,14 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     WorkbenchChatModelReadinessState? state = await chatSendController
       .RefreshReadinessAsync(ApplyChatSendProgress, cancellationToken)
       .ConfigureAwait(true);
-    if (state is null)
+    if (state is null || disposed)
     {
       return;
     }
 
     if (!chatController.IsBusy)
     {
-      SetChatStatus(state.Status);
+      SetChatStatus(state.Status, modelStatus: true);
     }
   }
 
@@ -1276,7 +1376,8 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
       return;
     }
 
-    string installState = chatController.IsModelInstalled
+    string installState = !chatController.IsInstallationKnown ? "Model status has not been verified."
+      : chatController.IsModelInstalled
       ? chatController.IsRuntimeReady ? "Ready." : "Downloaded; runtime needs update."
       : "Not downloaded.";
     string conversationState = chatController.Messages.Count == 0
@@ -1314,6 +1415,8 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     {
       await RefreshSettingsMenuModelOptionsAsync().ConfigureAwait(true);
     }
+    if (!disposed && !operationSession.IsBusy && dictationController.State == WorkbenchSessionState.Idle)
+      await RefreshChatModelReadinessAsync().ConfigureAwait(true);
   }
 
   [SuppressMessage(
@@ -1390,11 +1493,18 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
   private void ApplyPaperView()
   {
     bool enabled = CurrentSettings.ChatPaperViewEnabled;
+    bool paper = enabled && !WindowThemeBehavior.GetIsHighContrastActive(this);
+    PaperChatResources.Apply(this, paper);
+    if (paper)
+    {
+      Resources["Brush.Surface.Canvas"] = Brushes.Transparent;
+      Resources["Brush.Surface.Sidebar"] = Brushes.Transparent;
+    }
     PaperSurface.Visibility = enabled && !WindowThemeBehavior.GetIsHighContrastActive(this)
       ? Visibility.Visible : Visibility.Collapsed;
     ChatTranscriptView.SetPaperView(enabled);
     ComposerView.SetPaperView(enabled);
-    ComposerView.Margin = new Thickness(24, 0, 24, 18);
+    ComposerView.Margin = new Thickness(0);
     ExpandedPromptView.SetPaperView(enabled);
     QuickSettingsView.SetPaperViewState(enabled);
     RenderChatTranscript();
@@ -1496,14 +1606,14 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     int percent = delta == 0 ? 100 : Math.Clamp(CurrentSettings.WorkbenchZoomPercent + delta, 80, 150);
     if (percent == CurrentSettings.WorkbenchZoomPercent) return;
     settingsApplicationController.ApplyPresentationOnly(CurrentSettings with { WorkbenchZoomPercent = percent });
+    InlineSettingsView.SynchronizePresentationZoom(percent);
     ApplyWorkbenchZoom();
     WorkbenchZoomRequested?.Invoke(percent);
   }
 
   private void OnWorkbenchZoomKeyDown(object sender, KeyEventArgs e)
   {
-    // Inline Settings contains hotkey capture; let that surface own all keystrokes.
-    if (InlineSettingsView.IsOpen || e.IsRepeat || e.Key == Key.ImeProcessed) return;
+    if (InlineSettingsView.IsCapturingHotkey || e.IsRepeat || e.Key == Key.ImeProcessed) return;
     int? delta = WorkbenchZoomShortcut.Delta(e.Key, Keyboard.Modifiers);
     if (delta is null) return;
     e.Handled = true;
@@ -1553,6 +1663,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private async void OnExpandedSendChatClicked(object sender, RoutedEventArgs e)
   {
+    if (!CanSubmitChat(ExpandedPromptView.Text)) return;
     SyncComposerPromptFromExpanded();
     SetPromptExpanded(false);
     RefreshPromptExpansionButton();
@@ -1567,6 +1678,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     }
 
     e.Handled = true;
+    if (!CanSubmitChat(ExpandedPromptView.Text)) return;
     SyncComposerPromptFromExpanded();
     SetPromptExpanded(false);
     RefreshPromptExpansionButton();
@@ -1586,7 +1698,6 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     if (!string.Equals(ComposerView.PromptText, ExpandedPromptView.Text, StringComparison.Ordinal))
     {
       ComposerView.PromptText = ExpandedPromptView.Text;
-      ComposerView.FocusPromptAtEnd();
     }
 
     RenderPresentation();
@@ -1779,9 +1890,13 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
         throw new ArgumentOutOfRangeException(nameof(result), result.ComposerDirective, "Unsupported composer directive.");
     }
 
+    if (result.ComposerDirective != WorkbenchHistoryComposerDirective.None && ExpandedPromptView.IsOpen)
+      SyncExpandedPromptFromComposer();
+
     if (result.ShouldFocusComposer)
     {
-      ComposerView.FocusPromptAtEnd();
+      if (ExpandedPromptView.IsOpen) ExpandedPromptView.ShowAndFocus();
+      else ComposerView.FocusPromptAtEnd();
     }
 
     if (result.ShouldRefreshPendingFiles)
@@ -1805,7 +1920,12 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
       RenderChatTranscript();
     }
 
-    if (!string.IsNullOrWhiteSpace(result.StatusMessage))
+    if (!result.NeedsVisibleFeedback && !string.IsNullOrWhiteSpace(result.StatusMessage))
+    {
+      AutomationProperties.SetItemStatus(SidebarView, result.StatusMessage);
+      FrameworkElementAutomationPeer.FromElement(SidebarView)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+    }
+    if (result.NeedsVisibleFeedback && !string.IsNullOrWhiteSpace(result.StatusMessage))
     {
       if (chatStatus)
       {
@@ -1825,9 +1945,10 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     RenderPresentation(status);
   }
 
-  private void ShowTransientSessionOutcome(string status)
+  private void ShowTransientSessionOutcome(string status, bool autoExpire = true, bool recoveryNotice = false)
   {
-    OperationalStatusView.ShowTransientOutcome();
+    if (!recoveryNotice) recoveries.Hide();
+    OperationalStatusView.ShowTransientOutcome(autoExpire);
     UpdateVisualState(status);
   }
 
@@ -1838,13 +1959,34 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private void ClearTransientSessionOutcome()
   {
+    recoveries.Hide();
     OperationalStatusView.ClearTransientOutcome();
     RenderPresentation();
   }
 
-  private void SetChatStatus(string status)
+  private void DismissRecovery(Guid id)
   {
-    HeaderView.SetChatStatus(status, HeaderView.IsChatStatusVisible);
+    if (!recoveries.Dismiss(id)) return;
+    ClearTransientSessionOutcome();
+  }
+
+  private void SelectRecovery(Guid id)
+  {
+    if (disposed || !recoveries.Select(id)) return;
+    ShowTransientSessionOutcome(recoveries.Current!.Message, autoExpire: false, recoveryNotice: true);
+  }
+
+  private void SetChatStatus(string status, bool modelStatus = false)
+  {
+    if (string.IsNullOrWhiteSpace(status)) return;
+    if (modelStatus) chatController.SetModelStatus(status);
+    else
+    {
+      recoveries.Hide();
+      ShowTransientSessionOutcome(status);
+      return;
+    }
+    HeaderView.SetChatStatus(status, false);
     RenderPresentation();
   }
 
@@ -1890,7 +2032,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
     SetChatStatus(cancelledOperation == WorkbenchChatOperationKind.ModelSetup
       ? "Stopping model setup…"
-      : "Stopping response…");
+      : "Stopping response…", modelStatus: cancelledOperation == WorkbenchChatOperationKind.ModelSetup);
   }
 
   private void RenderPresentation(string? sessionStatusText = null)
@@ -1906,7 +2048,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
       chatController.Messages.Count > 0,
       ComposerView.HasPrompt,
       LocalGreetingResponder.IsStandaloneGreeting(ComposerView.PromptText),
-      historyInteractionController.State.HasSelectedDictation,
+      historyInteractionController.State.HasSelectedDictation && historyInteractionController.State.CanEditSelectedDictation,
       readAloudController.IsPreparing,
       readAloudController.CanStop,
       SidebarView.IsSidebarVisible,
@@ -1914,18 +2056,35 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
       OperationalStatusView.IsTransientOutcomeVisible,
       string.Equals(chatController.Selection.ProviderId, ChatProviderIds.OllamaLocal, StringComparison.OrdinalIgnoreCase),
       sessionStatusText ?? OperationalStatusView.SessionStatusText,
-      ComposerView.HotkeyStatusTextValue));
+      ComposerView.HotkeyStatusTextValue,
+      chatController.IsInstallationKnown,
+      chatController.IsCheckingReadiness,
+      operationSession.IsDictationOperation));
     OperationalStatusView.SetSessionStatus(
       state.Dictation.SessionStatusText,
       ThemeResourceResolver.ResolveStatusBrush(this, state.Dictation.SessionStatusKind));
+    OperationalStatusView.SetCompactDictationFeedback(
+      dictationController.State is WorkbenchSessionState.Recording or WorkbenchSessionState.Transcribing
+      || OperationalStatusView.IsTransientOutcomeVisible);
     ConversationLayout.VerticalAlignment = chatController.Messages.Count == 0
       ? VerticalAlignment.Center : VerticalAlignment.Stretch;
     HeaderView.Render(state.Header);
-    HeaderView.SetChatStatus(HeaderView.ChatStatusValue, state.OperationalStatus.IsVisible);
+    HeaderView.SetGroupEditGuidance(historyInteractionController.State.HasSelectedDictation
+      && !historyInteractionController.State.CanEditSelectedDictation);
+    HeaderView.SetChatStatus(HeaderView.ChatStatusValue, false);
+    string? attention = OperationalStatusView.IsTransientOutcomeVisible ? OperationalStatusView.SessionStatusText : null;
+    bool hasRecovery = recoveries.Current is not null && attention is not null;
+    ModelNotice.Render(chatController, attention, state.Composer.CanInteractWithChat, hasRecovery);
+    ExpandedPromptView.Notice.Render(chatController, attention, state.Composer.CanInteractWithChat, hasRecovery);
+    ModelNotice.SetRecoveries(hasRecovery ? recoveries.Current?.Id : null, recoveries.Pending);
+    ExpandedPromptView.Notice.SetRecoveries(hasRecovery ? recoveries.Current?.Id : null, recoveries.Pending);
+    ExpandedPromptView.SetCanSubmit(state.Composer.CanSend);
+    ExpandedPromptView.PromptElement.IsEnabled = state.Composer.CanEditPrompt;
     ComposerView.Render(state.Composer, state.Dictation);
     QuickSettingsView.Render(state.QuickSettings);
     SidebarView.Render(state.Sidebar);
     OperationalStatusView.Render(state.OperationalStatus);
+    if (!operationSession.IsImportingFiles) OperationalStatusView.SetVisible(false);
   }
 
   private void SetHotkeyStatus(string status)

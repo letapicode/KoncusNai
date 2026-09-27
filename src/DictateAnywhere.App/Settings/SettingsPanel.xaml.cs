@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using DictateAnywhere.App.Composition;
 using DictateAnywhere.App.Experience;
 using DictateAnywhere.App.History;
@@ -25,6 +26,13 @@ namespace DictateAnywhere.App.Settings;
   Justification = "UI event boundaries report failures to IDiagnostics and presentation status.")]
 public partial class SettingsPanel : UserControl, IAsyncDisposable
 {
+  internal bool IsCapturingHotkey => HotkeyCaptureControl.IsCapturing
+    || UndoHotkeyCaptureControl.IsCapturing || RetryLastDictationHotkeyCaptureControl.IsCapturing;
+  internal void SynchronizePresentationZoom(int percent)
+  {
+    if (!controller.CurrentDraft.IsReadOnly)
+      controller.UpdateDraft(draft => draft with { WorkbenchZoomPercent = percent }, scheduleAutoSave: false);
+  }
   private readonly SettingsOperationController controller;
   private readonly IHotkeyRegistrationValidator validator;
   private readonly ISettingsFileDialogService settingsFileDialogService;
@@ -48,6 +56,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
     AppThemeManager.ApplyThemeResources(AppThemeManager.CurrentPreference);
     InitializeComponent();
+    PreviewKeyDown += OnPageNavigationKeyDown;
 
     speechPresenter = new SettingsSpeechSectionPresenter(
       this.controller,
@@ -77,6 +86,15 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
     this.controller.DraftChanged += OnDraftChanged;
     this.controller.StatusChanged += OnStatusChanged;
     this.controller.SettingsSaved += OnSettingsSaved;
+  }
+
+  private void OnPageNavigationKeyDown(object sender, KeyEventArgs e)
+  {
+    if (e.Handled || !SettingsPageNavigation.ShouldScroll(e.Key, Keyboard.Modifiers,
+      e.OriginalSource as DependencyObject, IsCapturingHotkey)) return;
+    if (e.Key == Key.Home) SettingsScrollViewer.ScrollToTop();
+    else SettingsScrollViewer.ScrollToBottom();
+    e.Handled = true;
   }
 
   [SuppressMessage(

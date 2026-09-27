@@ -20,7 +20,8 @@ internal sealed record WorkbenchHistoryInteractionState(
   DictationHistoryRecord? SelectedDictationRecord,
   string? SelectedDictationEntryId,
   string? SelectedChatConversationId,
-  string ChatTitle)
+  string ChatTitle,
+  bool CanEditSelectedDictation = true)
 {
   public bool HasSelectedDictation => SelectedDictationRecord is not null;
 }
@@ -35,7 +36,8 @@ internal sealed record WorkbenchHistoryInteractionResult(
   bool ShouldFocusComposer = false,
   bool ShouldRenderChat = false,
   bool ShouldRefreshPendingFiles = false,
-  bool ShouldSelectChatModel = false);
+  bool ShouldSelectChatModel = false,
+  bool NeedsVisibleFeedback = true);
 
 /// <summary>
 /// Owns Workbench history selection and the relationship between a history load and composer text.
@@ -52,6 +54,7 @@ internal sealed class WorkbenchHistoryInteractionController
   private string? selectedChatConversationId;
   private string chatTitle = NewChatTitle;
   private LoadedDictationComposer? loadedDictationComposer;
+  private string currentComposerText = string.Empty;
   private string dictationSessionId = Guid.NewGuid().ToString("N");
 
   public WorkbenchHistoryInteractionController(
@@ -66,7 +69,8 @@ internal sealed class WorkbenchHistoryInteractionController
     selectedDictationRecord,
     selectedDictationEntryId,
     selectedChatConversationId,
-    chatTitle);
+    chatTitle,
+    selectedDictationRecord is not null && loadedDictationComposer?.RecordCount == 1);
 
   /// <summary>Identifies the current appendable dictation group for persistence.</summary>
   public string DictationSessionId => dictationSessionId;
@@ -75,6 +79,7 @@ internal sealed class WorkbenchHistoryInteractionController
 
   public void NotifyComposerTextChanged(string? composerText)
   {
+    currentComposerText = composerText ?? string.Empty;
     if (loadedDictationComposer is not null
         && !string.Equals(loadedDictationComposer.Text, composerText ?? string.Empty, StringComparison.Ordinal))
     {
@@ -91,14 +96,16 @@ internal sealed class WorkbenchHistoryInteractionController
     loadedDictationComposer = new LoadedDictationComposer(
       GroupSessionIds(group),
       text,
-      IsPristine: true);
+      IsPristine: true,
+      RecordCount: group.Records.Count);
     BeginNewDictationSession();
     return Result(
       HistoryCommandStatus.Succeeded,
       $"Loaded {group.Records.Count} dictation{(group.Records.Count == 1 ? string.Empty : "s")}: {group.Title}",
       composerDirective: WorkbenchHistoryComposerDirective.Replace,
       composerText: text,
-      shouldFocusComposer: true);
+      shouldFocusComposer: true,
+      needsVisibleFeedback: false);
   }
 
   public WorkbenchHistoryInteractionResult CancelDictationRename() =>
@@ -112,10 +119,14 @@ internal sealed class WorkbenchHistoryInteractionController
     string? editedText,
     CancellationToken cancellationToken = default)
   {
+    if (!State.CanEditSelectedDictation)
+      return Result(HistoryCommandStatus.Unavailable,
+        "To edit a day containing several dictations, open History and edit an individual entry.");
+    DictationHistoryRecord? selectionAtStart = selectedDictationRecord;
     WorkbenchHistoryMutationResult mutation = await historyController
-      .SaveDictationEditAsync(settings, selectedDictationRecord, editedText, cancellationToken)
+      .SaveDictationEditAsync(settings, selectionAtStart, editedText, cancellationToken)
       .ConfigureAwait(true);
-    return ApplyDictationMutation(mutation);
+    return ApplyDictationMutation(mutation, selectionAtStart);
   }
 
   public async Task<WorkbenchHistoryInteractionResult> RenameDictationAsync(
@@ -123,10 +134,11 @@ internal sealed class WorkbenchHistoryInteractionController
     string? requestedTitle,
     CancellationToken cancellationToken = default)
   {
+    DictationHistoryRecord? selectionAtStart = selectedDictationRecord;
     WorkbenchHistoryMutationResult mutation = await historyController
-      .RenameDictationAsync(settings, selectedDictationRecord, requestedTitle, cancellationToken)
+      .RenameDictationAsync(settings, selectionAtStart, requestedTitle, cancellationToken)
       .ConfigureAwait(true);
-    return ApplyDictationMutation(mutation);
+    return ApplyDictationMutation(mutation, selectionAtStart);
   }
 
   public async Task<WorkbenchHistoryInteractionResult> DeleteDictationGroupsAsync(
@@ -136,10 +148,9 @@ internal sealed class WorkbenchHistoryInteractionController
   {
     ArgumentNullException.ThrowIfNull(groups);
     string[] deletedSessionIds = groups.SelectMany(GroupSessionIds).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    LoadedDictationComposer? loadedAtStart = loadedDictationComposer;
     bool deletesLoadedGroup = loadedDictationComposer is not null
       && loadedDictationComposer.SessionIds.Intersect(deletedSessionIds, StringComparer.OrdinalIgnoreCase).Any();
-    bool deletesSelection = selectedDictationRecord is not null
-      && deletedSessionIds.Contains(SessionId(selectedDictationRecord), StringComparer.OrdinalIgnoreCase);
     WorkbenchHistoryMutationResult mutation = await historyController
       .DeleteDictationGroupsAsync(settings, groups, cancellationToken)
       .ConfigureAwait(true);
@@ -150,14 +161,17 @@ internal sealed class WorkbenchHistoryInteractionController
 
     // The command contract reports a successful delete only after its serialized store completes.
     LastDictationSessionCache.ClearIfMatches(deletedSessionIds);
-    if (deletesLoadedGroup || deletesSelection)
+    bool sameLoadedDraft = ReferenceEquals(loadedDictationComposer, loadedAtStart);
+    bool currentSelectionDeleted = selectedDictationRecord is not null
+      && deletedSessionIds.Contains(SessionId(selectedDictationRecord), StringComparer.OrdinalIgnoreCase);
+    if (currentSelectionDeleted)
     {
       selectedDictationRecord = null;
       selectedDictationEntryId = null;
     }
 
-    bool clearComposer = deletesLoadedGroup && loadedDictationComposer!.IsPristine;
-    if (deletesLoadedGroup)
+    bool clearComposer = sameLoadedDraft && deletesLoadedGroup && loadedAtStart!.IsPristine;
+    if (sameLoadedDraft && deletesLoadedGroup)
     {
       loadedDictationComposer = null;
     }
@@ -189,7 +203,8 @@ internal sealed class WorkbenchHistoryInteractionController
       $"Loaded: {record.Title}",
       shouldRenderChat: true,
       shouldRefreshPendingFiles: true,
-      shouldSelectChatModel: true);
+      shouldSelectChatModel: true,
+      needsVisibleFeedback: false);
   }
 
   public WorkbenchHistoryInteractionResult BeginNewChat()
@@ -239,9 +254,11 @@ internal sealed class WorkbenchHistoryInteractionController
       return Result(HistoryCommandStatus.Succeeded, "New chat title updated.");
     }
 
+    WorkbenchChatIdentity conversationAtStart = chatController.CaptureIdentity();
     WorkbenchHistoryMutationResult mutation = await historyController
       .RenameChatAsync(settings, chatController.CreateHistoryRecord(title), cancellationToken)
       .ConfigureAwait(true);
+    if (!chatController.IsCurrent(conversationAtStart)) return FromMutation(mutation);
     if (mutation.Status == HistoryCommandStatus.Succeeded && mutation.ChatRecord is not null)
     {
       chatController.MarkSaved(mutation.ChatRecord);
@@ -264,6 +281,9 @@ internal sealed class WorkbenchHistoryInteractionController
       return Result(HistoryCommandStatus.Canceled, "Finish the current chat action first.");
     }
 
+    WorkbenchChatIdentity conversationAtStart = chatController.CaptureIdentity();
+    bool deletesActiveConversation = items.Any(item => string.Equals(item.Record.ConversationId,
+      chatController.ConversationId, StringComparison.OrdinalIgnoreCase));
     WorkbenchHistoryMutationResult mutation = await historyController
       .DeleteChatsAsync(settings, items, cancellationToken)
       .ConfigureAwait(true);
@@ -272,10 +292,14 @@ internal sealed class WorkbenchHistoryInteractionController
       return FromMutation(mutation);
     }
 
+    if (!deletesActiveConversation || !chatController.IsCurrent(conversationAtStart) || chatController.IsBusy)
+      return FromMutation(mutation);
+    bool preserveDraft = !string.IsNullOrEmpty(currentComposerText);
     return BeginNewChat() with
     {
       StatusMessage = mutation.Message,
       ShouldRefresh = true,
+      ComposerDirective = preserveDraft ? WorkbenchHistoryComposerDirective.None : WorkbenchHistoryComposerDirective.ClearComposerContent,
     };
   }
 
@@ -320,21 +344,23 @@ internal sealed class WorkbenchHistoryInteractionController
 
   public void RecordDictationHistoryWrite(WorkbenchDictationHistoryWriteResult result)
   {
-    if (result.Status == HistoryCommandStatus.Succeeded)
+    if (result.Status == HistoryCommandStatus.Succeeded
+        && string.Equals(selectedDictationEntryId, result.Record.EntryId, StringComparison.Ordinal))
     {
       selectedDictationRecord = result.Record;
-      selectedDictationEntryId = result.Record.EntryId;
-      loadedDictationComposer = null;
     }
   }
 
-  private WorkbenchHistoryInteractionResult ApplyDictationMutation(WorkbenchHistoryMutationResult mutation)
+  private WorkbenchHistoryInteractionResult ApplyDictationMutation(WorkbenchHistoryMutationResult mutation,
+    DictationHistoryRecord? selectionAtStart)
   {
+    if (mutation.Status == HistoryCommandStatus.Succeeded && mutation.DictationRecord is not null)
+      LastDictationSessionCache.UpdateIfMatches(mutation.DictationRecord);
+    if (!ReferenceEquals(selectedDictationRecord, selectionAtStart)) return FromMutation(mutation);
     if (mutation.Status == HistoryCommandStatus.Succeeded && mutation.DictationRecord is not null)
     {
       selectedDictationRecord = mutation.DictationRecord;
       selectedDictationEntryId = mutation.DictationRecord.EntryId;
-      LastDictationSessionCache.UpdateIfMatches(mutation.DictationRecord);
       return Result(mutation.Status, mutation.Message, shouldRefresh: true);
     }
 
@@ -360,7 +386,8 @@ internal sealed class WorkbenchHistoryInteractionController
     bool shouldFocusComposer = false,
     bool shouldRenderChat = false,
     bool shouldRefreshPendingFiles = false,
-    bool shouldSelectChatModel = false) => new(
+    bool shouldSelectChatModel = false,
+    bool needsVisibleFeedback = true) => new(
       status,
       statusMessage,
       State,
@@ -370,7 +397,8 @@ internal sealed class WorkbenchHistoryInteractionController
       shouldFocusComposer,
       shouldRenderChat,
       shouldRefreshPendingFiles,
-      shouldSelectChatModel);
+      shouldSelectChatModel,
+      needsVisibleFeedback);
 
   private bool ContainsSelectedDictation(HistoryItemViewModel item) => item.Records.Any(record =>
     string.Equals(record.EntryId, selectedDictationEntryId, StringComparison.OrdinalIgnoreCase));
@@ -383,5 +411,5 @@ internal sealed class WorkbenchHistoryInteractionController
   private static string SessionId(DictationHistoryRecord record) =>
     string.IsNullOrWhiteSpace(record.SessionId) ? record.EntryId : record.SessionId;
 
-  private sealed record LoadedDictationComposer(string[] SessionIds, string Text, bool IsPristine);
+  private sealed record LoadedDictationComposer(string[] SessionIds, string Text, bool IsPristine, int RecordCount);
 }

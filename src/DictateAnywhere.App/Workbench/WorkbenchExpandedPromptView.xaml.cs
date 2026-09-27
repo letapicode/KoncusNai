@@ -29,9 +29,12 @@ public partial class WorkbenchExpandedPromptView : UserControl
   internal string Text => Prompt.Text;
   internal bool IsOpen => Visibility == Visibility.Visible;
   internal TextBox PromptElement => Prompt;
+  internal WorkbenchModelNoticeView Notice => ModelNotice;
+  internal void SetCanSubmit(bool enabled) => Submit.IsEnabled = enabled;
 
   internal void SetText(string text)
   {
+    if (string.Equals(Prompt.Text, text ?? string.Empty, StringComparison.Ordinal)) return;
     isApplyingText = true;
     try
     {

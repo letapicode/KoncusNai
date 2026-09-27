@@ -19,6 +19,8 @@ public partial class WorkbenchInlineSettingsView : UserControl
   internal event EventHandler? BackRequested;
 
   internal bool IsOpen => Visibility == Visibility.Visible;
+  internal bool IsCapturingHotkey => panel?.IsCapturingHotkey == true;
+  internal void SynchronizePresentationZoom(int percent) => panel?.SynchronizePresentationZoom(percent);
 
   internal void ShowPanel(SettingsPanel settingsPanel)
   {
