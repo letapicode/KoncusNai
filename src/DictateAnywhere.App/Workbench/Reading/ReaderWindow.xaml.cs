@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using DictateAnywhere.App.Composition;
@@ -791,6 +792,11 @@ public partial class ReaderWindow : Window
     {
       ReaderSidebarColumn.Width = new GridLength(0);
     }
+    Grid.SetColumn(SidebarToggleButton, state.SidebarVisible ? 0 : 1);
+    SidebarToggleButton.HorizontalAlignment = state.SidebarVisible
+      ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+    SidebarToggleButton.Margin = state.SidebarVisible
+      ? new Thickness(0, 8, 14, 0) : new Thickness(14, 8, 0, 0);
     SidebarToggleButton.Visibility = state.ChromeVisible ? Visibility.Visible : Visibility.Collapsed;
     WindowCaptionControls.Visibility = state.ChromeVisible ? Visibility.Visible : Visibility.Collapsed;
     ReaderChromeRow.Height = state.ChromeVisible ? new GridLength(StandardChromeHeight) : new GridLength(0);

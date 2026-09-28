@@ -407,8 +407,8 @@
                                        Margin="0,8,14,0"
                                        ContextTitle="Reading Studio" />
 
-    <Button x:Name="SidebarToggleButton" Grid.ColumnSpan="2" Panel.ZIndex="10"
-            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,8,0,0"
+    <Button x:Name="SidebarToggleButton" Grid.Column="0" Panel.ZIndex="10"
+            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,14,0"
             Style="{StaticResource ReaderWindowControlButton}"
             AutomationProperties.Name="Hide reading controls"
             shell:WindowChrome.IsHitTestVisibleInChrome="True"
