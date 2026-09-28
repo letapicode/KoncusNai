@@ -417,8 +417,8 @@
             Style="{StaticResource AppSidebarToggleIconStyle}" />
     </Button>
 
-    <TextBlock Grid.ColumnSpan="2" Panel.ZIndex="10"
-               HorizontalAlignment="Left" VerticalAlignment="Top" Margin="62,13,0,0"
+    <TextBlock x:Name="ReaderTitleTextBlock" Grid.ColumnSpan="2" Panel.ZIndex="10"
+               HorizontalAlignment="Left" VerticalAlignment="Top" Margin="26,13,0,0"
                Foreground="{DynamicResource Brush.Control.Primary}" FontSize="{DynamicResource Font.Size.Control}" FontWeight="SemiBold"
                Text="Reading Studio" IsHitTestVisible="False" />
 
