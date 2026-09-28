@@ -19,6 +19,8 @@ public partial class WorkbenchExpandedPromptView : UserControl
     Submit.Click += (_, args) => SubmitClicked?.Invoke(this, args);
     Prompt.KeyDown += (_, args) => PromptKeyDown?.Invoke(this, args);
     Prompt.TextChanged += OnPromptTextChanged;
+    Prompt.GotKeyboardFocus += (_, _) => UpdateFocusBorder();
+    Prompt.LostKeyboardFocus += (_, _) => UpdateFocusBorder();
   }
 
   public event RoutedEventHandler? CollapseClicked;
@@ -69,23 +71,17 @@ public partial class WorkbenchExpandedPromptView : UserControl
   internal void SetPaperView(bool enabled)
   {
     DictateAnywhere.App.Presentation.PaperChatResources.Apply(this, enabled);
-    Prompt.Resources.Remove("Brush.Control.InputDisabled");
     bool showGrain = enabled && !WindowThemeBehavior.GetIsHighContrastActive(this);
     PaperGrain.Visibility = showGrain ? Visibility.Visible : Visibility.Collapsed;
     Surface.SetResourceReference(Border.BackgroundProperty,
       enabled ? "Brush.Paper.Page" : "Brush.Surface.Composer");
-    Surface.SetResourceReference(Border.BorderBrushProperty,
-      enabled ? "Brush.Paper.Border" : "Brush.Border.Subtle");
-    if (showGrain)
-    {
-      Prompt.Background = Brushes.Transparent;
-      Prompt.Resources["Brush.Control.InputDisabled"] = Brushes.Transparent;
-    }
-    else Prompt.SetResourceReference(Control.BackgroundProperty,
-      enabled ? "Brush.Paper.Composer" : "Brush.Control.Input");
     Prompt.SetResourceReference(Control.ForegroundProperty,
       enabled ? "Brush.Paper.Ink" : "Brush.Text.Primary");
+    UpdateFocusBorder();
   }
+
+  private void UpdateFocusBorder() => Surface.SetResourceReference(
+    Border.BorderBrushProperty, Prompt.IsKeyboardFocused ? "Brush.Progress.Value" : "Brush.Border.Subtle");
 
   private void OnPromptTextChanged(object sender, TextChangedEventArgs args)
   {
