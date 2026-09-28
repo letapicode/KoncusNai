@@ -20,6 +20,69 @@ namespace DictateAnywhere.App.Tests;
 public sealed class ReaderWindowInitializationTests
 {
   [Xunit.Fact]
+  public void WindowBoundary_TracksPaletteAndWindowStateWithoutAffectingLayout()
+  {
+    RunOnStaAsync(() =>
+    {
+      ReaderWindow window = CreateReader("Draft", "Some text.", new CountingTextToSpeechService());
+      try
+      {
+        Grid shell = Find<Grid>(window, "ReaderShell");
+        Border boundary = Find<Border>(window, "ReaderWindowBoundary");
+        FrameworkElement sidebar = Find<FrameworkElement>(window, "SidebarView");
+        FrameworkElement main = Find<FrameworkElement>(window, "ReaderMainSurface");
+        void Layout()
+        {
+          shell.Measure(new Size(1380, 860));
+          shell.Arrange(new Rect(0, 0, 1380, 860));
+          shell.UpdateLayout();
+        }
+
+        Layout();
+        double sidebarWidth = sidebar.ActualWidth;
+        double mainWidth = main.ActualWidth;
+        Xunit.Assert.Equal(new CornerRadius(16), boundary.CornerRadius);
+        Xunit.Assert.Equal(new Thickness(1), boundary.BorderThickness);
+        Xunit.Assert.Equal(0.7, boundary.Opacity);
+        Xunit.Assert.False(boundary.IsHitTestVisible);
+        Xunit.Assert.False(boundary.Focusable);
+        Xunit.Assert.Equal(shell.ActualWidth, boundary.ActualWidth);
+        Xunit.Assert.Equal(shell.ActualHeight, boundary.ActualHeight);
+
+        AppThemeManager.ApplyPalette(window.Resources, useDarkTheme: true);
+        Layout();
+        Color darkBorder = Xunit.Assert.IsType<SolidColorBrush>(boundary.BorderBrush).Color;
+        Xunit.Assert.Equal(Xunit.Assert.IsType<SolidColorBrush>(window.Resources["Brush.Border.Subtle"]).Color, darkBorder);
+
+        AppThemeManager.ApplyPalette(window.Resources, useDarkTheme: false);
+        Layout();
+        Color lightBorder = Xunit.Assert.IsType<SolidColorBrush>(boundary.BorderBrush).Color;
+        Xunit.Assert.NotEqual(darkBorder, lightBorder);
+        Xunit.Assert.Equal(Xunit.Assert.IsType<SolidColorBrush>(window.Resources["Brush.Border.Subtle"]).Color, lightBorder);
+        Xunit.Assert.Equal(sidebarWidth, sidebar.ActualWidth);
+        Xunit.Assert.Equal(mainWidth, main.ActualWidth);
+
+        AppThemeManager.ApplyPalette(window.Resources, useDarkTheme: true, isHighContrast: true);
+        WindowThemeBehavior.SetIsHighContrastActive(window, true);
+        Layout();
+        Xunit.Assert.Equal(1, boundary.Opacity);
+        Xunit.Assert.Equal(new Thickness(1), boundary.BorderThickness);
+        Xunit.Assert.Equal(SystemColors.WindowTextColor,
+          Xunit.Assert.IsType<SolidColorBrush>(boundary.BorderBrush).Color);
+
+        window.WindowState = WindowState.Maximized;
+        Layout();
+        Xunit.Assert.Equal(new Thickness(0), boundary.BorderThickness);
+        window.WindowState = WindowState.Normal;
+        Layout();
+        Xunit.Assert.Equal(new Thickness(1), boundary.BorderThickness);
+      }
+      finally { window.Close(); }
+      return Task.CompletedTask;
+    });
+  }
+
+  [Xunit.Fact]
   public void SidebarToggle_StaysNearDividerAndRemainsReachableWhenSidebarIsHidden()
   {
     RunOnStaAsync(() =>

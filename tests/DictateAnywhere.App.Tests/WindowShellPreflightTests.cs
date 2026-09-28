@@ -154,35 +154,32 @@ public sealed class WindowShellPreflightTests
       XDocument xaml = XDocument.Load(Path.Combine(root, xamlRelative.Replace('/', Path.DirectorySeparatorChar)));
       XElement window = xaml.Root ?? throw new InvalidOperationException($"Shell '{id}' has no XAML root.");
 
-      int sharedBoundaryCount = window.Descendants()
-        .Count(element =>
+      string expectedStyle = id == "reading-studio"
+        ? "{StaticResource ReaderWindowBoundaryStyle}"
+        : "{StaticResource AppHighContrastWindowBoundaryStyle}";
+      XElement[] clientBoundaries = window.Descendants()
+        .Where(element =>
           element.Name.LocalName == "Border"
-          && string.Equals(
-            element.Attribute("Style")?.Value,
-            "{StaticResource AppHighContrastWindowBoundaryStyle}",
-            StringComparison.Ordinal));
+          && element.Attribute("Style")?.Value is
+            "{StaticResource AppHighContrastWindowBoundaryStyle}" or "{StaticResource ReaderWindowBoundaryStyle}")
+        .ToArray();
       int existingBoundaryCount = HasExistingRootBoundary(window) ? 1 : 0;
 
       Assert.True(
-        sharedBoundaryCount + existingBoundaryCount == 1,
+        clientBoundaries.Length + existingBoundaryCount == 1,
         $"Custom shell '{id}' must render exactly one High Contrast client boundary; "
-        + $"found {sharedBoundaryCount} shared and {existingBoundaryCount} existing boundaries.");
+        + $"found {clientBoundaries.Length} overlays and {existingBoundaryCount} existing boundaries.");
 
       if (id is "about" or "reading-studio-help")
       {
-        Assert.Equal(0, sharedBoundaryCount);
+        Assert.Empty(clientBoundaries);
         Assert.Equal(1, existingBoundaryCount);
       }
       else
       {
-        Assert.Equal(1, sharedBoundaryCount);
+        XElement boundary = Assert.Single(clientBoundaries);
+        Assert.Equal(expectedStyle, boundary.Attribute("Style")?.Value);
         Assert.Equal(0, existingBoundaryCount);
-        XElement boundary = Assert.Single(window.Descendants().Where(element =>
-          element.Name.LocalName == "Border"
-          && string.Equals(
-            element.Attribute("Style")?.Value,
-            "{StaticResource AppHighContrastWindowBoundaryStyle}",
-            StringComparison.Ordinal)));
         XElement parentGrid = boundary.Parent
           ?? throw new InvalidOperationException($"Custom shell '{id}' boundary has no parent grid.");
         Assert.Equal("Grid", parentGrid.Name.LocalName);
