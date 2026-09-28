@@ -98,13 +98,64 @@ public sealed class PaperSurfaceTests
     PaperTexture grain = Assert.IsType<PaperTexture>(expanded.FindName("PaperGrain"));
     Assert.Equal(Visibility.Visible, grain.Visibility);
     Assert.Same(Brushes.Transparent, expanded.PromptElement.Background);
+    Assert.Equal(new Thickness(0), expanded.PromptElement.BorderThickness);
     WindowThemeBehavior.SetIsHighContrastActive(expanded, true);
     expanded.SetPaperView(true);
     Assert.Equal(Visibility.Collapsed, grain.Visibility);
+    Assert.Same(Brushes.Transparent, expanded.PromptElement.Background);
+    Assert.Same(Brushes.WhiteSmoke, Assert.IsType<Border>(expanded.FindName("Surface")).Background);
     expanded.SetPaperView(false);
-    Assert.Same(Brushes.Gray, expanded.PromptElement.Background);
+    Assert.Same(Brushes.Transparent, expanded.PromptElement.Background);
     Assert.Same(Brushes.Navy, Assert.IsType<Border>(expanded.FindName("Surface")).Background);
     Assert.Equal("Unsent draft", expanded.Text);
+  });
+
+  [Fact]
+  public void ExpandedComposer_HasOneFocusOutlineAndKeepsLongDraftControlsVisible() => WpfTestSta.Run(() =>
+  {
+    WorkbenchExpandedPromptView expanded = new();
+    Window host = new()
+    {
+      Content = expanded, Width = 600, Height = 420,
+      Left = -10000, Top = -10000, ShowInTaskbar = false,
+    };
+    WpfTestSta.Cleanup(host.Close);
+    host.Resources["Brush.Border.Subtle"] = Brushes.SlateGray;
+    host.Resources["Brush.Progress.Value"] = Brushes.Orange;
+    expanded.SetOpen(true);
+    expanded.SetText(string.Join("\n", Enumerable.Repeat("A long draft line", 100)));
+    host.Show();
+    host.UpdateLayout();
+
+    TextBox prompt = expanded.PromptElement;
+    Border surface = Assert.IsType<Border>(expanded.FindName("Surface"));
+    Button collapse = Assert.IsType<Button>(expanded.FindName("Collapse"));
+    Button submit = Assert.IsType<Button>(expanded.FindName("Submit"));
+    Assert.Same(Brushes.Transparent, prompt.Background);
+    Assert.Equal(new Thickness(0), prompt.BorderThickness);
+    Assert.Null(prompt.Template.FindName("Chrome", prompt));
+    Assert.Same(Brushes.SlateGray, surface.BorderBrush);
+
+    Assert.True(prompt.Focus());
+    host.UpdateLayout();
+    Assert.Same(Brushes.Orange, surface.BorderBrush);
+    expanded.SetPaperView(true);
+    Assert.Same(Brushes.Orange, surface.BorderBrush);
+    expanded.SetPaperView(false);
+    Assert.Same(Brushes.Orange, surface.BorderBrush);
+    prompt.ScrollToEnd();
+    host.UpdateLayout();
+    Assert.True(prompt.ExtentHeight > prompt.ViewportHeight);
+    Assert.True(prompt.VerticalOffset > 0);
+    foreach (Button button in new[] { collapse, submit })
+    {
+      Point top = button.TransformToAncestor(host).Transform(new Point());
+      Assert.InRange(top.Y, 0, host.ActualHeight - button.ActualHeight);
+    }
+    Assert.Equal(string.Join("\n", Enumerable.Repeat("A long draft line", 100)), expanded.Text);
+
+    Assert.True(collapse.Focus());
+    Assert.Same(Brushes.SlateGray, surface.BorderBrush);
   });
 
 }
