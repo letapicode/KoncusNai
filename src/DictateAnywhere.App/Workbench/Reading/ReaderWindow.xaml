@@ -26,6 +26,16 @@
   </shell:WindowChrome.WindowChrome>
   <Window.Resources>
     <SolidColorBrush x:Key="ReaderInk" Color="#182237" />
+    <Style x:Key="ReaderWindowBoundaryStyle" TargetType="{x:Type Border}"
+           BasedOn="{StaticResource AppHighContrastWindowBoundaryStyle}">
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Opacity" Value="0.7" />
+      <Style.Triggers>
+        <Trigger Property="presentation:WindowThemeBehavior.IsHighContrastActive" Value="True">
+          <Setter Property="Opacity" Value="1" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
     <Style x:Key="ReaderMicroLabel" TargetType="TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
       <Setter Property="FontSize" Value="{DynamicResource Font.Size.Caption}" />
@@ -422,10 +432,10 @@
                Foreground="{DynamicResource Brush.Control.Primary}" FontSize="{DynamicResource Font.Size.Control}" FontWeight="SemiBold"
                Text="Reading Studio" IsHitTestVisible="False" />
 
-    <Border x:Name="HighContrastWindowBoundary"
+    <Border x:Name="ReaderWindowBoundary"
             Grid.RowSpan="2"
             Grid.ColumnSpan="2"
             CornerRadius="16"
-            Style="{StaticResource AppHighContrastWindowBoundaryStyle}" />
+            Style="{StaticResource ReaderWindowBoundaryStyle}" />
   </Grid>
 </Window>
