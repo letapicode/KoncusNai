@@ -20,6 +20,44 @@ namespace DictateAnywhere.App.Tests;
 public sealed class ReaderWindowInitializationTests
 {
   [Xunit.Fact]
+  public void SidebarToggle_StaysNearDividerAndRemainsReachableWhenSidebarIsHidden()
+  {
+    WpfTestSta.Run(() =>
+    {
+      ReaderWindow window = CreateReader("Draft", "Some text.", new CountingTextToSpeechService());
+      WpfTestSta.Cleanup(window.Close);
+      Grid shell = Find<Grid>(window, "ReaderShell");
+      ColumnDefinition sidebarColumn = Find<ColumnDefinition>(window, "ReaderSidebarColumn");
+      Button toggle = Find<Button>(window, "SidebarToggleButton");
+      void Layout()
+      {
+        shell.Measure(new Size(1380, 860));
+        shell.Arrange(new Rect(0, 0, 1380, 860));
+        shell.UpdateLayout();
+      }
+
+      Layout();
+      Rect expandedBounds = toggle.TransformToAncestor(shell).TransformBounds(new Rect(toggle.RenderSize));
+      Xunit.Assert.Equal(0, Grid.GetColumn(toggle));
+      Xunit.Assert.True(sidebarColumn.ActualWidth > 200);
+      Xunit.Assert.InRange(sidebarColumn.ActualWidth - expandedBounds.Right, 13, 15);
+
+      toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+      Layout();
+      Rect collapsedBounds = toggle.TransformToAncestor(shell).TransformBounds(new Rect(toggle.RenderSize));
+      Xunit.Assert.Equal(0, sidebarColumn.ActualWidth);
+      Xunit.Assert.Equal(1, Grid.GetColumn(toggle));
+      Xunit.Assert.InRange(collapsedBounds.Left, 13, 15);
+      Xunit.Assert.Equal("Show reading controls", System.Windows.Automation.AutomationProperties.GetName(toggle));
+
+      toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+      Layout();
+      Xunit.Assert.Equal(0, Grid.GetColumn(toggle));
+      Xunit.Assert.True(sidebarColumn.ActualWidth > 200);
+    });
+  }
+
+  [Xunit.Fact]
   public void Shutdown_WaitsForPreviewPreparationBeforeDisposingSpeech()
   {
     RunOnStaAsync(async () =>
