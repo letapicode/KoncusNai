@@ -37,7 +37,9 @@ internal static partial class ChatMarkdownRenderer
       section.Padding = new Thickness(16, 11, 16, 11);
       section.TextAlignment = TextAlignment.Left;
     }
-    if (markdown.Length > MaximumFormattedCharacters)
+    // A sent message is the user's input, not Markdown authored for display.
+    // Keep copied code and Markdown delimiters literal in the user bubble.
+    if (isUser || markdown.Length > MaximumFormattedCharacters)
       section.Blocks.Add(new Paragraph(new Run(markdown)));
     else
       AppendBlocks(section.Blocks, Markdown.Parse(markdown, Pipeline), onCopyCode, isPaper);
