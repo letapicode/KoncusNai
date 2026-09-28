@@ -797,6 +797,8 @@ public partial class ReaderWindow : Window
       ? HorizontalAlignment.Right : HorizontalAlignment.Left;
     SidebarToggleButton.Margin = state.SidebarVisible
       ? new Thickness(0, 8, 14, 0) : new Thickness(14, 8, 0, 0);
+    ReaderTitleTextBlock.Margin = state.SidebarVisible
+      ? new Thickness(26, 13, 0, 0) : new Thickness(62, 13, 0, 0);
     SidebarToggleButton.Visibility = state.ChromeVisible ? Visibility.Visible : Visibility.Collapsed;
     WindowCaptionControls.Visibility = state.ChromeVisible ? Visibility.Visible : Visibility.Collapsed;
     ReaderChromeRow.Height = state.ChromeVisible ? new GridLength(StandardChromeHeight) : new GridLength(0);
