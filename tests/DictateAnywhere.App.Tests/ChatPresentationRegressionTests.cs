@@ -62,6 +62,24 @@ public sealed class ChatPresentationRegressionTests
 
   [Fact]
   [Trait("Category", "WindowsWpf")]
+  public void UserMessage_DisplaysPastedMarkdownAndCodeLiterally()
+  {
+    WpfTestSta.Run(() =>
+    {
+      const string message = "class Node {\n```\n  Node(int data) {\n    this.data = data;\n  }\n```\n}";
+      FlowDocument document = new();
+      ChatMarkdownRenderer.Append(document, message, Brushes.Black, isUser: true);
+
+      Section section = Assert.IsType<Section>(document.Blocks.FirstBlock);
+      Paragraph paragraph = Assert.IsType<Paragraph>(Assert.Single(section.Blocks.Cast<Block>()));
+      Run text = Assert.IsType<Run>(Assert.Single(paragraph.Inlines.Cast<Inline>()));
+      Assert.Equal(message, text.Text);
+      Assert.IsType<ChatUserBubble>(section.Tag);
+    });
+  }
+
+  [Fact]
+  [Trait("Category", "WindowsWpf")]
   public void Markdown_PaperCodeStaysSelectableScrollableAndCopiesOriginalSource()
   {
     WpfTestSta.Run(() =>
