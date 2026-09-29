@@ -12,6 +12,28 @@ namespace DictateAnywhere.Core.Tests;
 public sealed class DictationPipelineCoordinatorTests
 {
   [Xunit.Fact]
+  public async Task ChunkTiming_CountsInFlightAndQueuedAudioWithoutRetainingPayloads()
+  {
+    FakeChunkedAudioCaptureService audio = new();
+    FakeTranscriptionService transcription = new(new TranscriptionResult("text", "model", TimeSpan.Zero))
+    { BlockUntilRelease = true };
+    await using ChunkedTranscriptionSession session = new(audio, transcription, "model", new FakeDiagnostics(), CancellationToken.None);
+    session.Start();
+    try
+    {
+      audio.EmitChunk(new(0, new([1, 0], 16_000, TimeSpan.FromSeconds(2)), false, DateTimeOffset.UtcNow));
+      await transcription.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+      session.QueueChunk(new(1, new([2, 0], 16_000, TimeSpan.FromSeconds(3)), true, DateTimeOffset.UtcNow));
+      Xunit.Assert.Equal(TimeSpan.FromSeconds(5), session.TotalDuration);
+      Xunit.Assert.Equal(TimeSpan.FromSeconds(5), session.PeakPendingDuration);
+    }
+    finally { transcription.Release(); }
+    await session.CompleteAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+    session.QueueChunk(new(2, new([3, 0], 16_000, TimeSpan.FromSeconds(10)), true, DateTimeOffset.UtcNow));
+    Xunit.Assert.Equal(TimeSpan.FromSeconds(5), session.TotalDuration);
+  }
+
+  [Xunit.Fact]
   public async Task FailedFinalFlush_CancelsAndDrainsThePreviousSessionBeforeReturningIdle()
   {
     await using FakeHotkeyService hotkey = new();

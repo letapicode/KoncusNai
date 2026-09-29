@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Inference;
@@ -64,7 +65,7 @@ internal static class Program
         Console.WriteLine(
           string.Create(
             CultureInfo.InvariantCulture,
-            $"{measurement.ProviderId}/{measurement.ModelId}: cold={measurement.ColdStartMs:F0}ms warmAvg={measurement.WarmAverageMs:F0}ms textLength={measurement.TextLength}"));
+            $"{measurement.ProviderId}/{measurement.ModelId}: first={measurement.FirstRequestMs:F0}ms warmAvg={measurement.WarmAverageMs:F0}ms textLength={measurement.TextLength}"));
       }
 
       Console.WriteLine($"Wrote timing report: {outputPath}");
@@ -91,9 +92,21 @@ internal static class Program
     DateTimeOffset? cancellationStartedUtc = null;
     DateTimeOffset? cancellationCompletedUtc = null;
     bool cancellationObserved = false;
+    string? reference = options.ReferenceTranscriptPath is null
+      ? null : await File.ReadAllTextAsync(options.ReferenceTranscriptPath).ConfigureAwait(false);
+    ModelBenchmarkWarmup? warmup = null;
 
     try
     {
+      if (options.InferenceWarmup && service is CohereTranscriptionService cohere)
+      {
+        Stopwatch warmupTimer = Stopwatch.StartNew();
+        await cohere.WarmUpAsync(candidate.ModelId).ConfigureAwait(false);
+        warmup = new ModelBenchmarkWarmup(
+          cohere.LastWarmupStartupDuration.TotalMilliseconds,
+          cohere.LastWarmupInferenceDuration.TotalMilliseconds,
+          warmupTimer.Elapsed.TotalMilliseconds);
+      }
       for (int i = 0; i < options.Iterations; i++)
       {
         DateTimeOffset startedUtc = DateTimeOffset.UtcNow;
@@ -107,7 +120,7 @@ internal static class Program
         InferenceTimingMetrics? timing = (service as CohereTranscriptionService)?.LastTimingMetrics;
         iterations.Add(new ModelBenchmarkIteration(
           Index: i + 1,
-          Temperature: i == 0 ? "cold" : "warm",
+          Temperature: i == 0 ? (warmup is null ? "cold" : "first-after-warmup") : "warm",
           StartedUtc: startedUtc,
           CompletedUtc: DateTimeOffset.UtcNow,
           ElapsedMs: Math.Round(stopwatch.Elapsed.TotalMilliseconds, 2),
@@ -118,7 +131,13 @@ internal static class Program
           TextLength: textLength,
           AccuracyPhraseMatched: string.IsNullOrWhiteSpace(options.ExpectedPhrase)
             ? null
-            : result.Text.Contains(options.ExpectedPhrase, StringComparison.OrdinalIgnoreCase)));
+            : result.Text.Contains(options.ExpectedPhrase, StringComparison.OrdinalIgnoreCase),
+          ReferenceWordCount: reference is null ? null : Tokens(reference).Length,
+          WordErrorCount: reference is null ? null : WordDistance(Tokens(reference), Tokens(result.Text)),
+          RealTimeFactor: stopwatch.Elapsed.TotalSeconds / audio.Duration.TotalSeconds,
+          ActualBackend: (service as CohereTranscriptionService)?.LastBackend,
+          Precision: (service as CohereTranscriptionService)?.LastPrecision,
+          FallbackReason: (service as CohereTranscriptionService)?.LastFallbackReason));
 
         if (i == 0 && options.IdleAfterColdSeconds > 0)
         {
@@ -171,14 +190,16 @@ internal static class Program
     return new ModelBenchmarkMeasurement(
       candidate.ProviderId,
       candidate.ModelId,
-      ColdStartMs: Math.Round(cold, 2),
+      ColdStartMs: warmup is null ? Math.Round(cold, 2) : null,
+      FirstRequestMs: Math.Round(cold, 2),
       WarmAverageMs: Math.Round(warmAverage, 2),
       WarmP50Ms: Math.Round(Percentile(warmElapsed, 0.50d), 2),
       WarmP95Ms: Math.Round(Percentile(warmElapsed, 0.95d), 2),
       P50Ms: Math.Round(p50, 2),
       P95Ms: Math.Round(p95, 2),
       TextLength: textLength,
-      AccuracyPassed: iterations.All(iteration => iteration.AccuracyPhraseMatched is not false),
+      AccuracyPassed: reference is null && string.IsNullOrWhiteSpace(options.ExpectedPhrase) ? null : iterations.All(iteration => iteration.AccuracyPhraseMatched is not false
+        && (iteration.WordErrorCount is null || iteration.WordErrorCount == 0)),
       IterationMeasurements: iterations,
       Lifecycle: new ModelBenchmarkLifecycleObservation(
         idleStartedUtc,
@@ -186,11 +207,34 @@ internal static class Program
         cancellationStartedUtc,
         cancellationCompletedUtc,
         cancellationObserved,
-        options.PostCancellationObservationSeconds));
+        options.PostCancellationObservationSeconds),
+      Warmup: warmup,
+      AccuracyEvaluation: reference is null
+        ? (string.IsNullOrWhiteSpace(options.ExpectedPhrase) ? "not-evaluated" : "substring-only-not-full-transcript")
+        : "word-edit-distance-casefold-word-tokens");
   }
 
   private static double? RoundMilliseconds(TimeSpan? duration) =>
     duration is null ? null : Math.Round(duration.Value.TotalMilliseconds, 2);
+
+  private static string[] Tokens(string text) => Regex.Matches(text.ToLowerInvariant(), @"[\p{L}\p{N}]+")
+    .Select(match => match.Value).ToArray();
+
+  private static int WordDistance(string[] reference, string[] hypothesis)
+  {
+    int[] row = Enumerable.Range(0, hypothesis.Length + 1).ToArray();
+    for (int i = 0; i < reference.Length; i++)
+    {
+      int[] next = new int[hypothesis.Length + 1];
+      next[0] = i + 1;
+      for (int j = 0; j < hypothesis.Length; j++)
+      {
+        next[j + 1] = Math.Min(Math.Min(next[j] + 1, row[j + 1] + 1), row[j] + (reference[i] == hypothesis[j] ? 0 : 1));
+      }
+      row = next;
+    }
+    return row[^1];
+  }
 
   private static ITranscriptionService CreateService(string providerId, string language)
   {
@@ -199,6 +243,7 @@ internal static class Program
       return new CohereTranscriptionService(CohereTranscriptionOptions.Default with
       {
         Language = language,
+        EnableInferenceWarmup = true,
       });
     }
 
@@ -336,14 +381,22 @@ internal sealed record BenchmarkCommandOptions(
   bool CancelAfterWarm,
   double PostCancellationObservationSeconds)
 {
+  public bool InferenceWarmup { get; init; }
+  public string? ReferenceTranscriptPath { get; init; }
   public static BenchmarkCommandOptions Parse(string[] args)
   {
     Dictionary<string, string> values = new(StringComparer.OrdinalIgnoreCase);
     bool allInstalled = false;
     bool cancelAfterWarm = false;
+    bool inferenceWarmup = false;
     for (int index = 0; index < args.Length; index++)
     {
       string arg = args[index];
+      if (string.Equals(arg, "--inference-warmup", StringComparison.OrdinalIgnoreCase))
+      {
+        inferenceWarmup = true;
+        continue;
+      }
       if (string.Equals(arg, "--all-installed", StringComparison.OrdinalIgnoreCase))
       {
         allInstalled = true;
@@ -410,7 +463,11 @@ internal sealed record BenchmarkCommandOptions(
       maxAudioSeconds,
       ParseNonNegativeSeconds(values, "idle-after-cold-seconds"),
       cancelAfterWarm,
-      ParseNonNegativeSeconds(values, "post-cancellation-observation-seconds"));
+      ParseNonNegativeSeconds(values, "post-cancellation-observation-seconds"))
+    {
+      InferenceWarmup = inferenceWarmup,
+      ReferenceTranscriptPath = values.TryGetValue("reference-transcript", out string? referencePath) ? referencePath : null,
+    };
   }
 
   private static double ParseNonNegativeSeconds(IReadOnlyDictionary<string, string> values, string key)
@@ -447,16 +504,21 @@ internal sealed record ModelBenchmarkReport(
 internal sealed record ModelBenchmarkMeasurement(
   string ProviderId,
   string ModelId,
-  double ColdStartMs,
+  double? ColdStartMs,
+  double FirstRequestMs,
   double WarmAverageMs,
   double WarmP50Ms,
   double WarmP95Ms,
   double P50Ms,
   double P95Ms,
   int TextLength,
-  bool AccuracyPassed,
+  bool? AccuracyPassed,
   IReadOnlyList<ModelBenchmarkIteration> IterationMeasurements,
-  ModelBenchmarkLifecycleObservation Lifecycle);
+  ModelBenchmarkLifecycleObservation Lifecycle,
+  ModelBenchmarkWarmup? Warmup,
+  string AccuracyEvaluation);
+
+internal sealed record ModelBenchmarkWarmup(double WorkerStartupMs, double InferenceMs, double TotalMs);
 
 internal sealed record ModelBenchmarkIteration(
   int Index,
@@ -469,7 +531,13 @@ internal sealed record ModelBenchmarkIteration(
   double? WorkerInvocationMs,
   double? WorkerInferenceMs,
   int TextLength,
-  bool? AccuracyPhraseMatched);
+  bool? AccuracyPhraseMatched,
+  int? ReferenceWordCount,
+  int? WordErrorCount,
+  double RealTimeFactor,
+  string? ActualBackend,
+  string? Precision,
+  string? FallbackReason);
 
 internal sealed record ModelBenchmarkLifecycleObservation(
   DateTimeOffset? IdleStartedUtc,

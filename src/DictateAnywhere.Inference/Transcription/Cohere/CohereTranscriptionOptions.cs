@@ -16,6 +16,8 @@ public sealed record CohereTranscriptionOptions(
   string Language,
   bool EnableAutomaticPunctuation)
 {
+  public bool EnableInferenceWarmup { get; init; }
+
   public static CohereTranscriptionOptions Default { get; } = new(
     PythonExecutablePath: "python",
     ModelRootPath: Path.Combine(

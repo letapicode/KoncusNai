@@ -8,6 +8,18 @@ namespace DictateAnywhere.Inference.Tests;
 public sealed class WorkerProtocolContractTests
 {
   [Fact]
+  public void DeserializePayload_CohereReportsActualRuntimeAndTruncation()
+  {
+    CohereTranscriptionResponse response = PersistentPythonWorkerClient.DeserializePayload<CohereTranscriptionResponse>(
+      """{"status":"ok","payload":{"text":"partial","duration_ms":123,"backend":"transformers/cpu","dtype":"torch.float32","fallback_reason":"native_setting_unsupported","threads":12,"is_truncated":true}}""");
+    Assert.Equal("transformers/cpu", response.Backend);
+    Assert.Equal("torch.float32", response.Dtype);
+    Assert.Equal("native_setting_unsupported", response.FallbackReason);
+    Assert.Equal(12, response.Threads);
+    Assert.True(response.IsTruncated);
+  }
+
+  [Fact]
   public void SerializeRequest_FormatsAllPropertiesAsSnakeCaseLower()
   {
     SampleWorkerRequest request = new(

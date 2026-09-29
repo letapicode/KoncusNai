@@ -1,0 +1,7 @@
+# Research workers only. Do not install into the configured application runtime.
+# The complete observed environment is pinned in requirements-lock.txt.
+numpy==1.26.4
+sherpa-onnx==1.13.8
+faster-whisper==1.2.1
+ctranslate2==4.8.2
+huggingface-hub==1.33.0

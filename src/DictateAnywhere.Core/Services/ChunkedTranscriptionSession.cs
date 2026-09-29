@@ -26,6 +26,12 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
   private readonly Task worker;
   private readonly List<TranscriptionChunkResult> results = [];
   private int pendingBytes;
+  private TimeSpan totalDuration;
+  private TimeSpan pendingDuration;
+  private TimeSpan peakPendingDuration;
+
+  internal TimeSpan TotalDuration { get { lock (sync) return totalDuration; } }
+  internal TimeSpan PeakPendingDuration { get { lock (sync) return peakPendingDuration; } }
   private Exception? failure;
   private bool accepting = true;
   private bool started;
@@ -69,6 +75,9 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
         return;
       }
       pendingBytes += bytes;
+      totalDuration += chunk.Audio.Duration;
+      pendingDuration += chunk.Audio.Duration;
+      if (pendingDuration > peakPendingDuration) peakPendingDuration = pendingDuration;
     }
   }
 
@@ -135,7 +144,7 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
             throw new InvalidOperationException("Dictation transcript limit reached. Use a shorter recording.");
           results.Add(new TranscriptionChunkResult(chunk.SequenceNumber, result));
         }
-        finally { lock (sync) pendingBytes -= chunk.Audio.Pcm16Mono.Length; }
+        finally { lock (sync) { pendingBytes -= chunk.Audio.Pcm16Mono.Length; pendingDuration -= chunk.Audio.Duration; } }
       }
     }
     catch (Exception ex)
@@ -146,7 +155,7 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
     finally
     {
       while (queue.Reader.TryRead(out _)) { }
-      lock (sync) pendingBytes = 0;
+      lock (sync) { pendingBytes = 0; pendingDuration = TimeSpan.Zero; }
     }
   }
 }

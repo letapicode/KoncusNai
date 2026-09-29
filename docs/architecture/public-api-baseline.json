@@ -1700,6 +1700,7 @@
         "P|DictateAnywhere.Inference.CohereTranscriptionOptions|AdditionalModelRootPaths[]:System.Collections.Generic.IReadOnlyList\u003CSystem.String\u003E|get:public|init:public",
         "P|DictateAnywhere.Inference.CohereTranscriptionOptions|Default[]:DictateAnywhere.Inference.CohereTranscriptionOptions|get:public static|",
         "P|DictateAnywhere.Inference.CohereTranscriptionOptions|EnableAutomaticPunctuation[]:System.Boolean|get:public|init:public",
+        "P|DictateAnywhere.Inference.CohereTranscriptionOptions|EnableInferenceWarmup[]:System.Boolean|get:public|init:public",
         "P|DictateAnywhere.Inference.CohereTranscriptionOptions|EnableWorkerHealthCheck[]:System.Boolean|get:public|init:public",
         "P|DictateAnywhere.Inference.CohereTranscriptionOptions|Language[]:System.String|get:public|init:public",
         "P|DictateAnywhere.Inference.CohereTranscriptionOptions|ModelRootPath[]:System.String|get:public|init:public",
@@ -1708,7 +1709,12 @@
         "P|DictateAnywhere.Inference.CohereTranscriptionOptions|RequestTimeout[]:System.TimeSpan|get:public|init:public",
         "P|DictateAnywhere.Inference.CohereTranscriptionOptions|ScriptFileName[]:System.String|get:public|init:public",
         "P|DictateAnywhere.Inference.CohereTranscriptionOptions|WorkerStartupTimeout[]:System.TimeSpan|get:public|init:public",
+        "P|DictateAnywhere.Inference.CohereTranscriptionService|LastBackend[]:System.String?|get:public|",
+        "P|DictateAnywhere.Inference.CohereTranscriptionService|LastFallbackReason[]:System.String?|get:public|",
+        "P|DictateAnywhere.Inference.CohereTranscriptionService|LastPrecision[]:System.String?|get:public|",
         "P|DictateAnywhere.Inference.CohereTranscriptionService|LastTimingMetrics[]:DictateAnywhere.Inference.InferenceTimingMetrics|get:public|",
+        "P|DictateAnywhere.Inference.CohereTranscriptionService|LastWarmupInferenceDuration[]:System.TimeSpan|get:public|",
+        "P|DictateAnywhere.Inference.CohereTranscriptionService|LastWarmupStartupDuration[]:System.TimeSpan|get:public|",
         "P|DictateAnywhere.Inference.CohereTranscriptionService|ProviderId[]:System.String|get:public virtual sealed|",
         "P|DictateAnywhere.Inference.CrisperWhisperForcedAlignmentOptions|Default[]:DictateAnywhere.Inference.CrisperWhisperForcedAlignmentOptions|get:public static|",
         "P|DictateAnywhere.Inference.CrisperWhisperForcedAlignmentOptions|ModelRootPath[]:System.String|get:public|init:public",
@@ -2183,7 +2189,8 @@
         "System.Linq",
         "System.Runtime",
         "System.Security.Cryptography",
-        "System.Text.Json"
+        "System.Text.Json",
+        "System.Text.RegularExpressions"
       ],
       "signatures": []
     },

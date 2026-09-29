@@ -627,7 +627,9 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
         combined,
         captureFinalizationStopwatch.Elapsed,
         chunkCompletionStopwatch.Elapsed,
-        IsChunked: true);
+        IsChunked: true,
+        CaptureDuration: chunkedTranscriptionSession.TotalDuration,
+        PeakBacklogDuration: chunkedTranscriptionSession.PeakPendingDuration);
     }
 
     Stopwatch captureStopwatch = Stopwatch.StartNew();
@@ -652,7 +654,9 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
       transcription,
       captureStopwatch.Elapsed,
       transcriptionWallStopwatch.Elapsed,
-      IsChunked: false);
+      IsChunked: false,
+      CaptureDuration: audio.Duration,
+      PeakBacklogDuration: audio.Duration);
   }
 
   private void LogPipelineTiming(
@@ -664,7 +668,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     TimeSpan stopToVisibleDuration,
     InsertionResult insertion)
   {
-    IReadOnlyDictionary<string, object?> properties = new Dictionary<string, object?>(StringComparer.Ordinal)
+    Dictionary<string, object?> properties = new(StringComparer.Ordinal)
     {
       ["operationId"] = activeOperationId ?? Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture),
       ["stage"] = "dictation",
@@ -685,6 +689,13 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
       ["insertionMethod"] = insertion.MethodUsed.ToString(),
       ["insertionOutcome"] = insertion.Outcome.ToString(),
     };
+    if (string.Equals(Environment.GetEnvironmentVariable("DICTATEANYWHERE_BENCHMARK_EVIDENCE"), "1", StringComparison.Ordinal))
+    {
+      // Explicit benchmark telemetry contains numeric timing only. Keep normal
+      // redaction of speech, audio, targets and correlation IDs intact.
+      properties["captureDurationMs"] = Math.Round(stopOutcome.CaptureDuration.TotalMilliseconds, 2);
+      properties["peakBacklogMs"] = Math.Round(stopOutcome.PeakBacklogDuration.TotalMilliseconds, 2);
+    }
 
     if (diagnostics is IStructuredDiagnostics structuredDiagnostics)
     {
@@ -708,7 +719,9 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     TranscriptionResult Transcription,
     TimeSpan CaptureFinalizationDuration,
     TimeSpan TranscriptionWallDuration,
-    bool IsChunked);
+    bool IsChunked,
+    TimeSpan CaptureDuration = default,
+    TimeSpan PeakBacklogDuration = default);
 
   [SuppressMessage(
     "Design",
