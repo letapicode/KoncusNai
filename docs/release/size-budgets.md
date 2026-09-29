@@ -57,8 +57,10 @@ projects are excluded. This checkpoint had no LFS entries or submodules.
 
 The September 26 chat readability and Paper update measured 1,675,782 Git blob
 bytes of test source in CI and 1,503,922 Git blob bytes of documentation and
-planning. Their caps are 1,780,000 and 1,600,000 bytes respectively, retaining
-about six percent headroom for regression coverage and implementation reports.
+planning. The September 28 tray and diagnostics update measured 1,804,048 bytes
+of test source after adding lifecycle, privacy, export, and model-readiness
+regression coverage. The test cap is now 1,920,000 bytes, retaining about six
+percent headroom; the documentation cap remains 1,600,000 bytes.
 Repository, production, bundled-asset, and release-output caps remain unchanged;
 historical checkpoint baselines above are retained. The unused paper reference
 image is untracked, and Paper grain is generated in code.
