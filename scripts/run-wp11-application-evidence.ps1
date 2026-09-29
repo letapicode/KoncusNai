@@ -2,7 +2,7 @@
 
 [CmdletBinding()]
 param(
-  [ValidateSet("Matrix", "Replacement", "SelfTest")][string]$Mode = "Matrix",
+  [ValidateSet("Matrix", "Replacement", "Warm", "SelfTest")][string]$Mode = "Matrix",
   [string]$OutputDirectory = "artifacts/wp11-application-evidence",
   [string]$TargetPath = "artifacts/wp11-manual-fixtures/wp11-dictation-target.txt",
   [string]$FixtureDirectory = "artifacts/wp11-manual-fixtures",
@@ -11,7 +11,10 @@ param(
   [ValidateRange(100, 2000)][int]$DurationLateToleranceMs = 750,
   [ValidateRange(10, 120)][int]$StartupTimeoutSeconds = 45,
   [ValidateRange(10, 300)][int]$CompletionTimeoutSeconds = 120,
-  [switch]$ConfirmKeyboardAutomation
+  [string]$ExpectedBackend,
+  [switch]$MeasureUiResponsiveness,
+  [switch]$ConfirmKeyboardAutomation,
+  [switch]$ExitAfterCapture
 )
 
 Set-StrictMode -Version Latest
@@ -434,7 +437,7 @@ function Stop-OwnedApplication {
   $expectedPath = [IO.Path]::GetFullPath((Join-Path -Path $script:RepoRoot -ChildPath "src\DictateAnywhere.App\bin\Release\net8.0-windows\DictateAnywhere.App.exe"))
   Assert-Condition ([string]::Equals([IO.Path]::GetFullPath($Process.MainModule.FileName), $expectedPath, [StringComparison]::OrdinalIgnoreCase)) "Refusing to terminate a process whose executable identity is not the owned Release application."
   $snapshot = @(Get-CimInstance Win32_Process)
-  $ownedIds = @(Get-OwnedProcessIds -RootProcessId $Process.Id -Snapshot $snapshot)
+  $ownedIds = @(Get-DescendantProcessIds -RootProcessId $Process.Id -Snapshot $snapshot)
   $ownedProcesses = @($ownedIds | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
   $Process.Kill($true)
   Assert-Condition $Process.WaitForExit(10000) "The owned application process tree did not exit within 10 seconds."
@@ -470,6 +473,9 @@ function Start-OwnedApplication {
   $null = Wait-ForLogRecord -SessionStartedUtc $startedUtc -AfterUtc $startedUtc `
     -Predicate { param($entry) $entry.message -like "Dictation coordinator started in * mode." } `
     -TimeoutSeconds $StartupTimeoutSeconds -Description "dictation coordinator startup" -AppProcess $process
+  # Initial Workbench activation can arrive after hotkey registration. Let the
+  # window settle before verifying/focusing the scratch target for a cold sample.
+  Start-Sleep -Milliseconds 2000
   return [pscustomobject]@{
     Process = $process
     StartedUtc = $startedUtc
@@ -552,14 +558,11 @@ function Complete-SampleEvidence {
   $records = @(Get-LogRecords -SessionStartedUtc $SessionStartedUtc | Where-Object {
     [datetimeoffset]$_.timestampUtc -ge $SampleStartedUtc -and [datetimeoffset]$_.timestampUtc -le ([datetimeoffset]$Completion.timestampUtc).AddSeconds(1)
   })
-  $queued = @($records | Where-Object { $_.message -match '^Queued transcription chunk 0 \(([0-9]+) ms, final=true\)\.$' })
-  Assert-Condition ($queued.Count -eq 1) "Expected exactly one final captured-audio duration for $Label."
-  $null = $queued[0].message -match '^Queued transcription chunk 0 \(([0-9]+) ms, final=true\)\.$'
-  [double]$capturedAudioMs = [double]$Matches[1]
   $properties = $Completion.properties
+  [double]$capturedAudioMs = Get-NumericProperty $properties 'captureDurationMs'
   Assert-Condition ([string]::Equals([string]$properties.providerId, $ProviderId, [StringComparison]::OrdinalIgnoreCase)) "Completion provider does not match current settings."
   Assert-Condition ([string]::Equals([string]$properties.modelId, $ModelId, [StringComparison]::OrdinalIgnoreCase)) "Completion model does not match current settings."
-  Assert-Condition ([string]::Equals([string]$properties.insertionOutcome, "VerifiedInserted", [StringComparison]::Ordinal)) "Insertion was not verified."
+  $verifiedInsertion = [string]::Equals([string]$properties.insertionOutcome, "VerifiedInserted", [StringComparison]::Ordinal)
   $captureFinalizationMs = Get-NumericProperty $properties "captureFinalizationMs"
   $transcriptionWallMs = Get-NumericProperty $properties "transcriptionWallMs"
   $modelReportedMs = Get-NumericProperty $properties "modelReportedMs"
@@ -569,14 +572,31 @@ function Complete-SampleEvidence {
   foreach ($stage in @($captureFinalizationMs, $transcriptionWallMs, $modelReportedMs, $transformationMs, $insertionMs)) {
     Assert-Condition ($stopToVisibleMs -ge $stage) "Stop-to-visible timing is smaller than a contained stage."
   }
-  $operationId = [string]$Completion.operationId
+  # Current privacy policy redacts correlation IDs. Use the verified event's
+  # timestamp plus the operator label for sample identity, not a fabricated ID.
+  $operationId = "$(([datetimeoffset]$Completion.timestampUtc).ToString('o'))-$Label"
   Assert-Condition (-not [string]::IsNullOrWhiteSpace($operationId)) "Completion operation ID is missing."
   Assert-Condition (-not ($script:RawSamples | Where-Object { $_.operationId -eq $operationId })) "Duplicate completion operation ID detected."
   [double]$nominalMs = $NominalSeconds * 1000
-  $acceptedDuration = $capturedAudioMs -ge ($nominalMs - $DurationEarlyToleranceMs) -and $capturedAudioMs -le ($nominalMs + $DurationLateToleranceMs)
+  $captureStart = @($records | Where-Object { $_.message -eq 'Recording started.' })
+  Assert-Condition ($captureStart.Count -eq 1) 'Recording start evidence is missing or ambiguous.'
+  # The production silence trim intentionally shortens PCM. Validate the real
+  # recording interval using the start event and completion minus stop timing.
+  $recordingWindowMs = ([datetimeoffset]$Completion.timestampUtc - [datetimeoffset]$captureStart[0].timestampUtc).TotalMilliseconds - $stopToVisibleMs
+  $acceptedDuration = $recordingWindowMs -ge ($nominalMs - $DurationEarlyToleranceMs) -and $recordingWindowMs -le ($nominalMs + $DurationLateToleranceMs)
+  Assert-Condition ($capturedAudioMs -gt 0 -and $capturedAudioMs -le ($recordingWindowMs + 100)) 'Processed audio duration is inconsistent with recording interval.'
 
   $request = @($records | Where-Object { $_.message -eq "Cohere transcription requested." } | Select-Object -First 1)
   Assert-Condition ($request.Count -eq 1) "Transcription request event is missing."
+  $response = @($records | Where-Object { $_.message -eq "Cohere transcription response received." } | Select-Object -Last 1)
+  Assert-Condition ($response.Count -eq 1) "Transcription backend evidence is missing."
+  $actualBackend = [string]$response[0].properties.backend
+  $actualPrecision = [string]$response[0].properties.precision
+  $fallbackProperty = $response[0].properties.PSObject.Properties['fallbackReason']
+  $fallbackReason = if ($fallbackProperty) { [string]$fallbackProperty.Value } else { $null }
+  if ($ExpectedBackend) {
+    Assert-Condition ($actualBackend -eq $ExpectedBackend) "Actual backend '$actualBackend' differs from expected '$ExpectedBackend'."
+  }
   $sessionRecords = @(Get-LogRecords -SessionStartedUtc $SessionStartedUtc)
   $warmupsBeforeRequest = @($sessionRecords | Where-Object {
     $_.message -eq "Cohere worker warmup completed." -and
@@ -589,8 +609,9 @@ function Complete-SampleEvidence {
   Assert-Condition ($processSlice.Count -gt 0) "No owned-process samples were captured for $Label."
   $maximumLeafWorkers = [int](($processSlice | Measure-Object leafWorkerCount -Maximum).Maximum)
   $maximumPythonProcesses = [int](($processSlice | Measure-Object pythonProcessCount -Maximum).Maximum)
-  $accepted = $acceptedDuration -and $temperatureValid -and $maximumLeafWorkers -eq 1
+  $accepted = $acceptedDuration -and $temperatureValid -and $maximumLeafWorkers -eq 1 -and $verifiedInsertion
   $reasons = [Collections.Generic.List[string]]::new()
+  if (-not $verifiedInsertion) { $reasons.Add('insertion-not-verified') }
   if (-not $acceptedDuration) { $reasons.Add("captured-duration-outside-band") }
   if (-not $temperatureValid) { $reasons.Add("temperature-classification-mismatch") }
   if ($maximumLeafWorkers -ne 1) { $reasons.Add("leaf-worker-count-$maximumLeafWorkers") }
@@ -601,12 +622,17 @@ function Complete-SampleEvidence {
     nominalSeconds = $NominalSeconds
     operationId = $operationId
     capturedAudioMs = $capturedAudioMs
+    recordingWindowMs = $recordingWindowMs
+    actualBackend = $actualBackend
+    actualPrecision = $actualPrecision
+    fallbackReason = $fallbackReason
     captureFinalizationMs = $captureFinalizationMs
     transcriptionWallMs = $transcriptionWallMs
     modelReportedMs = $modelReportedMs
     transformationMs = $transformationMs
     insertionMs = $insertionMs
     stopToVisibleMs = $stopToVisibleMs
+    peakBacklogMs = Get-NumericProperty $properties 'peakBacklogMs'
     insertionMethod = [string]$properties.insertionMethod
     insertionOutcome = [string]$properties.insertionOutcome
     maximumPythonProcessCount = $maximumPythonProcesses
@@ -737,6 +763,7 @@ if ($Mode -eq "SelfTest") {
 }
 
 Assert-Condition $ConfirmKeyboardAutomation "Pass -ConfirmKeyboardAutomation only when the dedicated scratch target may receive automated input."
+$env:DICTATEANYWHERE_BENCHMARK_EVIDENCE = '1'
 Ensure-NativeMethods
 
 $artifactRoot = Resolve-PathUnderRoot -Root $script:RepoRoot -Path "artifacts" -Label "Artifact root"
@@ -774,7 +801,8 @@ $target = Start-ScratchTarget -Path $resolvedTarget
 $targetFileName = [IO.Path]::GetFileName($resolvedTarget)
 $matrixStartedUtc = [datetimeoffset]::UtcNow
 $warmSession = $null
-$coldRequirements = if ($Mode -eq "Replacement") { [ordered]@{ 7 = 1 } } else { [ordered]@{ 3 = $SamplesPerBucket; 7 = $SamplesPerBucket; 11 = $SamplesPerBucket } }
+$uiProbe = $null
+$coldRequirements = if ($Mode -eq 'Warm') { [ordered]@{} } elseif ($Mode -eq "Replacement") { [ordered]@{ 7 = 1 } } else { [ordered]@{ 3 = $SamplesPerBucket; 7 = $SamplesPerBucket; 11 = $SamplesPerBucket } }
 $warmRequirements = if ($Mode -eq "Replacement") { [ordered]@{ 3 = 1; 7 = 2; 11 = 1 } } else { [ordered]@{ 3 = $SamplesPerBucket; 7 = $SamplesPerBucket; 11 = $SamplesPerBucket } }
 $labelSuffix = if ($Mode -eq "Replacement") { "R" } else { "" }
 try {
@@ -808,6 +836,24 @@ try {
   $null = Wait-ForLogRecord -SessionStartedUtc $warmSession.StartedUtc -AfterUtc $warmSession.StartedUtc `
     -Predicate { param($entry) $entry.message -eq "Cohere worker warmup completed." } `
     -TimeoutSeconds $CompletionTimeoutSeconds -Description "warm worker readiness" -AppProcess $warmSession.Process
+  $primeSample = $null
+  if ($MeasureUiResponsiveness) {
+    $probeStart = [Diagnostics.ProcessStartInfo]::new((Join-Path $PSHOME 'pwsh.exe'))
+    $probeStart.UseShellExecute = $false
+    $probeStart.CreateNoWindow = $true
+    foreach ($arg in @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'measure-dictation-ui-responsiveness.ps1'),
+        '-AppProcessId', [string]$warmSession.Process.Id, '-OutputPath', (Join-Path $resolvedOutput 'ui-responsiveness.json'), '-DurationSeconds', '600')) {
+      $probeStart.ArgumentList.Add($arg)
+    }
+    $uiProbe = [Diagnostics.Process]::Start($probeStart)
+  }
+  if ($Mode -eq 'Warm') {
+    Invoke-OneSample -AppSession $warmSession -TargetProcess $target -TargetFileName $targetFileName `
+      -Label 'PRIME-7' -Temperature 'warm' -NominalSeconds 7 -FixturePath $fixtures[7] `
+      -HotkeyModifiers $hotkeyModifiers -HotkeyVirtualKey $hotkeyVirtualKey -ProviderId $providerId -ModelId $modelId
+    $primeSample = $script:RawSamples[-1]
+    $script:RawSamples.RemoveAt($script:RawSamples.Count - 1)
+  }
   foreach ($entry in $warmRequirements.GetEnumerator()) {
     [int]$seconds = $entry.Key
     [int]$requiredAccepted = $entry.Value
@@ -834,7 +880,7 @@ try {
     modelId = $modelId
     hotkey = [pscustomobject]@{ modifiers = $hotkeyModifiers; virtualKey = $hotkeyVirtualKey }
     recordingMode = "ToggleToTalk"
-    durationAcceptance = [pscustomobject]@{ earlyToleranceMs = $DurationEarlyToleranceMs; lateToleranceMs = $DurationLateToleranceMs }
+    durationAcceptance = [pscustomobject]@{ metric = 'recording interval; processed PCM may be silence-trimmed'; earlyToleranceMs = $DurationEarlyToleranceMs; lateToleranceMs = $DurationLateToleranceMs }
     samples = $script:RawSamples
     processSamples = $script:ProcessSamples
     operatorVerification = "PENDING"
@@ -842,14 +888,26 @@ try {
   }
   $rawName = if ($Mode -eq "Replacement") { "application-evidence-replacements-raw.json" } else { "application-evidence-raw.json" }
   $rawPath = Join-Path -Path $resolvedOutput -ChildPath $rawName
+  if ($primeSample) { $raw | Add-Member -NotePropertyName firstUseAfterModelReady -NotePropertyValue $primeSample }
   $raw | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $rawPath -Encoding UTF8
   Write-Host "Matrix captured at $rawPath"
-  Write-Host "Leave the owned Koncus Nai application running. Verify the labelled scratch results, then exit Koncus Nai through its tray command for graceful-shutdown evidence."
+  Assert-TargetFocused -Process $target -ExpectedFileName $targetFileName
+  [Windows.Forms.SendKeys]::SendWait('^s')
+  if ($ExitAfterCapture) {
+    Stop-OwnedApplication -Process $warmSession.Process
+    $script:OwnedAppProcess = $null
+    if ($uiProbe) { $null = $uiProbe.WaitForExit(5000) }
+    Write-Host 'Benchmark-owned application and workers closed.'
+  }
+  else {
+    Write-Host "Leave the owned Koncus Nai application running. Verify the labelled scratch results, then exit Koncus Nai through its tray command for graceful-shutdown evidence."
+  }
 }
 catch {
   if ($null -ne $script:OwnedAppProcess) {
     Stop-OwnedApplication -Process $script:OwnedAppProcess
     $script:OwnedAppProcess = $null
   }
+  if ($uiProbe -and -not $uiProbe.HasExited) { $uiProbe.Kill(); $null = $uiProbe.WaitForExit(5000) }
   throw
 }

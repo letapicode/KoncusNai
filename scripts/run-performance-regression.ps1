@@ -8,6 +8,9 @@ param(
   [string]$Language = "en",
   [string]$FixtureId = "operator-supplied",
   [string]$ExpectedPhrase,
+  [string]$ReferenceTranscriptPath,
+  [switch]$InferenceWarmup,
+  [string]$ExpectedBackend,
   [ValidateRange(0, 3600)][double]$MaxAudioSeconds = 0,
   [ValidateRange(0, 60)][double]$IdleAfterColdSeconds = 0,
   [switch]$CancelAfterWarm,
@@ -120,7 +123,7 @@ function Assert-ModelBenchmarkEvidence {
   }
   for ($index = 0; $index -lt $iterationEvidence.Count; $index++) {
     $iteration = $iterationEvidence[$index]
-    $expectedTemperature = if ($index -eq 0) { "cold" } else { "warm" }
+    $expectedTemperature = if ($index -eq 0) { if ($InferenceWarmup) { 'first-after-warmup' } else { 'cold' } } else { 'warm' }
     if (-not [string]::Equals([string]$iteration.temperature, $expectedTemperature, [StringComparison]::Ordinal)) {
       throw "Benchmark iteration $($index + 1) has an invalid cold/warm classification."
     }
@@ -134,16 +137,21 @@ function Assert-ModelBenchmarkEvidence {
     if (-not [string]::IsNullOrWhiteSpace($ExpectedPhrase) -and $iteration.accuracyPhraseMatched -ne $true) {
       throw "Benchmark iteration $($index + 1) did not satisfy the accuracy criterion."
     }
+    if ($ExpectedBackend -and -not [string]::Equals([string]$iteration.actualBackend, $ExpectedBackend, [StringComparison]::OrdinalIgnoreCase)) {
+      throw 'Benchmark used an unexpected backend, possibly a fallback. Inspect actualBackend and fallbackReason.'
+    }
   }
 
-  foreach ($propertyName in @("coldStartMs", "warmAverageMs", "warmP50Ms", "warmP95Ms", "p50Ms", "p95Ms")) {
+  $summaryProperties = @('warmAverageMs', 'warmP50Ms', 'warmP95Ms', 'p50Ms', 'p95Ms', 'firstRequestMs')
+  if (-not $InferenceWarmup) { $summaryProperties += 'coldStartMs' }
+  foreach ($propertyName in $summaryProperties) {
     $property = $measurement.PSObject.Properties[$propertyName]
     if ($null -eq $property -or $null -eq $property.Value) {
       throw "Benchmark measurement is missing $propertyName."
     }
     Assert-FiniteNonNegativeValue $property.Value "Benchmark $propertyName"
   }
-  if ($measurement.accuracyPassed -ne $true) {
+  if (($ExpectedPhrase -or $ReferenceTranscriptPath) -and $measurement.accuracyPassed -ne $true) {
     throw "Benchmark measurement did not satisfy the accuracy criterion."
   }
 
@@ -192,6 +200,10 @@ function Invoke-SampledModelBenchmark {
       "--max-audio-seconds",
       $MaxAudioSeconds.ToString([Globalization.CultureInfo]::InvariantCulture))
   }
+  if ($ReferenceTranscriptPath) {
+    $arguments += @('--reference-transcript', [IO.Path]::GetFullPath($ReferenceTranscriptPath))
+  }
+  if ($InferenceWarmup) { $arguments += '--inference-warmup' }
   if ($IdleAfterColdSeconds -gt 0) {
     $arguments += @(
       "--idle-after-cold-seconds",
@@ -363,7 +375,7 @@ $summaryPath = Join-Path -Path $resolvedOutput -ChildPath "performance-regressio
 $summary = [PSCustomObject]@{
   schemaVersion = 2
   generatedAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
-  commit = (& git rev-parse HEAD 2>$null)
+  commit = (& git -c "safe.directory=$repoRoot" rev-parse HEAD 2>$null)
   machine = $env:COMPUTERNAME
   os = [Environment]::OSVersion.VersionString
   processorCount = [Environment]::ProcessorCount

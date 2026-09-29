@@ -56,6 +56,12 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
 
   public string ProviderId => options.ProviderId;
 
+  public TimeSpan LastWarmupInferenceDuration { get; private set; }
+  public TimeSpan LastWarmupStartupDuration { get; private set; }
+  public string? LastBackend { get; private set; }
+  public string? LastPrecision { get; private set; }
+  public string? LastFallbackReason { get; private set; }
+
   internal Task? BackgroundWarmUpTask
   {
     get
@@ -144,6 +150,16 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
           cancellationToken,
           validateHealthCheck)
         .ConfigureAwait(false);
+      LastWarmupStartupDuration = preparedWorker.StartupDuration;
+      if (options.EnableInferenceWarmup)
+      {
+        CohereTranscriptionResponse warmup = await preparedWorker.Client.InvokeAsync<CohereTranscriptionResponse>(
+          new { Operation = "warmup", Language = options.Language, Punctuation = options.EnableAutomaticPunctuation },
+          options.RequestTimeout,
+          cancellationToken).ConfigureAwait(false);
+        LastWarmupInferenceDuration = TimeSpan.FromMilliseconds(Math.Max(0, warmup.DurationMs));
+        UpdateExecutionMetadata(warmup);
+      }
       totalStopwatch.Stop();
       LogInfo(
         "Cohere worker warmup completed.",
@@ -154,6 +170,10 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
           ("stage", "warmupCompleted"),
           ("workerColdStart", preparedWorker.CreatedNewClient),
           ("workerStartupMs", RoundMilliseconds(preparedWorker.StartupDuration)),
+          ("warmupInferenceMs", RoundMilliseconds(LastWarmupInferenceDuration)),
+          ("backend", LastBackend),
+          ("precision", LastPrecision),
+          ("fallbackReason", LastFallbackReason),
           ("workerHealthCheckMs", preparedWorker.HealthCheckDuration > TimeSpan.Zero ? RoundMilliseconds(preparedWorker.HealthCheckDuration) : null),
           ("totalMs", RoundMilliseconds(totalStopwatch.Elapsed))));
     }
@@ -308,6 +328,11 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
       invokeStopwatch.Stop();
       invokeDuration = invokeStopwatch.Elapsed;
       workerInferenceDurationMs = response.DurationMs;
+      UpdateExecutionMetadata(response);
+      if (response.IsTruncated)
+      {
+        throw new InferenceException("Cohere returned an incomplete transcript. No partial text was inserted.");
+      }
 
       int responseTextLength = CohereTranscriptionResponseNormalizer.GetTrimmedTextLength(response);
       LogInfo(
@@ -320,6 +345,11 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
           ("invokeMs", RoundMilliseconds(invokeDuration)),
           ("workerInferenceMs", workerInferenceDurationMs > 0 ? Math.Round(workerInferenceDurationMs, 2) : null),
           ("responseTextLength", responseTextLength),
+          ("backend", response.Backend),
+          ("precision", response.Dtype),
+          ("fallbackReason", response.FallbackReason),
+          ("nativeVersion", response.NativeVersion),
+          ("threads", response.Threads),
           ("responseLanguage", response.Language),
           ("responseSampleRateHz", response.SampleRateHz),
           ("responseAudioSeconds", response.AudioSeconds is not null ? Math.Round(response.AudioSeconds.Value, 3) : null)));
@@ -561,6 +591,13 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
       "Cohere local runtime did not confirm that its loaded model is ready. Switch to CrisperWhisper or use a supported accelerated runtime.",
       InferenceFailureReason.RuntimeUnavailable,
       "The Cohere local model worker returned an invalid startup health-check response.");
+  }
+
+  private void UpdateExecutionMetadata(CohereTranscriptionResponse response)
+  {
+    LastBackend = response.Backend;
+    LastPrecision = response.Dtype;
+    LastFallbackReason = response.FallbackReason;
   }
 
   private string ResolveInstalledModelPath(string modelId)

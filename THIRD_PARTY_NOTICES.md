@@ -81,6 +81,24 @@ copyright/NOTICE material when redistributed. MIT, BSD, MPL, GPL, LGPL, OFL,
 CC BY-SA, Gemma, and other components retain their own terms. This notice is a
 navigation aid; the actual upstream license texts control.
 
+## Optional native speech and comparison runtimes
+
+The optional Cohere native runtime uses [transcribe.cpp v0.2.4](https://github.com/handy-computer/transcribe.cpp/tree/v0.2.4)
+and its matching Python ctypes bindings under MIT. The opt-in setup preserves
+the release's `licenses/` directory (including ggml and miniz notices) and
+the source license files. Native binaries and converted models are provisioned
+locally, not bundled in the application or Git. The converted Cohere model
+retains its Apache-2.0 license and original checkpoint provenance. Conversion
+uses gguf 0.18.0 (MIT) and the installed local model runtime in an isolated
+environment; it does not update that runtime's dependencies.
+
+The separate research workers use sherpa-onnx (Apache-2.0), ONNX Runtime (MIT),
+faster-whisper (MIT), CTranslate2 (MIT), NumPy (BSD-3-Clause), and the tested
+Whisper-small model (MIT). Nemotron's tested English checkpoint is governed by
+the [NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/).
+These comparison models are not bundled or automatically selected by the app.
+Pinned research dependencies are installed in a separate environment.
+
 ## Original assets
 
 The KN logo and application artwork are recorded as project assets in

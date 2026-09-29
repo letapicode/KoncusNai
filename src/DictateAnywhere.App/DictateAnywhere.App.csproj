@@ -73,6 +73,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\scripts\local-models\cohere_transcribe_worker.py;
+                   ..\..\scripts\local-models\cohere_native_runtime.py;
                    ..\..\scripts\local-models\crisperwhisper_transcribe_worker.py;
                    ..\..\scripts\local-models\gemma_chat_worker.py;
                    ..\..\scripts\local-models\indic_hindi_ctc_align_worker.py;

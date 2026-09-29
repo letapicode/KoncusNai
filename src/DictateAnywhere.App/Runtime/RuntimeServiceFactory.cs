@@ -131,6 +131,7 @@ internal static class RuntimeServiceFactory
     string compatibleLanguage = TranscriptionLanguageCompatibilityPolicy.ResolveCompatibleLanguage(settings);
     CohereTranscriptionOptions cohereOptions = CohereTranscriptionOptions.Default with
     {
+      EnableInferenceWarmup = !string.Equals(Environment.GetEnvironmentVariable("DICTATEANYWHERE_COHERE_INFERENCE_WARMUP"), "0", StringComparison.Ordinal),
       Language = compatibleLanguage,
       EnableAutomaticPunctuation = settings.EnableAutomaticPunctuation,
     };
@@ -153,6 +154,7 @@ internal static class RuntimeServiceFactory
   {
     CohereTranscriptionOptions options = CohereTranscriptionOptions.Default with
     {
+      EnableInferenceWarmup = !string.Equals(Environment.GetEnvironmentVariable("DICTATEANYWHERE_COHERE_INFERENCE_WARMUP"), "0", StringComparison.Ordinal),
       Language = TranscriptionLanguageCompatibilityPolicy.ResolveCompatibleLanguage(settings),
       EnableAutomaticPunctuation = settings.EnableAutomaticPunctuation,
     };

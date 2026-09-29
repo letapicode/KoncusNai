@@ -1,5 +1,10 @@
 # Dictation performance hardening baseline
 
+The fresh 2026-09-29 implementation and measured comparison are documented in
+[dictation-latency-optimization-2026-09-29.md](dictation-latency-optimization-2026-09-29.md).
+The historical evidence below is retained as background, not used as the new
+optimization's before measurement.
+
 ## Current-head controlled evidence (2026-09-05)
 
 - Commit measured: `c8377643bae26218ec8dc91c0dea4c60f930fac3`, Release.

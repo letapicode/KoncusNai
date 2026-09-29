@@ -15,6 +15,50 @@ namespace DictateAnywhere.Inference.Tests;
 public sealed class CohereTranscriptionServiceTests
 {
   [Xunit.Fact]
+  public async Task WarmUpInBackground_WhenInferenceEnabled_ExercisesConfiguredLanguageWithoutAudio()
+  {
+    using TempDirectoryScope scope = new();
+    using TempScriptScope script = new();
+    const string modelId = "cohere-transcribe-03-2026";
+    await using FakeWorkerClient workerClient = new(new WorkerResponse("discard warmup text", 123));
+    await using CohereTranscriptionService service = new(
+      CohereTranscriptionOptions.Default with
+      {
+        ModelRootPath = CreateInstalledModel(scope.DirectoryPath, modelId),
+        ScriptFileName = script.FileName,
+        EnableInferenceWarmup = true,
+        Language = "es",
+        EnableAutomaticPunctuation = false,
+      }, diagnostics: null, new FakeWorkerClientFactory(workerClient));
+    service.WarmUpInBackground(modelId);
+    await Xunit.Assert.IsAssignableFrom<Task>(service.BackgroundWarmUpTask);
+    Xunit.Assert.Equal(1, workerClient.InvokeCallCount);
+    Xunit.Assert.Equal("warmup", GetRequestProperty<string>(workerClient.LastRequest!, "Operation"));
+    Xunit.Assert.Equal("es", GetRequestProperty<string>(workerClient.LastRequest!, "Language"));
+    Xunit.Assert.False(GetRequestProperty<bool>(workerClient.LastRequest!, "Punctuation"));
+    Xunit.Assert.Null(workerClient.LastRequest!.GetType().GetProperty("AudioPath"));
+    Xunit.Assert.Equal(TimeSpan.FromMilliseconds(123), service.LastWarmupInferenceDuration);
+  }
+
+  [Xunit.Fact]
+  public async Task TranscribeAsync_WhenWorkerMarksTruncation_RejectsPartialOutput()
+  {
+    using TempDirectoryScope scope = new();
+    using TempScriptScope script = new();
+    const string modelId = "cohere-transcribe-03-2026";
+    await using FakeWorkerClient workerClient = new(new WorkerResponse("incomplete", 123, IsTruncated: true));
+    await using CohereTranscriptionService service = new(
+      CohereTranscriptionOptions.Default with
+      {
+        ModelRootPath = CreateInstalledModel(scope.DirectoryPath, modelId),
+        ScriptFileName = script.FileName,
+      }, diagnostics: null, new FakeWorkerClientFactory(workerClient));
+    InferenceException error = await Xunit.Assert.ThrowsAsync<InferenceException>(() => service.TranscribeAsync(
+      new AudioCaptureResult([0, 1], 16000, TimeSpan.FromMilliseconds(1)), modelId));
+    Xunit.Assert.Contains("incomplete transcript", error.Message, StringComparison.Ordinal);
+  }
+
+  [Xunit.Fact]
   public async Task TranscribeAsync_UsesStructuredLogging_AndCleansUpTemporaryAudio()
   {
     using TempDirectoryScope scope = new();
@@ -586,6 +630,7 @@ public sealed class CohereTranscriptionServiceTests
         {
           text = response.Text,
           duration_ms = response.DurationMs,
+          is_truncated = response.IsTruncated,
         });
       string envelope = $$"""{"status":"ok","payload":{{payload}}}""";
       return Task.FromResult(PersistentPythonWorkerClient.DeserializePayload<TResponse>(envelope));
@@ -657,7 +702,7 @@ public sealed class CohereTranscriptionServiceTests
     }
   }
 
-  private sealed record WorkerResponse(string Text, double DurationMs, string? HealthCheck = "model_ready");
+  private sealed record WorkerResponse(string Text, double DurationMs, string? HealthCheck = "model_ready", bool IsTruncated = false);
 
   private sealed record LogEntry(
     string Message,
