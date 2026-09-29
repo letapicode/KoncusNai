@@ -2,7 +2,7 @@
 
 ## Distribution contract
 
-Koncus Nai ships one x64 Windows application MSI and one WiX Burn setup EXE. Transcription and narration models are not bundled; each Windows user prepares the selected provider/model once and its runtime cache remains under that user's local application data.
+The planned supported release produces one x64 Windows application MSI and one WiX Burn setup EXE. No supported public installer has been validated or published yet; follow the [release checklist](../release/release-checklist.md) before distributing one. Transcription and narration models are not bundled; each Windows user prepares the selected provider/model separately and its runtime cache remains under that user's local application data.
 
 Interactive setup:
 

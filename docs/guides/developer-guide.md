@@ -108,7 +108,7 @@ Bootstrap:
 
 Manual build/test:
 ```powershell
-dotnet restore DictateAnywhere.sln --force-evaluate
+dotnet restore DictateAnywhere.sln --locked-mode
 dotnet build DictateAnywhere.sln --configuration Release --no-restore
 dotnet test DictateAnywhere.sln --configuration Release --no-restore
 ```
@@ -269,9 +269,7 @@ Release planning references:
 - `docs/release/diagnostics-feedback-loop-and-bugfix-queue.md`
 
 ## CI Expectations
-- CI runs build + test + reliability + fault-injection + compatibility contract checks.
-- CI also runs the project-reference guardrail check to catch new coupling and circular references early.
-- CI failures are blocking for release candidate progression.
+The [GitHub Actions CI guide](../quality/github-actions-ci.md) maps the current workflow to its scripts, public evidence, and limits. CI runs on pushes and pull requests to `main`; the compiled dependency/API and supply-chain checks cover project-reference contracts. Use the [release checklist](../release/release-checklist.md) for candidate-specific manual, installer, and publishing gates.
 
 ## Koncus Nai branding
 

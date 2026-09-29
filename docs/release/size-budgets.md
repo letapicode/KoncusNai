@@ -74,8 +74,10 @@ occupy 1,850,343 Git bytes and the application icon occupies 10,236 bytes.
 The September 22 source candidate removes all 129 generated previews and the
 manifest from its working tree and publish output. Preview audio is generated
 on demand in bounded per-user storage. The size validator fails if a preview
-WAV or manifest reappears in the source tree. The old Git history still
-contains those WAVs; see the current public-source audit before pushing history.
+WAV or manifest reappears in the source tree. The earlier Notype history
+contained those WAVs; the fresh Koncus Nai history did not import that history.
+See the [historical public-source audit](../../planning/public-source-pre-release-audit-2026-09-17.md)
+for the reviewed source boundary.
 
 ## Release output baseline
 

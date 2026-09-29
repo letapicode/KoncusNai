@@ -17,12 +17,13 @@ does not approve a supported installer or clear third-party rights.
 - [x] Build and test the fresh 1,126-file root checkout and the later 1,127-file `7d3dfd0` baseline. The current tree and history contain no reachable Notype commits.
 - [x] Obtain passing private GitHub CI runs on `ac2e6df`, `7d3dfd0`, `76f2f8e`, `f9a238c`, and `d1b532f` for source and static packaging checks. The owner-supplied `d1b532f` log checked out that exact SHA and reported success.
 - [x] Obtain a passing private GitHub CI run on the final pre-publication source commit `26af366`. Validate later commits separately.
-- [x] Record the owner's direction in the [owner decision record](public-source-owner-decision-record.md) using the [rights review packet](public-source-rights-review-packet.md): pursue source-only visibility while AI4Bharat, Nyra, and Ampixa replies and qualified GPL/LGPL/FFmpeg review remain pending. Keep existing model options available. No notice or unanswered inquiry resolves publisher obligations.
+- [x] Record the owner's September 24 direction in the [owner decision record](public-source-owner-decision-record.md) using the [rights review packet](public-source-rights-review-packet.md): pursue source-only visibility while AI4Bharat, Nyra, and Ampixa replies and qualified GPL/LGPL/FFmpeg review were pending. Keep existing model options available. Ampixa subsequently replied; the historical publication decision remains unchanged.
 - [x] The owner made the final decision to publish source despite unresolved rights questions. Qualified review remains recommended and unperformed; this decision is not third-party permission.
 - [x] The owner reports reviewing the retained private GitHub Actions logs and artifacts that would become visible. That owner-side review was not independently audited locally.
 - [x] Review the final private GitHub diff and exact history before the owner changes visibility; the final candidate passed CI and the owner approved and made the change.
 - [x] Keep public PR submissions enabled by owner choice. The owner reports no collaborators. Opening a PR does not confer merge permission; review any proposed code before merging.
-- [ ] Follow up on AI4Bharat, Nyra, and Ampixa replies and qualified GPL/LGPL/FFmpeg review. Preserve model options and distinguish source visibility from ordinary use, outputs, commercial use, and installer distribution.
+- [x] Record Ampixa's response about Kala voices and the limits of the brief email in the [owner decision record](public-source-owner-decision-record.md).
+- [ ] AI4Bharat and Nyra have not replied: retain existing restrictions and obtain qualified GPL/LGPL/FFmpeg review before making broader rights or supported-installer claims. Preserve model options and distinguish source visibility from ordinary use, outputs, commercial use, and installer distribution.
 
 The September 23 committed-checkout evidence is in the ignored
 `artifacts/release-audit/public-source-2026-09-23/READINESS_REPORT.md`; the
@@ -58,11 +59,15 @@ artifact directory; uploading that whole directory caused the excess. The
 current workflow stages only coverage, fault-seed, compliance, and Python
 advisory JSON summaries plus a hash manifest for the 14-day public artifact.
 The raw fault workspace stays available in the runner during the test; it is
-not in the staged upload. Confirm the reduced artifact on the next public CI
-run. Earlier uploaded artifacts are unaffected by this source change.
+not in the staged upload. The public [`91fa71a` CI run](https://github.com/letapicode/KoncusNai/actions/runs/36502499939)
+completed successfully on September 29, 2026; GitHub's artifact API reported
+one `coverage-and-fault-evidence` artifact of 3,549 bytes. This confirms the
+reduced upload for that commit, not the contents or result of a later commit.
+Earlier uploaded artifacts are unaffected by this source change.
 
 ## Scope
 Use this checklist before publishing any `1.x` release artifact.
+The [GitHub Actions CI guide](../quality/github-actions-ci.md) identifies the automated source checks and their evidence limits; this checklist also requires candidate-specific manual and installer evidence.
 
 ## One-Command Orchestration (Recommended)
 Run end-to-end release execution with one command:

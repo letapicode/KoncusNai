@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 The format is based on Keep a Changelog and uses semantic versioning intent.
 
+The `1.0.0` section below is a planning placeholder, not a published installer or release tag.
+
 ## [Unreleased]
 
 ### Added
@@ -19,6 +21,7 @@ The format is based on Keep a Changelog and uses semantic versioning intent.
 - Release and rollback operational checklists (`docs/release/release-checklist.md`, `docs/release/rollback-checklist.md`).
 - Phased rollout plan (`docs/release/phased-rollout-plan.md`).
 - Diagnostics feedback loop and bugfix queue templates (`docs/release/diagnostics-feedback-loop-and-bugfix-queue.md`, `docs/release/bugfix-queue-template.md`).
+- GitHub Actions workflow guide describing checks, public evidence, and release limits (`docs/quality/github-actions-ci.md`).
 
 ### Changed
 - Replaced verbose successful dictation status copy with a letter-animated **Transcribing** state and brief green completion check; recovery and error outcomes remain explicit.
@@ -35,7 +38,7 @@ The format is based on Keep a Changelog and uses semantic versioning intent.
 ### Fixed
 - Prevented nonanimated insertion/completion overlays from terminating their UI thread and leaving subsequent dictation hotkeys stuck behind a permanently busy pipeline.
 - Made expanded chat composition replace the compact composer visually instead of displaying both editors at once.
-- Preserved successfully transcribed text when the original insertion target cannot be restored by creating a recovery clipboard copy and saving to encrypted history when enabled.
+- Preserved successfully transcribed text when the original insertion target cannot be restored by creating a recovery clipboard copy and saving to local plaintext history.
 - Refreshed open dictation-history views immediately after a successful global history write.
 - Prevented custom Windows maximize handling from bypassing the main window's minimum resize constraints.
 - Prevented disabled Reading Studio color swatches from rendering as white rectangles during videobook preparation.
