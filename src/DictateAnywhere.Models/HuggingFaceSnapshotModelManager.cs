@@ -104,7 +104,7 @@ public sealed class HuggingFaceSnapshotModelManager : IProviderModelManager
       bool isActive = installed && string.Equals(activeModelId, entry.ModelId, StringComparison.OrdinalIgnoreCase);
       bool hasUnverifiedLocalFiles = !installed && IsNonEmptyFile(Path.Combine(GetModelPath(entry), "config.json"));
       models.Add(new ModelInfo(providerId, entry.ModelId, entry.DisplayName, installed, isActive,
-        entry.SupportedLanguages, hasUnverifiedLocalFiles));
+        entry.SupportedLanguages) { HasUnverifiedLocalFiles = hasUnverifiedLocalFiles });
     }
 
     return models;

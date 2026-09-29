@@ -31,7 +31,7 @@ public sealed class TrayMenuPresentationTests
   public void CohereSelectedWithUnverifiedFiles_ShowsVerificationAction()
   {
     ModelInfo cohere = new("cohere-local", "cohere-transcribe-03-2026", "Cohere",
-      false, false, ["en"], HasUnverifiedLocalFiles: true);
+      false, false, ["en"]) { HasUnverifiedLocalFiles = true };
     TrayMenuPresentation presentation = TrayMenuPresentation.Create(
       DictationSessionState.Idle, ModelReadinessSnapshot.Empty, [cohere],
       new TranscriptionModelSelection(cohere.ProviderId, cohere.ModelId), modelCatalogLoaded: true);

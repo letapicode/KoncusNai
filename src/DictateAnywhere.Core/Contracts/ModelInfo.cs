@@ -8,5 +8,7 @@ public sealed record ModelInfo(
   string DisplayName,
   bool IsInstalled,
   bool IsActive,
-  IReadOnlyList<string> SupportedLanguages,
-  bool HasUnverifiedLocalFiles = false);
+  IReadOnlyList<string> SupportedLanguages)
+{
+  public bool HasUnverifiedLocalFiles { get; init; }
+}
