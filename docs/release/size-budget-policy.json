@@ -100,8 +100,8 @@
       "baselineBytes": 718389,
       "minimumFiles": 105,
       "minimumBytes": 646550,
-      "maximumBytes": 1600000,
-      "rationale": "September 26 tracked documentation and planning measured 1503922 Git blob bytes after the chat readability and Paper plans and verification reports. A 1600000-byte cap retains about six percent headroom for bounded documentation growth. Historical baselines are unchanged and generated outputs remain excluded."
+      "maximumBytes": 1700000,
+      "rationale": "September 29 documentation and planning measured approximately 1612000 Git blob bytes after adding the measured dictation latency report and compact numeric evidence. A 1700000-byte cap retains about five percent headroom for bounded documentation growth. Historical baselines are unchanged; private benchmark payloads and generated build outputs remain excluded, and the repository-wide ten-megabyte cap is unchanged."
     },
     {
       "id": "bundled-app-assets",

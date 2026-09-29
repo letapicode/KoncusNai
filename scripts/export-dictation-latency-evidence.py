@@ -122,7 +122,9 @@ def main():
                    'short desktop native p95 regressed; no universal latency improvement claim',
                    'unrestricted 136-second native output lost two passages despite EOS; never approved for insertion'],
     }
-    Path(args.output).write_text(json.dumps(evidence, indent=2)+'\n', encoding='utf-8')
+    # Keep the machine-readable evidence compact; the adjacent Markdown report
+    # provides the readable tables. Whitespace changes must not discard samples.
+    Path(args.output).write_text(json.dumps(evidence, separators=(',', ':'))+'\n', encoding='utf-8')
     print('Exported numeric evidence without private payloads.')
 
 if __name__ == '__main__':

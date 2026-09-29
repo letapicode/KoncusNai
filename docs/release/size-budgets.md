@@ -60,7 +60,12 @@ bytes of test source in CI and 1,503,922 Git blob bytes of documentation and
 planning. The September 28 tray and diagnostics update measured 1,804,048 bytes
 of test source after adding lifecycle, privacy, export, and model-readiness
 regression coverage. The test cap is now 1,920,000 bytes, retaining about six
-percent headroom; the documentation cap remains 1,600,000 bytes.
+percent headroom. The September 29 dictation latency report and compact numeric
+evidence bring documentation and planning to approximately 1,612,000 bytes.
+The documentation cap is now 1,700,000 bytes, retaining about five percent
+headroom. The numeric evidence preserves every exported measurement while
+omitting formatting whitespace; private audio, transcripts and logs remain
+outside Git.
 Repository, production, bundled-asset, and release-output caps remain unchanged;
 historical checkpoint baselines above are retained. The unused paper reference
 image is untracked, and Paper grain is generated in code.
