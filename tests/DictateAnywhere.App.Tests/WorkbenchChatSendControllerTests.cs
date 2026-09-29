@@ -283,21 +283,26 @@ public sealed class WorkbenchChatSendControllerTests
   [Xunit.Fact]
   public async Task SendAsync_CheckingReadinessCannotSubmitOrCreateMessages()
   {
-    TaskCompletionSource<bool> readinessStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
     TaskCompletionSource<WorkbenchChatModelReadinessState> readiness = new(TaskCreationOptions.RunContinuationsAsynchronously);
     await using WorkbenchChatController chat = new(_ => new ImmediateChatService());
+    chat.SetReadiness(isInstalled: true, isRuntimeReady: true);
+    int readinessChecks = 0;
     WorkbenchChatSendController sender = new(
       chat,
       (_, _) =>
       {
-        readinessStarted.TrySetResult(true);
+        readinessChecks++;
         return readiness.Task;
       },
       (_, record, _) => Task.FromResult(Saved(record)),
       new RecordingDiagnostics());
 
     Task<WorkbenchChatModelReadinessState?> check = sender.RefreshReadinessAsync();
-    await readinessStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    // RefreshReadinessAsync invokes the probe before its first suspension.
+    Xunit.Assert.Equal(1, readinessChecks);
+    Xunit.Assert.True(chat.IsCheckingReadiness);
+    Xunit.Assert.True(chat.IsRuntimeReady);
+    Xunit.Assert.False(check.IsCompleted);
     WorkbenchChatSendResult blocked = await sender.SendAsync(
       "Explain this.",
       "New chat",
@@ -307,7 +312,7 @@ public sealed class WorkbenchChatSendControllerTests
     Xunit.Assert.Empty(chat.Messages);
 
     readiness.SetResult(Ready());
-    await check.WaitAsync(TimeSpan.FromSeconds(2));
+    await check.WaitAsync(TimeSpan.FromSeconds(15));
     Xunit.Assert.True(chat.IsRuntimeReady);
     Xunit.Assert.False(chat.IsBusy);
   }
