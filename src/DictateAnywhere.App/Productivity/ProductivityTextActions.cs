@@ -31,13 +31,13 @@ internal static class ProductivityTextActions
       .ConfigureAwait(false);
     if (!resolution.Success || resolution.Record is null)
     {
-      return ProductivityActionResult.Failed(resolution.Message);
+      return ProductivityActionResult.Failed(resolution.Message, resolution.FailureOutcome);
     }
 
     string text = resolution.Record.FinalText;
     if (string.IsNullOrWhiteSpace(text))
     {
-      return ProductivityActionResult.Failed("The last dictation has no insertable text.");
+      return ProductivityActionResult.Failed("The last dictation has no insertable text.", RetryOutcomeCode.EmptyText);
     }
 
     ITextInsertionService insertionService = createInsertionService(settings, diagnostics);
@@ -50,15 +50,28 @@ internal static class ProductivityTextActions
       .ConfigureAwait(false);
 
     return insertion.Success
-      ? ProductivityActionResult.Succeeded("Last dictation retried.")
-      : ProductivityActionResult.Failed(insertion.ErrorMessage ?? $"Insertion returned {insertion.Outcome}.");
+      ? ProductivityActionResult.Succeeded("Last dictation retried.", RetryOutcomeCode.Inserted)
+      : ProductivityActionResult.Failed(insertion.ErrorMessage ?? $"Insertion returned {insertion.Outcome}.",
+        RetryOutcomeCode.InsertionFailed);
   }
 
 }
 
-internal sealed record ProductivityActionResult(bool Success, string Message)
+internal enum RetryOutcomeCode
 {
-  public static ProductivityActionResult Succeeded(string message) => new(true, message);
+  None,
+  Inserted,
+  NoHistory,
+  Expired,
+  EmptyText,
+  InsertionFailed,
+}
 
-  public static ProductivityActionResult Failed(string message) => new(false, message);
+internal sealed record ProductivityActionResult(bool Success, string Message, RetryOutcomeCode OutcomeCode)
+{
+  public static ProductivityActionResult Succeeded(string message, RetryOutcomeCode outcomeCode) =>
+    new(true, message, outcomeCode);
+
+  public static ProductivityActionResult Failed(string message, RetryOutcomeCode outcomeCode) =>
+    new(false, message, outcomeCode);
 }

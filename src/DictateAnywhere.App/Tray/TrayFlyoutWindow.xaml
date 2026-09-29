@@ -1,0 +1,125 @@
+<Window x:Class="DictateAnywhere.App.Tray.TrayFlyoutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        Title="Koncus Nai tray menu"
+        Width="326" MaxHeight="620" SizeToContent="Height"
+        WindowStyle="None" ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True"
+        Deactivated="OnDeactivated" Closing="OnClosing" PreviewKeyDown="OnPreviewKeyDown">
+  <Window.Resources>
+    <Style x:Key="TrayActionStyle" TargetType="Button">
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Padding" Value="11,0" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{StaticResource AppKeyboardFocusVisualStyle}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="8"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter VerticalAlignment="Center"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.Hover}" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Brush.Control.Pressed}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+                <Setter Property="Cursor" Value="Arrow" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <Border Margin="8" Padding="9"
+          Background="{DynamicResource Brush.Surface.Elevated}"
+          BorderBrush="{DynamicResource Brush.Border.Subtle}">
+    <Border.Style>
+      <Style TargetType="Border">
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Effect">
+          <Setter.Value>
+            <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.25" Color="#000000" />
+          </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+          <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=(presentation:WindowThemeBehavior.IsHighContrastActive)}"
+                       Value="True">
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="Effect" Value="{x:Null}" />
+          </DataTrigger>
+        </Style.Triggers>
+      </Style>
+    </Border.Style>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel>
+        <DockPanel Margin="8,5,8,6">
+          <Image Width="24" Height="24" Margin="0,0,9,0" Style="{StaticResource AppBrandMarkStyle}" />
+          <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" FontSize="{DynamicResource Font.Size.Section}"
+                     Foreground="{DynamicResource Brush.Text.Primary}" Text="Koncus Nai" />
+        </DockPanel>
+        <StackPanel Margin="9,0,9,5" AutomationProperties.LiveSetting="Polite">
+          <TextBlock x:Name="SessionStatusText" Foreground="{DynamicResource Brush.Text.Primary}"
+                     FontSize="{DynamicResource Font.Size.Body}" FontWeight="SemiBold" />
+          <TextBlock x:Name="SpeechModelStatusText" Margin="0,2,0,0"
+                     Foreground="{DynamicResource Brush.Text.Secondary}"
+                     FontSize="{DynamicResource Font.Size.Caption}" TextWrapping="Wrap" />
+        </StackPanel>
+        <Button x:Name="SetupModelButton" Style="{StaticResource TrayActionStyle}"
+                Foreground="{DynamicResource Brush.Control.Primary}"
+                AutomationProperties.Name="Set up speech model"
+                Click="OnSetupModelClicked" Content="Set up speech model…" Visibility="Collapsed" />
+
+        <Border Height="1" Margin="7,7" Background="{DynamicResource Brush.Border.Subtle}" />
+        <Button x:Name="OpenWorkbenchButton" Style="{StaticResource TrayActionStyle}" Click="OnOpenWorkbenchClicked" Content="Open Workbench" />
+        <Button x:Name="OpenHistoryButton" Style="{StaticResource TrayActionStyle}"
+                Click="OnOpenHistoryClicked" Content="Dictation History" />
+
+        <Border Height="1" Margin="7,7" Background="{DynamicResource Brush.Border.Subtle}" />
+        <Button x:Name="ModelSwitcherButton" Style="{StaticResource TrayActionStyle}"
+                HorizontalContentAlignment="Stretch"
+                AutomationProperties.Name="Speech model switcher" Click="OnModelSwitcherClicked">
+          <DockPanel LastChildFill="True">
+            <TextBlock x:Name="ModelSwitcherChevron" DockPanel.Dock="Right" Text="▾" />
+            <TextBlock Text="Speech model" />
+          </DockPanel>
+        </Button>
+        <StackPanel x:Name="ModelListPanel" Margin="13,0,0,0" Visibility="Collapsed" />
+        <Button x:Name="RetryLastDictationButton" Style="{StaticResource TrayActionStyle}"
+                Click="OnRetryLastDictationClicked" Content="Retry Last Dictation" />
+
+        <Border Height="1" Margin="7,7" Background="{DynamicResource Brush.Border.Subtle}" />
+        <Button x:Name="OpenSettingsButton" Style="{StaticResource TrayActionStyle}"
+                Click="OnOpenSettingsClicked" Content="Settings" />
+        <Button x:Name="StartWithWindowsButton" Style="{StaticResource TrayActionStyle}"
+                Click="OnStartWithWindowsClicked" AutomationProperties.Name="Start with Windows">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock x:Name="StartupCheckmark" Width="19" Text="✓" Visibility="Hidden" />
+            <TextBlock Text="Start with Windows" />
+          </StackPanel>
+        </Button>
+        <Button x:Name="ExportDiagnosticsButton" Style="{StaticResource TrayActionStyle}"
+                Click="OnExportDiagnosticsClicked" Content="Export Diagnostics…" />
+        <Border Height="1" Margin="7,7" Background="{DynamicResource Brush.Border.Subtle}" />
+        <Button x:Name="QuitButton" Style="{StaticResource TrayActionStyle}"
+                Click="OnQuitClicked" Content="Quit Koncus Nai" />
+      </StackPanel>
+    </ScrollViewer>
+  </Border>
+</Window>

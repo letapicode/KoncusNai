@@ -102,7 +102,9 @@ public sealed class HuggingFaceSnapshotModelManager : IProviderModelManager
     {
       bool installed = IsInstalled(entry);
       bool isActive = installed && string.Equals(activeModelId, entry.ModelId, StringComparison.OrdinalIgnoreCase);
-      models.Add(new ModelInfo(providerId, entry.ModelId, entry.DisplayName, installed, isActive, entry.SupportedLanguages));
+      bool hasUnverifiedLocalFiles = !installed && IsNonEmptyFile(Path.Combine(GetModelPath(entry), "config.json"));
+      models.Add(new ModelInfo(providerId, entry.ModelId, entry.DisplayName, installed, isActive,
+        entry.SupportedLanguages) { HasUnverifiedLocalFiles = hasUnverifiedLocalFiles });
     }
 
     return models;
@@ -156,6 +158,25 @@ public sealed class HuggingFaceSnapshotModelManager : IProviderModelManager
     string providerRootPath = GetProviderRootPath();
 
     Directory.CreateDirectory(providerRootPath);
+    if (!IsInstalled(entry) && Directory.Exists(destinationPath))
+    {
+      string manifestPath = ResolveBundledScriptPath("model-snapshot-provenance.json");
+      bool recovered = await SnapshotProvenanceRepair.TryRepairAsync(destinationPath, entry.ModelId,
+        entry.RepositoryId, entry.Revision!, manifestPath, cancellationToken).ConfigureAwait(false);
+      foreach (RepositoryModelAuxiliaryEntry auxiliary in entry.AuxiliaryRepositories ?? Array.Empty<RepositoryModelAuxiliaryEntry>())
+      {
+        string auxiliaryPath = GetAuxiliaryModelPath(destinationPath, auxiliary);
+        recovered &= await SnapshotProvenanceRepair.TryRepairAsync(auxiliaryPath,
+          $"{entry.ModelId}:{NormalizeAuxiliaryDirectoryName(auxiliary.DirectoryName)}",
+          auxiliary.RepositoryId, auxiliary.Revision!, manifestPath, cancellationToken).ConfigureAwait(false);
+      }
+      if (recovered && IsInstalled(entry))
+      {
+        progress?.Report(1.0);
+        return;
+      }
+    }
+
     TryDeleteDirectory(tempPath);
     progress?.Report(0.0);
 

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -37,16 +38,43 @@ public sealed class DiagnosticsBundleExporter
     string bundlePath = Path.Combine(
       resolvedDestination,
       string.Concat(
-        "dictate-anywhere-diagnostics-",
+        "koncus-nai-diagnostics-",
         DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture),
+        "-",
+        Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture)[..8],
         ".zip"));
 
-    using FileStream zipStream = new(bundlePath, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
-    using ZipArchive archive = new(zipStream, ZipArchiveMode.Create, leaveOpen: false);
+    bool created = false;
+    try
+    {
+      using FileStream zipStream = new(bundlePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+      created = true;
+      using ZipArchive archive = new(zipStream, ZipArchiveMode.Create, leaveOpen: false);
 
-    int logCount = AddLogFiles(archive, logsDirectoryPath, options.IncludeSensitiveData);
-    bool includedSettings = options.IncludeSettings && AddOptionalSettings(archive, settingsFilePath);
-    WriteManifest(archive, logCount, includedSettings, options);
+      int logCount = AddLogFiles(archive, logsDirectoryPath, options);
+      bool includedSettings = options.IncludeSettings && AddOptionalSettings(archive, settingsFilePath, options.AllowlistedSettings);
+      WriteManifest(archive, logCount, includedSettings, options);
+    }
+    catch
+    {
+      if (created)
+      {
+        try
+        {
+          File.Delete(bundlePath);
+        }
+        catch (IOException)
+        {
+          // Preserve the original export failure.
+        }
+        catch (UnauthorizedAccessException)
+        {
+          // Preserve the original export failure.
+        }
+      }
+
+      throw;
+    }
 
     return bundlePath;
   }
@@ -67,7 +95,9 @@ public sealed class DiagnosticsBundleExporter
     return resolved;
   }
 
-  private static int AddLogFiles(ZipArchive archive, string logsDirectoryPath, bool includeSensitiveData)
+  [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+    Justification = "The log stream is disposed in the finally block; the redacting reader explicitly leaves it open.")]
+  private static int AddLogFiles(ZipArchive archive, string logsDirectoryPath, DiagnosticsBundleExportOptions options)
   {
     if (string.IsNullOrWhiteSpace(logsDirectoryPath) || !Directory.Exists(logsDirectoryPath))
     {
@@ -81,19 +111,40 @@ public sealed class DiagnosticsBundleExporter
     foreach (string file in files)
     {
       string fileName = Path.GetFileName(file);
-      if (IsExcludedDiagnosticFile(fileName))
+      if (IsExcludedDiagnosticFile(fileName)
+          || (!string.IsNullOrWhiteSpace(options.LogFilePrefix)
+              && !fileName.StartsWith(options.LogFilePrefix + "-", StringComparison.OrdinalIgnoreCase)
+              && !string.Equals(fileName, options.LogFilePrefix + ".log", StringComparison.OrdinalIgnoreCase)))
       {
         continue;
       }
 
       string entryName = Path.Combine("logs", fileName).Replace('\\', '/');
-      if (includeSensitiveData)
+      Stream? source = null;
+      try
       {
-        archive.CreateEntryFromFile(file, entryName, CompressionLevel.Optimal);
+        try
+        {
+          source = OpenLogForRead(file);
+        }
+        catch (FileNotFoundException)
+        {
+          // A rotated log can disappear after enumeration.
+          continue;
+        }
+        if (options.IncludeSensitiveData)
+        {
+          using Stream destination = archive.CreateEntry(entryName, CompressionLevel.Optimal).Open();
+          source.CopyTo(destination);
+        }
+        else
+        {
+          AddRedactedTextFile(archive, source, entryName, options.MetadataOnlyLogs);
+        }
       }
-      else
+      finally
       {
-        AddRedactedTextFile(archive, file, entryName);
+        source?.Dispose();
       }
 
       count++;
@@ -102,9 +153,19 @@ public sealed class DiagnosticsBundleExporter
     return count;
   }
 
+  private static Stream OpenLogForRead(string path) =>
+    new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
   private static bool IsExcludedDiagnosticFile(string fileName)
   {
     if (string.IsNullOrWhiteSpace(fileName))
+    {
+      return true;
+    }
+
+    // Reader worker logs are free-form and may contain prompt or path fragments
+    // that marker-based redaction cannot reliably recognize.
+    if (fileName.StartsWith("reader-", StringComparison.OrdinalIgnoreCase))
     {
       return true;
     }
@@ -126,45 +187,49 @@ public sealed class DiagnosticsBundleExporter
     return false;
   }
 
-  private static bool AddOptionalSettings(ZipArchive archive, string? settingsFilePath)
+  private static bool AddOptionalSettings(ZipArchive archive, string? settingsFilePath, bool allowlistedOnly)
   {
     if (string.IsNullOrWhiteSpace(settingsFilePath) || !File.Exists(settingsFilePath))
     {
       return false;
     }
 
-    AddSanitizedSettings(archive, settingsFilePath);
-    return true;
-  }
-
-  private static void AddSanitizedSettings(ZipArchive archive, string settingsFilePath)
-  {
-    ZipArchiveEntry entry = archive.CreateEntry("settings/settings.json", CompressionLevel.Optimal);
-    using Stream entryStream = entry.Open();
-    using StreamWriter writer = new(entryStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
+    string sanitized;
     try
     {
       JsonNode? node = JsonNode.Parse(File.ReadAllText(settingsFilePath, Encoding.UTF8));
-      SanitizeSettingsNode(node);
-
-      writer.Write(node?.ToJsonString(new JsonSerializerOptions
+      if (node is not JsonObject) return false;
+      if (allowlistedOnly)
+      {
+        node = SafeSettingsExportProjector.Project((JsonObject)node);
+      }
+      else
+      {
+        SanitizeSettingsNode(node);
+      }
+      sanitized = node.ToJsonString(new JsonSerializerOptions
       {
         WriteIndented = true,
-      }) ?? "{}");
+      });
     }
     catch (JsonException)
     {
-      writer.Write("{}");
+      return false;
     }
     catch (IOException)
     {
-      writer.Write("{}");
+      return false;
     }
     catch (UnauthorizedAccessException)
     {
-      writer.Write("{}");
+      return false;
     }
+
+    ZipArchiveEntry entry = archive.CreateEntry("settings/settings.json", CompressionLevel.Optimal);
+    using Stream entryStream = entry.Open();
+    using StreamWriter writer = new(entryStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    writer.Write(sanitized);
+    return true;
   }
 
   private static void SanitizeSettingsNode(JsonNode? node)
@@ -200,7 +265,8 @@ public sealed class DiagnosticsBundleExporter
     [
       "password", "secret", "token", "apiKey", "api_key", "api-key",
       "credential", "verifier", "salt", "privateKey", "private_key",
-      "authKey", "auth_key", "client_secret", "clientsecret"
+      "authKey", "auth_key", "client_secret", "clientsecret",
+      "path", "directory", "folder", "fileName", "deviceId", "processName", "url"
     ];
     foreach (string marker in markers)
     {
@@ -213,14 +279,23 @@ public sealed class DiagnosticsBundleExporter
     return false;
   }
 
-  private static void AddRedactedTextFile(ZipArchive archive, string sourcePath, string entryName)
+  private static void AddRedactedTextFile(ZipArchive archive, Stream source, string entryName, bool metadataOnly)
   {
     ZipArchiveEntry entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
     using Stream entryStream = entry.Open();
     using StreamWriter writer = new(entryStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-    foreach (string line in File.ReadLines(sourcePath, Encoding.UTF8))
+    using StreamReader reader = new(source, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+    while (reader.ReadLine() is { } line)
     {
-      writer.WriteLine(SensitiveDiagnosticsRedactor.Redact(line));
+      if (metadataOnly)
+      {
+        string? projected = SafeLogExportProjector.Project(line);
+        if (projected is not null) writer.WriteLine(projected);
+      }
+      else
+      {
+        writer.WriteLine(SensitiveDiagnosticsRedactor.Redact(line));
+      }
     }
   }
 
@@ -237,7 +312,10 @@ public sealed class DiagnosticsBundleExporter
       IncludedSensitiveData: options.IncludeSensitiveData,
       IncludedHistory: false,
       IncludedAudio: false,
-      ContentsPolicy: "logs are redacted unless sensitive data is explicitly included; raw history and audio are strictly excluded; settings exclude credential material",
+      ContentsPolicy: options.MetadataOnlyLogs
+        ? "app logs contain structured metadata and fixed retry outcomes only; raw history, audio, message text, paths, and credentials are excluded; settings contain allowlisted non-identifying fields"
+        : "logs are redacted unless sensitive data is explicitly included; raw history and audio are strictly excluded; settings exclude credential material",
+      ApplicationVersion: options.ApplicationVersion ?? "unknown",
       RuntimeVersion: Environment.Version.ToString());
 
     ZipArchiveEntry entry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
@@ -257,5 +335,6 @@ public sealed class DiagnosticsBundleExporter
     bool IncludedHistory,
     bool IncludedAudio,
     string ContentsPolicy,
+    string ApplicationVersion,
     string RuntimeVersion);
 }

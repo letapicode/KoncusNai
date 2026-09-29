@@ -23,4 +23,5 @@ internal interface ITrayIconHost : IDisposable
   void SetStartOnLoginEnabled(bool enabled);
   void SetModelMenu(IReadOnlyList<ModelInfo> models, TranscriptionModelSelection activeSelection);
   void ShowNotification(string title, string message, Forms.ToolTipIcon icon = Forms.ToolTipIcon.Info, int timeoutMilliseconds = 5000);
+  void BeginShutdown();
 }

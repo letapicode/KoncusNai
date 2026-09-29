@@ -23,11 +23,36 @@ public sealed class DiagnosticsBundleExporterTests
     string bundlePath = exporter.ExportToDirectory(outputDirectory, logsDirectory, settingsFile);
 
     Xunit.Assert.True(File.Exists(bundlePath));
+    DiagnosticsBundleVerifier.Verify(bundlePath);
 
     using ZipArchive archive = ZipFile.OpenRead(bundlePath);
     Xunit.Assert.Contains(archive.Entries, entry => string.Equals(entry.FullName, "manifest.json", StringComparison.Ordinal));
     Xunit.Assert.Contains(archive.Entries, entry => entry.FullName.StartsWith("logs/", StringComparison.Ordinal));
     Xunit.Assert.Contains(archive.Entries, entry => string.Equals(entry.FullName, "settings/settings.json", StringComparison.Ordinal));
+  }
+
+  [Xunit.Fact]
+  public void ExportToDirectory_RepeatedExportsKeepBothBundles()
+  {
+    using TempDirectoryScope root = new();
+    DiagnosticsBundleExporter exporter = new();
+
+    string first = exporter.ExportToDirectory(root.DirectoryPath, logsDirectoryPath: string.Empty);
+    string second = exporter.ExportToDirectory(root.DirectoryPath, logsDirectoryPath: string.Empty);
+
+    Xunit.Assert.NotEqual(first, second);
+    DiagnosticsBundleVerifier.Verify(first);
+    DiagnosticsBundleVerifier.Verify(second);
+  }
+
+  [Xunit.Fact]
+  public void Verify_RejectsCorruptBundle()
+  {
+    using TempDirectoryScope root = new();
+    string path = Path.Combine(root.DirectoryPath, "broken.zip");
+    File.WriteAllText(path, "not a zip");
+
+    Xunit.Assert.Throws<InvalidDataException>(() => DiagnosticsBundleVerifier.Verify(path));
   }
 
   [Xunit.Fact]
@@ -51,6 +76,22 @@ public sealed class DiagnosticsBundleExporterTests
     Xunit.Assert.DoesNotContain("apiToken", exportedSettings, StringComparison.Ordinal);
     Xunit.Assert.DoesNotContain("clientSecret", exportedSettings, StringComparison.Ordinal);
     Xunit.Assert.Contains("model", exportedSettings, StringComparison.Ordinal);
+  }
+
+  [Xunit.Fact]
+  public void ExportToDirectory_DoesNotClaimUnreadableSettingsWereIncluded()
+  {
+    using TempDirectoryScope root = new();
+    string settingsFile = Path.Combine(root.DirectoryPath, "settings.json");
+    File.WriteAllText(settingsFile, "{ invalid json");
+
+    string bundlePath = new DiagnosticsBundleExporter().ExportToDirectory(
+      root.DirectoryPath, logsDirectoryPath: string.Empty, settingsFilePath: settingsFile);
+    DiagnosticsBundleVerifier.Verify(bundlePath);
+    using ZipArchive archive = ZipFile.OpenRead(bundlePath);
+    Xunit.Assert.Null(archive.GetEntry("settings/settings.json"));
+    using JsonDocument manifest = JsonDocument.Parse(archive.GetEntry("manifest.json")!.Open());
+    Xunit.Assert.False(manifest.RootElement.GetProperty("includedSettings").GetBoolean());
   }
 
   [Xunit.Fact]
@@ -156,6 +197,7 @@ public sealed class DiagnosticsBundleExporterTests
     File.WriteAllText(Path.Combine(logsDirectory, "recording.mp3"), "ID3000000");
     File.WriteAllText(Path.Combine(logsDirectory, "history-export.log"), "{\"text\":\"history log\"}");
     File.WriteAllText(Path.Combine(logsDirectory, "audio-debug.log"), "{\"text\":\"audio log\"}");
+    File.WriteAllText(Path.Combine(logsDirectory, "reader-indic-parler.log"), "unstructured prompt fragments");
 
     DiagnosticsBundleExporter exporter = new();
     string bundlePath = exporter.ExportToDirectory(outputDirectory, logsDirectory);
@@ -169,6 +211,7 @@ public sealed class DiagnosticsBundleExporterTests
     Xunit.Assert.DoesNotContain(entryNames, name => name.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase));
     Xunit.Assert.DoesNotContain(entryNames, name => name.EndsWith(".wav", StringComparison.OrdinalIgnoreCase));
     Xunit.Assert.DoesNotContain(entryNames, name => name.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase));
+    Xunit.Assert.DoesNotContain(entryNames, name => name.Contains("reader-indic-parler", StringComparison.OrdinalIgnoreCase));
   }
 
   [Xunit.Fact]

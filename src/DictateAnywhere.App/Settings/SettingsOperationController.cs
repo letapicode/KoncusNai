@@ -325,12 +325,14 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   {
     ArgumentNullException.ThrowIfNull(selection);
 
-    SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.DownloadModel, $"Downloading {selection.ProviderId}/{selection.ModelId}..."));
+    SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.DownloadModel,
+      $"Verifying local files or downloading {selection.ProviderId}/{selection.ModelId}..."));
     try
     {
       await modelManager.DownloadModelAsync(selection, progress, cancellationToken).ConfigureAwait(false);
       await RefreshModelsAsync(selection, cancellationToken).ConfigureAwait(false);
-      SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.DownloadModel, $"Downloaded {selection.ProviderId}/{selection.ModelId}."));
+      SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.DownloadModel,
+        $"Speech model installed: {selection.ProviderId}/{selection.ModelId}."));
       return true;
     }
     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -340,7 +342,8 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     catch (Exception ex)
     {
       diagnostics.Error("Speech-model download failed", ex);
-      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.DownloadModel, "Download failed. See Diagnostics."));
+      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.DownloadModel,
+        "Speech model verification or download failed. See Diagnostics."));
       return false;
     }
   }

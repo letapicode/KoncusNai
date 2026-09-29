@@ -50,6 +50,7 @@ public partial class App : Application
   private IDisposable? textScaleSubscription;
   private EventWaitHandle? activationSignal;
   private DispatcherTimer? activationTimer;
+  private bool isShuttingDown;
 
   protected override async void OnStartup(StartupEventArgs e)
   {
@@ -101,7 +102,9 @@ public partial class App : Application
       (operation, message, exception) => ReportUserFacingError(operation, message, exception, MessageBoxImage.Warning));
     trayCommandCoordinator = composition.CreateTrayCommandCoordinator(
       trayHandlers,
-      () => applicationHost?.CurrentState ?? DictationSessionState.Idle);
+      () => applicationHost?.IsRunning == true
+        ? applicationHost.CurrentState
+        : DictationSessionState.Error);
 
     try
     {
@@ -158,6 +161,8 @@ public partial class App : Application
 
   protected override async void OnExit(ExitEventArgs e)
   {
+    isShuttingDown = true;
+    trayCommandCoordinator?.BeginShutdown();
     activationTimer?.Stop();
     if (activationTimer is not null) activationTimer.Tick -= OnActivationRequested;
     activationSignal?.Dispose();
@@ -214,7 +219,8 @@ public partial class App : Application
     instanceGuard?.Dispose();
     instanceGuard = null;
 
-    watchdogTickLock.Dispose();
+    // An in-flight async timer callback may still release this lock after OnExit returns.
+    // The process is exiting, so disposing it here would create a shutdown race.
     base.OnExit(e);
   }
 
@@ -442,6 +448,7 @@ public partial class App : Application
 
   private async Task OpenSettingsAsync()
   {
+    if (isShuttingDown) return;
     if (windowCoordinator is null)
     {
       throw new InvalidOperationException("Window coordinator is not initialized.");
@@ -468,6 +475,7 @@ public partial class App : Application
     }
 
     AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    if (isShuttingDown) return;
     if (!settings.AssistantFeaturesEnabled)
     {
       await OpenSettingsAsync().ConfigureAwait(true);
@@ -479,6 +487,7 @@ public partial class App : Application
       runtimeStarted = await RestartRuntimeForSettingsAsync(settings).ConfigureAwait(true);
     }
 
+    if (isShuttingDown) return;
     await EnsureWorkbenchAsync(settings, registerWorkbenchHotkey: !runtimeStarted).ConfigureAwait(true);
     await RefreshTrayModelsAsync().ConfigureAwait(true);
     await RestartProductivityHotkeysAsync(settings).ConfigureAwait(true);
@@ -486,6 +495,7 @@ public partial class App : Application
 
   private async Task OpenHistoryAsync()
   {
+    if (isShuttingDown) return;
     if (windowCoordinator is null)
     {
       throw new InvalidOperationException("Window coordinator is not initialized.");
@@ -522,21 +532,22 @@ public partial class App : Application
     ProductivityActionResult result = await composition
       .RetryLastDictationAsync(settings)
       .ConfigureAwait(true);
+    if (isShuttingDown) return;
+    RetryActionDiagnostics.Write(diagnostics, result);
     ShowProductivityActionResult(result);
   }
 
-  private static void ShowProductivityActionResult(ProductivityActionResult result)
+  private void ShowProductivityActionResult(ProductivityActionResult result)
   {
-    if (result.Success)
+    if (result.Success || isShuttingDown)
     {
       return;
     }
 
-    _ = MessageBox.Show(
-      result.Message,
-      "Koncus Nai",
-      MessageBoxButton.OK,
-      MessageBoxImage.Information);
+    Window? mainWindow = MainWindow;
+    RetryFeedbackWindow notice = new(result);
+    if (ReferenceEquals(MainWindow, notice)) MainWindow = mainWindow;
+    notice.Show();
   }
 
   private async Task ApplyQuickModelSwitchAsync(TranscriptionModelSelection selection)
@@ -555,6 +566,7 @@ public partial class App : Application
     }
 
     AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    if (isShuttingDown) return;
     if (!CrisperWhisperLicenseConfirmation.EnsureAccepted(
           Current?.MainWindow,
           normalizedSelection,
@@ -599,6 +611,7 @@ public partial class App : Application
 
     IReadOnlyList<ModelInfo> models = await modelManager.GetModelsAsync().ConfigureAwait(true);
     AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    if (isShuttingDown) return;
     trayCommandCoordinator.SetModelMenu(models, settings.GetConfiguredTranscriptionSelection());
   }
 
@@ -625,13 +638,24 @@ public partial class App : Application
       Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
       "DictateAnywhere",
       "support");
-    string bundlePath = diagnostics.ExportBundle(destinationDirectory);
-
-    _ = MessageBox.Show(
-      $"Diagnostics bundle exported to:\n{bundlePath}\n\nAttach this file when reporting an issue.",
-      "Koncus Nai",
-      MessageBoxButton.OK,
-      MessageBoxImage.Information);
+    try
+    {
+      string bundlePath = diagnostics.ExportBundle(destinationDirectory);
+      DiagnosticsBundleVerifier.Verify(bundlePath);
+      Window? mainWindow = MainWindow;
+      DiagnosticsExportResultWindow result = new(bundlePath);
+      if (ReferenceEquals(MainWindow, result)) MainWindow = mainWindow;
+      result.Show();
+    }
+    catch (Exception exception) when (exception is IOException or InvalidDataException
+      or UnauthorizedAccessException or InvalidOperationException)
+    {
+      _ = MessageBox.Show(
+        $"Could not export diagnostics to:\n{destinationDirectory}\n\n{exception.Message}\n\nCheck that the folder is writable and has free space, then try again.",
+        "Diagnostics export failed",
+        MessageBoxButton.OK,
+        MessageBoxImage.Warning);
+    }
     return Task.CompletedTask;
   }
 
@@ -700,6 +724,7 @@ public partial class App : Application
 
   private Task RunTrayActionAsync(Func<Task> action)
   {
+    if (isShuttingDown) return Task.CompletedTask;
     if (trayCommandCoordinator is null)
     {
       throw new InvalidOperationException("Tray command coordinator is not initialized.");
@@ -721,7 +746,7 @@ public partial class App : Application
 
   private void ShowPendingRuntimeNotice()
   {
-    if (trayCommandCoordinator is null || pendingRuntimeNotice is null)
+    if (isShuttingDown || trayCommandCoordinator is null || pendingRuntimeNotice is null)
     {
       return;
     }
@@ -742,6 +767,7 @@ public partial class App : Application
 
   private void ReportUserFacingError(string operationName, string diagnosticsMessage, Exception exception, MessageBoxImage messageBoxImage)
   {
+    if (isShuttingDown) return;
     UserFacingDiagnosticError userFacingError = DiagnosticErrorClassifier.Describe(operationName, diagnosticsMessage, exception);
     diagnostics?.Error(diagnosticsMessage, exception);
 

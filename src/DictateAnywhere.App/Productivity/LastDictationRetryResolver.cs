@@ -26,9 +26,11 @@ internal static class LastDictationRetryResolver
     latest = await readHistoryLatestAsync(cancellationToken).ConfigureAwait(false);
     bool expiredCacheEntryExists = LastDictationSessionCache.TryGet(TimeSpan.Zero, out _);
     return latest is null
-      ? LastDictationRetryResolution.Failed(expiredCacheEntryExists
-        ? "Last dictation retry expired and no saved history entry is available."
-        : "No dictation history entry is available yet.")
+      ? expiredCacheEntryExists
+        ? LastDictationRetryResolution.Failed(
+          "Last dictation retry expired and no saved history entry is available.", RetryOutcomeCode.Expired)
+        : LastDictationRetryResolution.Failed(
+          "No dictation history entry is available yet.", RetryOutcomeCode.NoHistory)
       : LastDictationRetryResolution.Succeeded(latest.Normalize(), "local-history");
   }
 
@@ -42,16 +44,17 @@ internal sealed record LastDictationRetryResolution(
   bool Success,
   string Message,
   string Source,
-  DictationHistoryRecord? Record)
+  DictationHistoryRecord? Record,
+  RetryOutcomeCode FailureOutcome)
 {
   public static LastDictationRetryResolution Succeeded(DictationHistoryRecord record, string source)
   {
     ArgumentNullException.ThrowIfNull(record);
-    return new LastDictationRetryResolution(true, string.Empty, source, record);
+    return new LastDictationRetryResolution(true, string.Empty, source, record, RetryOutcomeCode.None);
   }
 
-  public static LastDictationRetryResolution Failed(string message)
+  public static LastDictationRetryResolution Failed(string message, RetryOutcomeCode reason)
   {
-    return new LastDictationRetryResolution(false, message, string.Empty, null);
+    return new LastDictationRetryResolution(false, message, string.Empty, null, reason);
   }
 }

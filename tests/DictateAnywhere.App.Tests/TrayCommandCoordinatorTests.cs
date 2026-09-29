@@ -65,6 +65,24 @@ public sealed class TrayCommandCoordinatorTests
   }
 
   [Xunit.Fact]
+  public async Task RunAsync_DoesNotCrashIfFailureReporterAlsoFails()
+  {
+    FakeTrayIconHost host = new();
+    TrayCommandHandlers handlers = CreateHandlers((_, _, _) => throw new InvalidOperationException("report failed"));
+    await using TrayCommandCoordinator coordinator = new(host, handlers, () => DictationSessionState.Idle);
+
+    await coordinator.RunAsync(() => throw new IOException("action failed"));
+    bool followUpRan = false;
+    await coordinator.RunAsync(() =>
+    {
+      followUpRan = true;
+      return Task.CompletedTask;
+    });
+
+    Xunit.Assert.True(followUpRan);
+  }
+
+  [Xunit.Fact]
   public async Task DisposeAsync_DetachesEventsAndDisposesTrayHost()
   {
     FakeTrayIconHost host = new();
@@ -84,6 +102,59 @@ public sealed class TrayCommandCoordinatorTests
     await Task.Delay(20);
     Xunit.Assert.Equal(1, commandCount);
     Xunit.Assert.True(host.Disposed);
+    Xunit.Assert.True(host.ShutdownStarted);
+  }
+
+  [Xunit.Fact]
+  public async Task BeginShutdownStopsTrayInputBeforeAnActiveCommandFinishes()
+  {
+    FakeTrayIconHost host = new();
+    TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TrayCommandCoordinator coordinator = CreateCoordinator(host);
+    bool queuedCommandRan = false;
+    Task command = coordinator.RunAsync(async () =>
+    {
+      started.SetResult();
+      await release.Task;
+    });
+    await started.Task;
+    Task queuedCommand = coordinator.RunAsync(() =>
+    {
+      queuedCommandRan = true;
+      return Task.CompletedTask;
+    });
+
+    coordinator.BeginShutdown();
+    Xunit.Assert.True(host.ShutdownStarted);
+    Xunit.Assert.False(host.Disposed);
+    await queuedCommand;
+    Xunit.Assert.False(queuedCommandRan);
+    Xunit.Assert.False(await coordinator.TryRunAsync(() => Task.CompletedTask));
+
+    release.SetResult();
+    await command;
+    await coordinator.DisposeAsync();
+    Xunit.Assert.True(host.Disposed);
+  }
+
+  [Xunit.Fact]
+  public async Task ExportRequested_RunsExportHandler()
+  {
+    FakeTrayIconHost host = new();
+    TaskCompletionSource called = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TrayCommandHandlers handlers = CreateHandlers((_, _, _) => { }) with
+    {
+      ExportDiagnosticsAsync = () =>
+      {
+        called.SetResult();
+        return Task.CompletedTask;
+      },
+    };
+    await using TrayCommandCoordinator coordinator = new(host, handlers, () => DictationSessionState.Idle);
+
+    host.RaiseExportDiagnostics();
+    await called.Task.WaitAsync(TimeSpan.FromSeconds(2));
   }
 
   private static TrayCommandCoordinator CreateCoordinator(FakeTrayIconHost host) => new(
@@ -124,16 +195,19 @@ public sealed class TrayCommandCoordinatorTests
     public event EventHandler<bool>? StartupToggleRequested { add { } remove { } }
     public event EventHandler? RetryLastDictationRequested { add { } remove { } }
     public event EventHandler<TranscriptionModelSelection>? QuickModelSwitchRequested { add { } remove { } }
-    public event EventHandler? ExportDiagnosticsRequested { add { } remove { } }
+    public event EventHandler? ExportDiagnosticsRequested;
 
     public bool Disposed { get; private set; }
+    public bool ShutdownStarted { get; private set; }
 
     public void RaiseOpenSettings() => OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+    public void RaiseExportDiagnostics() => ExportDiagnosticsRequested?.Invoke(this, EventArgs.Empty);
     public void SetStatus(DictationSessionState state) { }
     public void SetModelReadiness(ModelReadinessSnapshot snapshot) { }
     public void SetStartOnLoginEnabled(bool enabled) { }
     public void SetModelMenu(IReadOnlyList<ModelInfo> models, TranscriptionModelSelection activeSelection) { }
     public void ShowNotification(string title, string message, Forms.ToolTipIcon icon = Forms.ToolTipIcon.Info, int timeoutMilliseconds = 5000) { }
+    public void BeginShutdown() => ShutdownStarted = true;
     public void Dispose() => Disposed = true;
   }
 }

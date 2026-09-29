@@ -281,15 +281,21 @@ public sealed class WindowShellPreflightTests
   public void TrayKeyboardAlternatives_AreNamedAndRemainStructurallyWired()
   {
     string root = FindRepoRoot();
-    string trayPath = Path.Combine(root, "src", "DictateAnywhere.App", "Tray", "TrayIconHost.cs");
-    string source = File.ReadAllText(trayPath);
+    string trayDirectory = Path.Combine(root, "src", "DictateAnywhere.App", "Tray");
+    string host = File.ReadAllText(Path.Combine(trayDirectory, "TrayIconHost.cs"));
+    string flyout = File.ReadAllText(Path.Combine(trayDirectory, "TrayFlyoutWindow.xaml"));
+    string handlers = File.ReadAllText(Path.Combine(trayDirectory, "TrayFlyoutWindow.xaml.cs"));
 
-    Assert.Contains("Open Settings", source, StringComparison.Ordinal);
-    Assert.Contains("Open Textbox Workbench", source, StringComparison.Ordinal);
-    Assert.Contains("Open Dictation History", source, StringComparison.Ordinal);
-    Assert.Contains("OpenSettingsRequested?.Invoke", source, StringComparison.Ordinal);
-    Assert.Contains("OpenWorkbenchRequested?.Invoke", source, StringComparison.Ordinal);
-    Assert.Contains("OpenHistoryRequested?.Invoke", source, StringComparison.Ordinal);
+    Assert.Contains("Content=\"Settings\"", flyout, StringComparison.Ordinal);
+    Assert.Contains("Content=\"Open Workbench\"", flyout, StringComparison.Ordinal);
+    Assert.Contains("Content=\"Dictation History\"", flyout, StringComparison.Ordinal);
+    Assert.Contains("OnPreviewKeyDown", handlers, StringComparison.Ordinal);
+    Assert.Contains("OpenSettingsRequested?.Invoke", handlers, StringComparison.Ordinal);
+    Assert.Contains("OpenWorkbenchRequested?.Invoke", handlers, StringComparison.Ordinal);
+    Assert.Contains("OpenHistoryRequested?.Invoke", handlers, StringComparison.Ordinal);
+    Assert.Contains("window.OpenSettingsRequested +=", host, StringComparison.Ordinal);
+    Assert.Contains("window.OpenWorkbenchRequested +=", host, StringComparison.Ordinal);
+    Assert.Contains("window.OpenHistoryRequested +=", host, StringComparison.Ordinal);
   }
 
   private static Window CreateOffscreenWindow() => new()

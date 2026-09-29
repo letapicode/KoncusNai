@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,8 +32,10 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
   private readonly TrayCommandHandlers handlers;
   private readonly Func<DictationSessionState> getRuntimeState;
   private readonly SemaphoreSlim commandLock = new(1, 1);
+  private readonly CancellationTokenSource shutdownCancellation = new();
   private readonly DispatcherTimer statusTimer;
   private Task? disposalTask;
+  private bool shuttingDown;
   private bool disposed;
 
   public TrayCommandCoordinator(
@@ -78,20 +81,31 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
   public void SetModelMenu(IReadOnlyList<ModelInfo> models, TranscriptionModelSelection selection) =>
     trayHost.SetModelMenu(models, selection);
 
-  public void ShowNotification(string title, string message, Forms.ToolTipIcon icon) =>
-    trayHost.ShowNotification(title, message, icon);
+  public void ShowNotification(string title, string message, Forms.ToolTipIcon icon)
+  {
+    if (!shuttingDown && !disposed) trayHost.ShowNotification(title, message, icon);
+  }
+
+  public void BeginShutdown()
+  {
+    if (shuttingDown || disposed) return;
+    shuttingDown = true;
+    shutdownCancellation.Cancel();
+    statusTimer.Stop();
+    trayHost.BeginShutdown();
+  }
 
   public Task RunAsync(Func<Task> action)
   {
-    ObjectDisposedException.ThrowIf(disposed, this);
     ArgumentNullException.ThrowIfNull(action);
+    if (shuttingDown || disposed) return Task.CompletedTask;
     return RunCoreAsync(action, waitForTurn: true);
   }
 
   public async Task<bool> TryRunAsync(Func<Task> action)
   {
-    ObjectDisposedException.ThrowIf(disposed, this);
     ArgumentNullException.ThrowIfNull(action);
+    if (shuttingDown || disposed) return false;
     return await RunCoreAsync(action, waitForTurn: false).ConfigureAwait(true);
   }
 
@@ -108,8 +122,8 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
       return;
     }
 
+    BeginShutdown();
     disposed = true;
-    statusTimer.Stop();
     statusTimer.Tick -= OnStatusTimerTick;
     trayHost.OpenSettingsRequested -= OnOpenSettingsRequested;
     trayHost.OpenWorkbenchRequested -= OnOpenWorkbenchRequested;
@@ -128,6 +142,7 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
     {
       commandLock.Release();
       commandLock.Dispose();
+      shutdownCancellation.Dispose();
     }
   }
 
@@ -137,9 +152,17 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
     Justification = "Tray event commands are an application boundary; all failures must be observed and presented without crashing the dispatcher.")]
   private async Task<bool> RunCoreAsync(Func<Task> action, bool waitForTurn)
   {
-    bool entered = waitForTurn
-      ? await WaitForTurnAsync().ConfigureAwait(true)
-      : await commandLock.WaitAsync(0).ConfigureAwait(true);
+    bool entered;
+    try
+    {
+      entered = waitForTurn
+        ? await WaitForTurnAsync().ConfigureAwait(true)
+        : await commandLock.WaitAsync(0, shutdownCancellation.Token).ConfigureAwait(true);
+    }
+    catch (OperationCanceledException) when (shuttingDown)
+    {
+      return false;
+    }
     if (!entered)
     {
       return false;
@@ -147,15 +170,16 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
 
     try
     {
+      if (shuttingDown) return false;
       await action().ConfigureAwait(true);
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ModelManagementException)
     {
-      handlers.ReportFailure("Tray action", "Tray action failed.", ex);
+      if (!shuttingDown) ReportFailureSafely("Tray action failed.", ex);
     }
     catch (Exception ex)
     {
-      handlers.ReportFailure("Tray action", "Tray action failed unexpectedly.", ex);
+      if (!shuttingDown) ReportFailureSafely("Tray action failed unexpectedly.", ex);
     }
     finally
     {
@@ -165,9 +189,23 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
     return true;
   }
 
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "The error reporter is the final tray event boundary; its own failure must not crash the dispatcher.")]
+  private void ReportFailureSafely(string message, Exception exception)
+  {
+    try
+    {
+      handlers.ReportFailure("Tray action", message, exception);
+    }
+    catch (Exception reportingFailure)
+    {
+      Trace.TraceError("Tray error reporting failed: {0}", reportingFailure.GetType().FullName);
+    }
+  }
+
   private async Task<bool> WaitForTurnAsync()
   {
-    await commandLock.WaitAsync().ConfigureAwait(true);
+    await commandLock.WaitAsync(shutdownCancellation.Token).ConfigureAwait(true);
     return true;
   }
 
@@ -179,5 +217,8 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
   private async void OnQuickModelSwitchRequested(object? sender, TranscriptionModelSelection selection) => await RunAsync(() => handlers.ApplyQuickModelSwitchAsync(selection)).ConfigureAwait(true);
   private async void OnExportDiagnosticsRequested(object? sender, EventArgs e) => await RunAsync(handlers.ExportDiagnosticsAsync).ConfigureAwait(true);
   private void OnQuitRequested(object? sender, EventArgs e) => handlers.Quit();
-  private void OnStatusTimerTick(object? sender, EventArgs e) => trayHost.SetStatus(getRuntimeState());
+  private void OnStatusTimerTick(object? sender, EventArgs e)
+  {
+    if (!shuttingDown) trayHost.SetStatus(getRuntimeState());
+  }
 }

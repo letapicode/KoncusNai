@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Diagnostics;
 
@@ -11,6 +12,7 @@ public sealed class LocalFileDiagnostics : IStructuredDiagnostics, IDisposable
   private readonly StructuredLocalDiagnostics diagnostics;
   private readonly DiagnosticsBundleExporter bundleExporter;
   private readonly string settingsPath;
+  private readonly string logFilePrefix;
   private bool disposed;
 
   public LocalFileDiagnostics()
@@ -34,6 +36,7 @@ public sealed class LocalFileDiagnostics : IStructuredDiagnostics, IDisposable
     diagnostics = new StructuredLocalDiagnostics(options);
     this.bundleExporter = bundleExporter ?? throw new ArgumentNullException(nameof(bundleExporter));
     this.settingsPath = settingsPath ?? throw new ArgumentNullException(nameof(settingsPath));
+    logFilePrefix = options.FileNamePrefix;
   }
 
   public void Info(string message)
@@ -72,7 +75,16 @@ public sealed class LocalFileDiagnostics : IStructuredDiagnostics, IDisposable
   public string ExportBundle(string destinationDirectory)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
-    return bundleExporter.ExportToDirectory(destinationDirectory, diagnostics.LogsDirectoryPath, settingsPath);
+    return bundleExporter.ExportToDirectory(destinationDirectory, diagnostics.LogsDirectoryPath, settingsPath,
+      DiagnosticsBundleExportOptions.Default with
+      {
+        ApplicationVersion = typeof(LocalFileDiagnostics).Assembly
+          .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+          ?? typeof(LocalFileDiagnostics).Assembly.GetName().Version?.ToString(),
+        LogFilePrefix = logFilePrefix,
+        MetadataOnlyLogs = true,
+        AllowlistedSettings = true,
+      });
   }
 
   public void Dispose()

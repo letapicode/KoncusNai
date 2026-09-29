@@ -219,6 +219,7 @@ public sealed class HuggingFaceSnapshotModelManagerTests
 
       models = await manager.GetModelsAsync();
       Xunit.Assert.False(models[0].IsInstalled);
+      Xunit.Assert.True(models[0].HasUnverifiedLocalFiles);
 
       File.WriteAllText(
         Path.Combine(modelDir, HuggingFaceSnapshotModelManager.ProvenanceMarkerFileName),
