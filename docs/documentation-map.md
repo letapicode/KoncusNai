@@ -15,6 +15,7 @@ for the commit or decision context they identify.
 | Intentional compiled APIs and assembly dependency evidence | [Public API and dependency contract](architecture/public-api-and-dependency-contract.md) | [Compiled baseline](architecture/public-api-baseline.json) |
 | Contributor setup and command index | [Developer guide](guides/developer-guide.md) | [Test strategy](quality/test-strategy.md) |
 | Test taxonomy and automated gates | [Test strategy](quality/test-strategy.md) | [Engineering rubric](quality/engineering-decision-and-maintainability-rubric.md) |
+| GitHub Actions triggers, step order, permissions, and public evidence | [GitHub Actions CI](quality/github-actions-ci.md) | [Workflow source](../.github/workflows/ci.yml) and [test strategy](quality/test-strategy.md) |
 | Security threats and local-processing guarantees | [Threat model](security/threat-model.md) and [local-processing guarantees](security/local-processing-guarantees.md) | [Supply-chain provenance](security/supply-chain-provenance.json) |
 | Dependency, model, runtime, asset, and CI-action provenance | [Supply-chain provenance](security/supply-chain-provenance.json) | [Dependency manifest](dependency-manifest.md) and [license inventory](license-inventory.md) |
 | Installer payload | [Installer packaging](release/installer-packaging.md) | [Release checklist](release/release-checklist.md) |

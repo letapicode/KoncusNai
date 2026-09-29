@@ -44,6 +44,12 @@
       "requiredHeadings": ["Executable taxonomy", "Focused commands", "Release gates"]
     },
     {
+      "id": "github-actions-ci",
+      "path": "docs/quality/github-actions-ci.md",
+      "owns": ["github-actions-workflow"],
+      "requiredHeadings": ["When it runs and what it can change", "Checks in workflow order", "Public evidence safeguard", "How CI relates to a release"]
+    },
+    {
       "id": "supply-chain-provenance",
       "path": "docs/security/supply-chain-provenance.json",
       "owns": ["dependency-model-runtime-action-provenance"]

@@ -1,6 +1,6 @@
 # Koncus Nai
 
-> **Public work-in-progress source:** commit `26af366` passed GitHub CI on September 24, 2026. Koncus Nai has no supported `v1` installer; do not redistribute an installer built from this checkout as an official release. Later commits require their own validation.
+> **Public work-in-progress source:** Koncus Nai has no supported `v1` installer. The [release checklist](docs/release/release-checklist.md) records dated CI evidence; each later commit needs its own validation before its result is claimed. Do not redistribute an installer built from this checkout as an official release.
 
 Koncus Nai was previously named Nilo and Notype (and originally Dictate Anywhere). The burnt-orange KN monogram
 is the current application mark. Existing data paths, executable names and installer
@@ -18,7 +18,7 @@ Koncus Nai is a Windows 11 local-first application for global dictation, local c
 
 ## Start here
 
-The public source is a work in progress. The last pre-publication commit, `26af366`, passed its automated CI gates. The owner published the source while AI4Bharat, Nyra, Ampixa, and optional GPL/LGPL/FFmpeg runtime rights questions remain open; public visibility is not a claim of third-party permission. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md), [the owner decision record](docs/release/public-source-owner-decision-record.md), [the runtime rights review packet](docs/release/public-source-rights-review-packet.md), [the release checklist](docs/release/release-checklist.md), and [TODO.md](TODO.md) for tested changes, remaining decisions, and installation limitations. Local audit installers are not approved public releases.
+The public source is a work in progress. The last pre-publication commit, `26af366`, passed its automated CI gates; later commits need their own run evidence. Ampixa has replied to the Kala voice inquiry, while AI4Bharat and Nyra have not replied and optional GPL/LGPL/FFmpeg runtime rights still need review. Public visibility and Ampixa's brief reply do not approve a supported installer or settle other providers' terms. See [the owner decision record](docs/release/public-source-owner-decision-record.md), [runtime rights review packet](docs/release/public-source-rights-review-packet.md), [release checklist](docs/release/release-checklist.md), and [TODO.md](TODO.md). Local audit installers are not approved public releases.
 
 Koncus Nai is **source-available** under [PolyForm Noncommercial 1.0.0](LICENSE); it is not OSI-approved open source. The license permits noncommercial use, modification, and redistribution. Commercial use requires separate written permission from Ram Adhikari through [koncusnai@gmail.com](mailto:koncusnai@gmail.com). Third-party code, models, and assets remain under their own licenses.
 
@@ -26,12 +26,13 @@ Before running or contributing, review the [project license](LICENSE), [disclaim
 
 Read these in order; they are the canonical small-context entry points:
 
-1. [`docs/documentation-map.md`](docs/documentation-map.md) â€” canonical-document navigation and planning-document disposition.
-2. [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md) â€” system context, boundaries, runtime flows, invariants, and authoritative code entry points.
-3. [`docs/architecture/product-capability-matrix.md`](docs/architecture/product-capability-matrix.md) â€” supported capabilities and explicit non-capabilities.
-4. [`docs/guides/developer-guide.md`](docs/guides/developer-guide.md) â€” contributor setup and current build, test, packaging, and release commands.
-5. [`planning/codebase-hardening-backlog.md`](planning/codebase-hardening-backlog.md) â€” hardening item scope and status.
-6. [`planning/codebase-hardening-ledger.md`](planning/codebase-hardening-ledger.md) â€” packet commits, evidence, dependencies, and the next action.
+1. [`docs/documentation-map.md`](docs/documentation-map.md) — canonical-document navigation and planning-document disposition.
+2. [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md) — system context, boundaries, runtime flows, invariants, and authoritative code entry points.
+3. [`docs/architecture/product-capability-matrix.md`](docs/architecture/product-capability-matrix.md) — supported capabilities and explicit non-capabilities.
+4. [`docs/guides/developer-guide.md`](docs/guides/developer-guide.md) — contributor setup and current build, test, packaging, and release commands.
+5. [`docs/quality/github-actions-ci.md`](docs/quality/github-actions-ci.md) — current CI triggers, checks, public evidence, and limits.
+6. [`planning/codebase-hardening-backlog.md`](planning/codebase-hardening-backlog.md) — hardening item scope and status.
+7. [`planning/codebase-hardening-ledger.md`](planning/codebase-hardening-ledger.md) — packet commits, evidence, dependencies, and the next action.
 
 Do not treat dated planning documents or generated release reports as current architecture unless one of the canonical documents links to them.
 

@@ -13,13 +13,13 @@ No supported public installer has been validated or published. The installer ste
 
 The installer candidate requires administrator approval on Windows 11 x64. Dictation only and Full assistant are first-run choices within the same installation, not separate packages. Settings can still open the workbench in Dictation only mode.
 
-Model weights are downloaded separately when prepared. Current pinned dictation downloads are approximately 4.13 GB for Cohere, 1.62 GB for CrisperWhisper Turbo, or 3.09 GB for CrisperWhisper Large, plus runtimes and temporary storage. Prepared local models can run offline. Voice previews are generated and cached locally; user-generated narration and recordings stay local and should never be uploaded as release assets.
+Model weights are downloaded separately when prepared; see [model licenses and approximate pinned sizes](../../MODEL_LICENSES.md) for the current inventory. Runtime and temporary storage add to the download footprint. Prepared local models can run offline. Voice previews are generated and cached locally; user-generated narration and recordings stay local and should never be uploaded as release assets.
 
-See the [current public-source audit](../../planning/public-source-pre-release-audit-2026-09-17.md) for the release decisions and installation limits. Source archives from GitHub require a build; use a tested installer from GitHub Releases when one is published.
+See the [release checklist](../release/release-checklist.md) for current release decisions and installation limits; the [September public-source audit](../../planning/public-source-pre-release-audit-2026-09-17.md) is historical evidence. Source archives from GitHub require a build; use a tested installer from GitHub Releases when one is published.
 
 When a validated installer is published, use its setup package:
 - `KoncusNai-Setup-Small-<version>-x64.exe`
-  - Includes the application and local runtime dependencies.
+  - Includes the application and its self-contained .NET runtime. Optional provider runtimes and model weights require separate preparation.
   - A model may be downloaded the first time its provider is prepared.
 
 1. Run your selected setup EXE and complete installation.

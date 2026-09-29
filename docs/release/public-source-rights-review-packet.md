@@ -10,11 +10,13 @@ installer and commercial product are separate decisions.
 
 Publication update: the owner made `letapicode/KoncusNai` public after the
 successful private CI run on `26af366c2458db5112ee76b5afdb9ea2f85f970a`.
-The provider and GPL/LGPL/FFmpeg questions below remain open. Public source
-visibility does not establish permission for ordinary model use, generated
-outputs, commercial use, or a future bundled installer. The details below
-describe the earlier `d1b532f` rights review and should be refreshed when
-runtime pins or packaging change.
+On September 29 the owner supplied Ampixa's brief Kala voice reply, recorded
+in the [owner decision record](public-source-owner-decision-record.md).
+AI4Bharat and Nyra have not replied; GPL/LGPL/FFmpeg review remains open.
+Public source visibility does not establish permission for other providers'
+ordinary use, generated outputs, commercial use, or a future bundled installer.
+The details below describe the earlier `d1b532f` rights review and should be
+refreshed when runtime pins or packaging change.
 
 - Reviewed private commit: `d1b532fbb93e21c2d43df649a20dab73d235549f`.
   The owner-supplied September 24 `build-test` log checked out that exact SHA
@@ -103,21 +105,22 @@ the executable.
    virtual environment, model weight, or generated preview, which obligations
    change? Review that actual payload separately; the current static
    packaging check is not evidence of a built or installed release.
-5. Do the pending AI4Bharat, Nyra, and Ampixa questions require an answer or a
-   license before publishing **integration source alone**, while preserving
-   each optional feature and stating its current limits? Distinguish source
-   visibility from ordinary operational use, commercial use, generated output,
-   and distribution of weights or recordings. An unanswered email or user
-   notice is not a grant.
+5. For the already-public **integration source alone**, what obligations remain
+   for AI4Bharat and Nyra despite their unanswered inquiries, and how should
+   Ampixa's brief Kala voice response be described? Preserve each optional
+   feature and state its current limits. Distinguish source visibility from
+   ordinary operational use, commercial use, generated output, and distribution
+   of weights or recordings. An unanswered email or user notice is not a grant.
 
 ## Decision status
 
 Technically, the reviewed private source and static packaging baseline passed
 CI, followed by a successful final pre-publication CI run on `26af366`. The
 owner reports reviewing retained private Actions logs and artifacts and then
-made the repository public while upstream replies and qualified review remain
-pending. Those actions do not resolve the rights questions above. Qualified
-advice remains recommended but unperformed. No opinion here declares the source
+made the repository public. Ampixa later replied about Kala voices; AI4Bharat,
+Nyra, and qualified runtime review remain outstanding. Those actions do not
+resolve the other rights questions above. Qualified advice remains recommended
+but unperformed. No opinion here declares the source
 or future installer legally cleared. A supported installer additionally needs
 manual compatibility, real-model, clean-install/upgrade, signing, and release
 validation under `docs/release/release-checklist.md`.

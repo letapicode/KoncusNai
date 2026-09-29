@@ -2,7 +2,7 @@
 
 Current plan: [Chat polish and production readiness](planning/production-readiness-plan-2026-09-15.md).
 
-Current assessment: the source repository is public as a work in progress. Pre-publication commit `26af366` passed GitHub CI on September 24, 2026. The owner published while provider replies and qualified runtime-rights review remain pending. Public visibility does not clear those rights; a supported version 1 installer is not ready. See [the public-source audit](planning/public-source-pre-release-audit-2026-09-17.md), [owner decision record](docs/release/public-source-owner-decision-record.md), and [runtime rights review packet](docs/release/public-source-rights-review-packet.md).
+Current assessment: the source repository is public as a work in progress. Pre-publication commit `26af366` passed GitHub CI on September 24, 2026; later commits need their own run evidence. Ampixa replied to the Kala voice inquiry on the terms recorded in the [owner decision record](docs/release/public-source-owner-decision-record.md). AI4Bharat and Nyra have not replied, and qualified runtime-rights review remains pending. A supported version 1 installer is not ready. See the [historical public-source audit](planning/public-source-pre-release-audit-2026-09-17.md) and [runtime rights review packet](docs/release/public-source-rights-review-packet.md).
 
 This is the user-facing checklist for the September 15 request. The [engineering hardening backlog](planning/codebase-hardening-backlog.md) remains the record for previous hardening work. Unchecked items below are planned, not implemented or verified.
 
@@ -27,7 +27,8 @@ Release status: the owner changed `letapicode/KoncusNai` to public after the suc
 - [x] Start fresh Git history in KoncusNai: root commit `851bf46` has no parent, and the old Notype commit `2946ad2` is not reachable from `main`. Keep the old repository private as a rollback copy and never import its audio-bearing history.
 - [x] Replace the affected Indic graph with compatibility-patched, source-manifested Parler-TTS 0.2.2, AudioTools 0.7.4, and Descript Audio Codec 1.0.0 on Transformers 5.17.0, protobuf 7.36.2, and PyTorch 2.13.0. The September 23 CI query checked the exact 193-package inventory with zero OSV matches; rerun at release time.
 - [x] Record the owner's decision to publish source-only while Indic Parler, CrisperWhisper, Kala speaker, and optional GPL/LGPL/FFmpeg questions remain open. Keep every model option available. User notices do not settle publisher obligations; model weights and third-party Python wheels remain outside the public source tree.
-- [ ] Follow up on provider replies and qualified GPL/LGPL/FFmpeg review. Do not describe ordinary model use, generated outputs, commercial use, or a future bundled installer as cleared without supporting evidence.
+- [x] Record Ampixa's Kala voice reply and its evidentiary limits without changing the published material-license obligations.
+- [ ] AI4Bharat and Nyra have not replied: retain the existing restrictions while source work proceeds. Obtain qualified GPL/LGPL/FFmpeg review before claiming a supported installer or additional distribution rights.
 - [x] Remove the undocumented Cohere health-check WAV from source and payload. Startup checks the loaded model through IPC; an isolated installed-model warm-up passed. This does not establish transcription accuracy; the benchmark accepts only operator-supplied, authorized audio.
 - [x] Pass the private `d1b532f` GitHub CI source gates: locked build, documentation, supply chain, security, size, focused and full tests, coverage, fault seeds, Milestone 2 reliability, compatibility contracts and static packaging checks. The full suite retained six opt-in or environment skips. No real-model latency or installed-installer claim follows from these results.
 - [x] Obtain a green private CI run for final pre-publication commit `26af366`; the attached run checked out that exact SHA and passed.
@@ -35,6 +36,8 @@ Release status: the owner changed `letapicode/KoncusNai` to public after the suc
 - [x] The owner chose to keep Pull requests enabled for public suggestions. GitHub's public API reports creation policy `all`. The owner reports no collaborators; opening a PR does not grant merge permission. Review proposals before merging and set branch protection or rulesets if additional controls are desired.
 
 ## Blockers before a supported v1 installer
+
+The [release checklist](docs/release/release-checklist.md) owns the candidate-specific sequence and evidence. The [GitHub Actions CI guide](docs/quality/github-actions-ci.md) explains which source gates run automatically and why they do not complete the installer gates below.
 
 - [ ] Finish model-server trust and exact tokenizer-budget review; loopback restrictions, unowned-server rejection and orphan-turn trimming are implemented.
 - [x] Add Dictation only / Full assistant first-run choice and lazy optional runtime preparation.

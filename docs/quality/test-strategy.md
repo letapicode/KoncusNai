@@ -53,7 +53,7 @@ The focused runner performs filtered discovery first and fails if the selected s
 .\scripts\run-focused-tests.ps1 -Suite All
 ```
 
-Use `-NoBuild` after an explicit Release build. Model, hardware, and FFmpeg tests remain discoverable but report an explicit skip until their documented environment variable and prerequisite are present. Normal CI runs the deterministic focused suite and retains the full solution test gate.
+Use `-NoBuild` after an explicit Release build. Model, hardware, and FFmpeg tests remain discoverable but report an explicit skip until their documented environment variable and prerequisite are present. [GitHub Actions CI](github-actions-ci.md) runs deterministic and Windows WPF focused suites, then the full solution test gate.
 
 Solution-level discovery is deliberately serialized with `--maxcpucount:1`. The test list is parsed to reject zero-test filters, and parallel MSBuild output can otherwise interleave test names and transiently undercount a real suite.
 
