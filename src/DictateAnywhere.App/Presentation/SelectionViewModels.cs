@@ -27,7 +27,8 @@ public sealed record ModelOptionViewModel(
   string DisplayName,
   bool IsInstalled,
   bool IsActive,
-  IReadOnlyList<string> SupportedLanguages)
+  IReadOnlyList<string> SupportedLanguages,
+  bool HasUnverifiedLocalFiles = false)
 {
   public static ModelOptionViewModel FromModelInfo(ModelInfo model)
   {
@@ -38,7 +39,8 @@ public sealed record ModelOptionViewModel(
       model.DisplayName,
       model.IsInstalled,
       model.IsActive,
-      model.SupportedLanguages);
+      model.SupportedLanguages,
+      model.HasUnverifiedLocalFiles);
   }
 
   public TranscriptionModelSelection ToSelection()

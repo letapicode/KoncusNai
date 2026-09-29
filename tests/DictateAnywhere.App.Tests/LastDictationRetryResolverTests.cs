@@ -41,6 +41,7 @@ public sealed class LastDictationRetryResolverTests : IDisposable
 
     Xunit.Assert.False(resolution.Success);
     Xunit.Assert.Contains("expired", resolution.Message, StringComparison.OrdinalIgnoreCase);
+    Xunit.Assert.Equal(RetryOutcomeCode.Expired, resolution.FailureOutcome);
   }
 
   [Xunit.Fact]
@@ -66,6 +67,7 @@ public sealed class LastDictationRetryResolverTests : IDisposable
 
     Xunit.Assert.False(resolution.Success);
     Xunit.Assert.Contains("history", resolution.Message, StringComparison.OrdinalIgnoreCase);
+    Xunit.Assert.Equal(RetryOutcomeCode.NoHistory, resolution.FailureOutcome);
   }
 
   private static DictationHistoryRecord CreateRecord(DateTimeOffset createdUtc, string finalText)

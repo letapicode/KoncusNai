@@ -381,8 +381,13 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
   private async void OnRefreshModelsClicked(object sender, RoutedEventArgs e) =>
     await speechPresenter.RefreshModelsAsync().ConfigureAwait(true);
 
-  private async void OnDownloadModelClicked(object sender, RoutedEventArgs e) =>
-    await speechPresenter.DownloadModelAsync().ConfigureAwait(true);
+  private async void OnDownloadModelClicked(object sender, RoutedEventArgs e)
+  {
+    if (await speechPresenter.DownloadModelAsync().ConfigureAwait(true))
+    {
+      SettingsSaved?.Invoke(this, EventArgs.Empty);
+    }
+  }
 
   private async void OnActivateModelClicked(object sender, RoutedEventArgs e) =>
     await speechPresenter.ActivateModelAsync().ConfigureAwait(true);

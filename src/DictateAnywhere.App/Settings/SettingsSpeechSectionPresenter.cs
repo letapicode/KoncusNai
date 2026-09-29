@@ -115,7 +115,9 @@ internal sealed class SettingsSpeechSectionPresenter
   {
     bool showProgress = status.IsBusy && status.Kind is SettingsOperationKind.DownloadModel or SettingsOperationKind.ActivateModel or SettingsOperationKind.RefreshModels;
     modelProgressBar.Visibility = showProgress ? Visibility.Visible : Visibility.Collapsed;
-    modelProgressBar.IsIndeterminate = showProgress && status.Kind != SettingsOperationKind.DownloadModel;
+    modelProgressBar.IsIndeterminate = showProgress
+      && (status.Kind != SettingsOperationKind.DownloadModel
+        || (modelComboBox.SelectedItem as ModelOptionViewModel)?.HasUnverifiedLocalFiles == true);
     switch (status.Kind)
     {
       case SettingsOperationKind.DownloadModel:
@@ -245,27 +247,27 @@ internal sealed class SettingsSpeechSectionPresenter
     await controller.RefreshModelsAsync(GetSelectedModelSelection()).ConfigureAwait(true);
   }
 
-  public async Task DownloadModelAsync()
+  public async Task<bool> DownloadModelAsync()
   {
     if (controller.IsBusy)
     {
-      return;
+      return false;
     }
 
     TranscriptionModelSelection? selection = GetSelectedModelSelection();
     if (selection is null)
     {
-      return;
+      return false;
     }
 
     if (!EnsureResearchLicenseAccepted(selection))
     {
-      return;
+      return false;
     }
 
     modelProgressBar.Value = 0;
     Progress<double> progress = new(value => modelProgressBar.Value = value * 100d);
-    await controller.DownloadModelAsync(selection, progress).ConfigureAwait(true);
+    return await controller.DownloadModelAsync(selection, progress).ConfigureAwait(true);
   }
 
   public async Task ActivateModelAsync()
@@ -333,6 +335,9 @@ internal sealed class SettingsSpeechSectionPresenter
     bool isActiveModel = selectedModel?.IsActive == true;
     activateModelButton.Content = isActiveModel ? "Active" : "Use model";
     bool installed = selectedModel?.IsInstalled == true;
+    downloadModelButton.Content = selectedModel?.HasUnverifiedLocalFiles == true
+      ? "Verify / repair"
+      : "Download";
     downloadModelButton.Visibility = selectedModel is not null && !installed ? Visibility.Visible : Visibility.Collapsed;
     activateModelButton.Visibility = installed ? Visibility.Visible : Visibility.Collapsed;
     downloadModelButton.Margin = new Thickness(0);

@@ -1,0 +1,26 @@
+<Window x:Class="DictateAnywhere.App.Diagnostics.DiagnosticsExportResultWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:presentation="clr-namespace:DictateAnywhere.App.Presentation"
+        presentation:WindowThemeBehavior.IsEnabled="True"
+        Title="Diagnostics exported" Width="550" MinWidth="420"
+        SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Brush.Surface.Canvas}">
+  <StackPanel Margin="22">
+    <TextBlock FontSize="{DynamicResource Font.Size.Subheading}" FontWeight="SemiBold"
+               Foreground="{DynamicResource Brush.Text.Primary}" Text="Diagnostics bundle ready" />
+    <TextBlock Margin="0,10,0,8" FontSize="{DynamicResource Font.Size.Body}"
+               Foreground="{DynamicResource Brush.Text.Secondary}" Text="Saved to:" />
+    <TextBox x:Name="BundlePathTextBox" IsReadOnly="True" TextWrapping="Wrap"
+             Style="{StaticResource AppTextBoxStyle}" AutomationProperties.Name="Diagnostics bundle path" />
+    <StackPanel Margin="0,18,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+      <Button Margin="0,0,9,0" Style="{StaticResource AppActionButtonStyle}"
+              Content="Open folder" Click="OnOpenFolderClicked" />
+      <Button x:Name="CopyPathButton" Margin="0,0,9,0" Style="{StaticResource AppActionButtonStyle}"
+              Content="Copy path" Click="OnCopyPathClicked" />
+      <Button Style="{StaticResource AppPrimaryActionButtonStyle}"
+              Content="Close" Click="OnCloseClicked" />
+    </StackPanel>
+  </StackPanel>
+</Window>
