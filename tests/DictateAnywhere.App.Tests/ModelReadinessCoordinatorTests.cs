@@ -9,12 +9,49 @@ using DictateAnywhere.Inference;
 
 namespace DictateAnywhere.App.Tests;
 
+[Xunit.Collection("Exclusive audio capture")]
 public sealed class ModelReadinessCoordinatorTests
 {
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task Preparation_ReleasesOldModelAndRestoresBothExistingFlowFacades(bool cancel)
+  {
+    FakeModelManager manager = new([new(TranscriptionProviderIds.CohereLocal, "cohere-transcribe-03-2026", "Cohere", true, true, ["en"])]);
+    List<FakeTranscriptionModel> generations = new();
+    RecordingDiagnostics diagnostics = new();
+    await using ModelReadinessCoordinator coordinator = new(manager, diagnostics, (_, _) =>
+    {
+      FakeTranscriptionModel model = new(TranscriptionProviderIds.CohereLocal);
+      generations.Add(model);
+      return new TranscriptionModelRegistry([model]);
+    }, (_, _) => throw new InvalidOperationException("Unexpected owned worker"));
+    await coordinator.RefreshAsync(AppSettings.Default);
+    ITranscriptionService hotkey = coordinator.CreateTranscriptionService(AppSettings.Default, diagnostics);
+    ITranscriptionService workbench = coordinator.CreateTranscriptionService(AppSettings.Default, diagnostics);
+    AudioCaptureResult audio = new([0, 0], 16_000, TimeSpan.FromMilliseconds(1));
+    Task<TranscriptionResult>? queued = null;
+    async Task Preparation()
+    {
+      Xunit.Assert.True(generations[0].IsDisposed);
+      Xunit.Assert.Throws<InvalidOperationException>(() => coordinator.CreateTranscriptionService(AppSettings.Default, diagnostics));
+      queued = hotkey.TranscribeAsync(audio, "cohere-transcribe-03-2026");
+      Xunit.Assert.False(queued.IsCompleted);
+      await Task.Yield();
+      if (cancel) throw new OperationCanceledException();
+    }
+    if (cancel) await Xunit.Assert.ThrowsAsync<OperationCanceledException>(() => coordinator.PrepareRuntimeAsync(Preparation, CancellationToken.None));
+    else await coordinator.PrepareRuntimeAsync(Preparation, CancellationToken.None);
+    await queued!;
+    await hotkey.TranscribeAsync(audio, "cohere-transcribe-03-2026");
+    await workbench.TranscribeAsync(audio, "cohere-transcribe-03-2026");
+    Xunit.Assert.Equal(2, generations.Count);
+    Xunit.Assert.Equal(3, generations[1].TranscriptionCount);
+  }
   [Xunit.Fact]
   public async Task CreateTranscriptionService_UsesSameRegistryAsReadinessWarmup()
   {
-    FakeTranscriptionModel fakeModel = new(TranscriptionProviderIds.CohereLocal);
+    await using FakeTranscriptionModel fakeModel = new(TranscriptionProviderIds.CohereLocal);
     FakeModelManager modelManager = new([
       new ModelInfo(
         TranscriptionProviderIds.CohereLocal,
@@ -60,8 +97,8 @@ public sealed class ModelReadinessCoordinatorTests
   [Xunit.Fact]
   public async Task RefreshAsync_WarmsOnlyConfiguredTranscriptionProvider()
   {
-    FakeTranscriptionModel crisperWhisper = new(TranscriptionProviderIds.CrisperWhisperLocal);
-    FakeTranscriptionModel cohere = new(TranscriptionProviderIds.CohereLocal);
+    await using FakeTranscriptionModel crisperWhisper = new(TranscriptionProviderIds.CrisperWhisperLocal);
+    await using FakeTranscriptionModel cohere = new(TranscriptionProviderIds.CohereLocal);
     FakeModelManager modelManager = new([
       new ModelInfo(
         TranscriptionProviderIds.CrisperWhisperLocal,
@@ -181,7 +218,7 @@ public sealed class ModelReadinessCoordinatorTests
     }
   }
 
-  private sealed class FakeTranscriptionModel : ITranscriptionModel, ITranscriptionModelWarmup
+  private sealed class FakeTranscriptionModel : ITranscriptionModel, ITranscriptionModelWarmup, IAsyncDisposable
   {
     public FakeTranscriptionModel(string providerId)
     {
@@ -193,6 +230,8 @@ public sealed class ModelReadinessCoordinatorTests
     public int WarmupCount { get; private set; }
 
     public int TranscriptionCount { get; private set; }
+    public bool IsDisposed { get; private set; }
+    public ValueTask DisposeAsync() { IsDisposed = true; return ValueTask.CompletedTask; }
 
     public Task WarmUpAsync(string modelId, CancellationToken cancellationToken = default)
     {

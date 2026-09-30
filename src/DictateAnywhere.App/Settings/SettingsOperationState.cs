@@ -13,6 +13,7 @@ public enum SettingsOperationKind
   RefreshModels,
   RefreshAudioDevices,
   DownloadModel,
+  PrepareRuntime,
   ActivateModel,
   DeleteModel,
   RunBenchmark,

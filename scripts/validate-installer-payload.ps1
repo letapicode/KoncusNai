@@ -98,4 +98,14 @@ foreach ($payloadFile in $payloadFiles) {
 if ($payloadFiles | Where-Object { (Get-PayloadRelativePath -FilePath $_.FullName) -match '^local-models/fixtures/.*\.(wav|mp3|ogg|flac)$' }) {
   throw 'Generated or unlicensed audio fixtures must not be included in the installer payload.'
 }
+  if (Test-Path -LiteralPath (Join-Path $resolvedPayloadDirectory 'local-models/cohere_transcribe_worker.py')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $resolvedPayloadDirectory 'prepare-cohere-python-runtime.ps1'))) {
+      throw 'Cohere automatic-runtime deployment helper is missing: prepare-cohere-python-runtime.ps1'
+    }
+  foreach ($helper in @('cohere_native_runtime.py', 'cohere_runtime_selection.py', 'cohere_quantize.py', 'prepare_cohere_runtime.py')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $resolvedPayloadDirectory "local-models/$helper"))) {
+      throw "Cohere automatic-runtime deployment helper is missing: $helper"
+    }
+  }
+}
 Write-Host "Installer payload boundary is valid: App and UIAccess only." -ForegroundColor Green

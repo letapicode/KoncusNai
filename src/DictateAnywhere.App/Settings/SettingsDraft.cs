@@ -25,6 +25,8 @@ public sealed record SettingsDraft
   public string TranscriptionModelId { get; init; } = "cohere-transcribe-03-2026";
   public string TranscriptionLanguage { get; init; } = TranscriptionLanguageSettings.DefaultLanguage;
   public bool EnableAutomaticPunctuation { get; init; } = true;
+  public string DictationRuntimePreference { get; init; } = "automatic";
+  public string? DictationRuntimeDevice { get; init; }
 
   // Audio / Hardware Domain
   public string? PreferredAudioInputDeviceId { get; init; }
@@ -87,6 +89,8 @@ public sealed record SettingsDraft
       TranscriptionModelId = normalized.TranscriptionModelId,
       TranscriptionLanguage = normalized.TranscriptionLanguage,
       EnableAutomaticPunctuation = normalized.EnableAutomaticPunctuation,
+      DictationRuntimePreference = normalized.DictationRuntimePreference,
+      DictationRuntimeDevice = normalized.DictationRuntimeDevice,
       PreferredAudioInputDeviceId = normalized.PreferredAudioInputDeviceId,
       RecordingMode = normalized.RecordingMode,
       PreferredInsertionMethod = normalized.PreferredInsertionMethod,
@@ -182,7 +186,11 @@ public sealed record SettingsDraft
       AssistantFeaturesEnabled: AssistantFeaturesEnabled,
       CrisperWhisperLicenseAcceptanceVersion: CrisperWhisperLicenseAcceptanceVersion,
       LegalAcceptanceVersion: LegalAcceptanceVersion,
-      LegalAcceptanceAcceptedAtUtc: LegalAcceptanceAcceptedAtUtc);
+      LegalAcceptanceAcceptedAtUtc: LegalAcceptanceAcceptedAtUtc)
+    {
+      DictationRuntimePreference = DictationRuntimePreference,
+      DictationRuntimeDevice = DictationRuntimeDevice,
+    };
   }
 
   /// <summary>
@@ -221,6 +229,8 @@ public sealed record SettingsDraft
       || !string.Equals(TranscriptionModelId, baseline.TranscriptionModelId, StringComparison.Ordinal)
       || !string.Equals(TranscriptionLanguage, baseline.TranscriptionLanguage, StringComparison.Ordinal)
       || EnableAutomaticPunctuation != baseline.EnableAutomaticPunctuation
+      || DictationRuntimePreference != baseline.DictationRuntimePreference
+      || DictationRuntimeDevice != baseline.DictationRuntimeDevice
       || !string.Equals(PreferredAudioInputDeviceId, baseline.PreferredAudioInputDeviceId, StringComparison.Ordinal)
       || RecordingMode != baseline.RecordingMode
       || PreferredInsertionMethod != baseline.PreferredInsertionMethod
@@ -274,6 +284,8 @@ public sealed record SettingsDraft
       || EnableAutomaticPunctuation != baseline.EnableAutomaticPunctuation
       || !string.Equals(PreferredAudioInputDeviceId, baseline.PreferredAudioInputDeviceId, StringComparison.Ordinal)
       || AssistantFeaturesEnabled != baseline.AssistantFeaturesEnabled
+      || DictationRuntimePreference != baseline.DictationRuntimePreference
+      || DictationRuntimeDevice != baseline.DictationRuntimeDevice
       || !string.Equals(CrisperWhisperLicenseAcceptanceVersion, baseline.CrisperWhisperLicenseAcceptanceVersion, StringComparison.Ordinal);
   }
 

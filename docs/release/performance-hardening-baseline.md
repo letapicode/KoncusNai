@@ -1,5 +1,10 @@
 # Dictation performance hardening baseline
 
+The later [automatic runtime report](automatic-dictation-runtime-2026-09-29.md)
+records compiler-free preparation, calibrated backend selection and fresh
+synthetic inference measurements. It does not replace historical desktop
+stop-to-visible measurements with worker response timings.
+
 The fresh 2026-09-29 implementation and measured comparison are documented in
 [dictation-latency-optimization-2026-09-29.md](dictation-latency-optimization-2026-09-29.md).
 The historical evidence below is retained as background, not used as the new

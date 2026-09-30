@@ -37,6 +37,11 @@ Release status: the owner changed `letapicode/KoncusNai` to public after the suc
 
 ## Blockers before a supported v1 installer
 
+- [x] Implement compiler-free Cohere runtime preparation, measured CPU/Vulkan
+  selection, cache invalidation and Settings overrides for both dictation flows.
+  See [the automatic runtime report](docs/release/automatic-dictation-runtime-2026-09-29.md).
+  Broader physical GPU/driver and clean-machine deployment validation remains open.
+
 The [release checklist](docs/release/release-checklist.md) owns the candidate-specific sequence and evidence. The [GitHub Actions CI guide](docs/quality/github-actions-ci.md) explains which source gates run automatically and why they do not complete the installer gates below.
 
 - [ ] Finish model-server trust and exact tokenizer-budget review; loopback restrictions, unowned-server rejection and orphan-turn trimming are implemented.

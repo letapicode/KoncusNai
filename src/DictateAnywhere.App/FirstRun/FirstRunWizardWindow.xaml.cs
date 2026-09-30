@@ -7,6 +7,7 @@ using System.Windows;
 using DictateAnywhere.App.Benchmarking;
 using DictateAnywhere.App.Hotkeys;
 using DictateAnywhere.App.Presentation;
+using DictateAnywhere.App.Runtime;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Hotkeys;
 
@@ -41,6 +42,8 @@ public partial class FirstRunWizardWindow : Window
     this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
 
     InitializeComponent();
+    if (modelManager is AutomaticDictationModelManager automatic)
+      automatic.PreparationProgress += OnPreparationProgress;
     HotkeyCaptureControl.RegistrationValidator = this.validator;
     HotkeyCaptureControl.HotkeyChanged += OnHotkeyChanged;
   }
@@ -48,6 +51,8 @@ public partial class FirstRunWizardWindow : Window
   protected override void OnClosed(EventArgs e)
   {
     closed = true;
+    if (modelManager is AutomaticDictationModelManager automatic)
+      automatic.PreparationProgress -= OnPreparationProgress;
     lifetime.Cancel();
     lifetime.Dispose();
     HotkeyCaptureControl.HotkeyChanged -= OnHotkeyChanged;
@@ -55,6 +60,16 @@ public partial class FirstRunWizardWindow : Window
   }
 
   public AppSettings? CompletedSettings { get; private set; }
+
+  private void OnPreparationProgress(object? sender, string message)
+  {
+    _ = Dispatcher.BeginInvoke(() =>
+    {
+      if (closed) return;
+      DownloadProgressBar.IsIndeterminate = true;
+      SetModelActionStatus(message, isError: false);
+    });
+  }
 
   private async void OnLoaded(object sender, RoutedEventArgs e)
   {
@@ -155,6 +170,11 @@ public partial class FirstRunWizardWindow : Window
         SetModelActionStatus($"Downloading {FormatModelIdentity(selectedModel)} ...", isError: false);
         await modelManager.DownloadModelAsync(selectedModel, progress, lifetimeToken).ConfigureAwait(true);
       }
+      else if (modelManager is AutomaticDictationModelManager automatic && CohereRuntimePreparation.Supports(selectedModel))
+      {
+        try { await automatic.PrepareAsync(selectedModel, null, false, lifetimeToken).ConfigureAwait(true); }
+        catch (InvalidOperationException ex) { SetModelActionStatus(ex.Message + " Original runtime retained.", isError: true); }
+      }
 
       lifetimeToken.ThrowIfCancellationRequested();
       await modelManager.SetActiveModelAsync(selectedModel, lifetimeToken).ConfigureAwait(true);
@@ -181,6 +201,7 @@ public partial class FirstRunWizardWindow : Window
     finally
     {
       isBusy = false;
+      DownloadProgressBar.IsIndeterminate = false;
       SetBusyState(false);
     }
   }

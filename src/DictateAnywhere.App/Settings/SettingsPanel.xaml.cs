@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
+using System.Threading;
+using System.Windows.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -26,6 +28,9 @@ namespace DictateAnywhere.App.Settings;
   Justification = "UI event boundaries report failures to IDiagnostics and presentation status.")]
 public partial class SettingsPanel : UserControl, IAsyncDisposable
 {
+  private CancellationTokenSource? dictationPreparationCancellation;
+  private Task? dictationPreparationTask;
+  private readonly DispatcherTimer runtimeStatusTimer = new() { Interval = TimeSpan.FromSeconds(2) };
   internal bool IsCapturingHotkey => HotkeyCaptureControl.IsCapturing
     || UndoHotkeyCaptureControl.IsCapturing || RetryLastDictationHotkeyCaptureControl.IsCapturing;
   internal void SynchronizePresentationZoom(int percent)
@@ -56,6 +61,8 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
     AppThemeManager.ApplyThemeResources(AppThemeManager.CurrentPreference);
     InitializeComponent();
+    runtimeStatusTimer.Tick += OnRuntimeStatusTick;
+    Unloaded += OnRuntimePanelUnloaded;
     PreviewKeyDown += OnPageNavigationKeyDown;
 
     speechPresenter = new SettingsSpeechSectionPresenter(
@@ -142,6 +149,11 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
     }
 
     disposed = true;
+    runtimeStatusTimer.Stop();
+    runtimeStatusTimer.Tick -= OnRuntimeStatusTick;
+    Unloaded -= OnRuntimePanelUnloaded;
+    dictationPreparationCancellation?.Cancel();
+    if (dictationPreparationTask is not null) await dictationPreparationTask.ConfigureAwait(false);
 
     controller.DraftChanged -= OnDraftChanged;
     controller.StatusChanged -= OnStatusChanged;
@@ -160,6 +172,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   private async void OnLoaded(object sender, RoutedEventArgs e)
   {
+    runtimeStatusTimer.Start();
     ChatTypefaceComboBox.ItemsSource = ChatTypefaceCatalog.Options;
     speechPresenter.PopulateProviders();
 
@@ -199,6 +212,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
       AssistantFeaturesEnabledCheckBox.IsChecked = draft.AssistantFeaturesEnabled;
 
       speechPresenter.ApplyDraft(draft, isUpdating: false);
+      RefreshRuntimeChoices(draft);
 
       AudioDeviceComboBox.ItemsSource = controller.AvailableAudioDevices;
       AudioDeviceComboBox.SelectedItem = SettingsTranscriptionPresentationHelper.ResolveSelectedAudioDevice(
@@ -383,11 +397,69 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   private async void OnDownloadModelClicked(object sender, RoutedEventArgs e)
   {
-    if (await speechPresenter.DownloadModelAsync().ConfigureAwait(true))
+    if (dictationPreparationCancellation is not null) return;
+    using CancellationTokenSource cancellation = new();
+    dictationPreparationCancellation = cancellation;
+    CancelDictationPreparationButton.Visibility = Visibility.Visible;
+    try
     {
-      SettingsSaved?.Invoke(this, EventArgs.Empty);
+      Task<bool> preparation = speechPresenter.DownloadModelAsync(cancellation.Token);
+      dictationPreparationTask = preparation;
+      if (await preparation.ConfigureAwait(true)) SettingsSaved?.Invoke(this, EventArgs.Empty);
     }
+    finally { dictationPreparationCancellation = null; CancelDictationPreparationButton.Visibility = Visibility.Collapsed; }
   }
+
+  private void RefreshRuntimeChoices(SettingsDraft draft)
+  {
+    System.Collections.Generic.IReadOnlyList<DictationRuntimeChoice> choices = CohereRuntimePresentation.Choices(draft.ToSettings().GetConfiguredTranscriptionSelection());
+    DictationRuntimeComboBox.ItemsSource = choices;
+    DictationRuntimeComboBox.SelectedItem = System.Linq.Enumerable.FirstOrDefault(choices,
+      choice => choice.Preference == draft.DictationRuntimePreference && choice.Device == draft.DictationRuntimeDevice) ?? choices[0];
+    bool supported = draft.TranscriptionProviderId == TranscriptionProviderIds.CohereLocal;
+    DictationRuntimeComboBox.IsEnabled = supported && !controller.IsBusy && !draft.IsReadOnly;
+    PrepareDictationRuntimeButton.IsEnabled = DictationRuntimeComboBox.IsEnabled;
+    DictationRuntimeStatusTextBlock.Text = CohereRuntimePresentation.Status(draft.DictationRuntimePreference);
+  }
+
+  private void OnRuntimeStatusTick(object? sender, EventArgs e)
+  {
+    DictationRuntimeStatusTextBlock.Text = CohereRuntimePresentation.Status(controller.CurrentDraft.DictationRuntimePreference);
+    bool enabled = !controller.IsBusy && !controller.CurrentDraft.IsReadOnly;
+    DictationRuntimeComboBox.IsEnabled = enabled && controller.CurrentDraft.TranscriptionProviderId == TranscriptionProviderIds.CohereLocal;
+    PrepareDictationRuntimeButton.IsEnabled = DictationRuntimeComboBox.IsEnabled;
+  }
+
+  private void OnRuntimePanelUnloaded(object sender, RoutedEventArgs e) => runtimeStatusTimer.Stop();
+
+  private void OnDictationRuntimeChanged(object sender, SelectionChangedEventArgs e)
+  {
+    if (isUpdatingUi || DictationRuntimeComboBox.SelectedItem is not DictationRuntimeChoice choice) return;
+    controller.UpdateDraft(draft => draft with { DictationRuntimePreference = choice.Preference, DictationRuntimeDevice = choice.Device });
+  }
+
+  private async void OnPrepareDictationRuntimeClicked(object sender, RoutedEventArgs e)
+  {
+    if (dictationPreparationCancellation is not null || controller.IsBusy) return;
+    using CancellationTokenSource cancellation = new();
+    dictationPreparationCancellation = cancellation;
+    CancelDictationPreparationButton.Visibility = Visibility.Visible;
+    try
+    {
+      Task<bool> preparation = controller.PrepareRuntimeAsync(controller.CurrentDraft.ToSettings().GetConfiguredTranscriptionSelection(), cancellation.Token);
+      dictationPreparationTask = preparation;
+      if (await preparation.ConfigureAwait(true))
+      {
+        isUpdatingUi = true;
+        try { RefreshRuntimeChoices(controller.CurrentDraft); }
+        finally { isUpdatingUi = false; }
+        SettingsSaved?.Invoke(this, EventArgs.Empty);
+      }
+    }
+    finally { dictationPreparationCancellation = null; CancelDictationPreparationButton.Visibility = Visibility.Collapsed; }
+  }
+
+  private void OnCancelDictationPreparationClicked(object sender, RoutedEventArgs e) => dictationPreparationCancellation?.Cancel();
 
   private async void OnActivateModelClicked(object sender, RoutedEventArgs e) =>
     await speechPresenter.ActivateModelAsync().ConfigureAwait(true);

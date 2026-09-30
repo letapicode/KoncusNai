@@ -21,7 +21,20 @@ foreach ($relative in @('local-models\__pycache__\worker.pyc', 'private.pfx', '.
   if (-not $rejected) { throw "Payload validator accepted forbidden fixture: $relative" }
 }
 Write-Host 'Payload positive case and six contamination rejection cases passed.'
-[IO.File]::WriteAllText((Join-Path $scratch 'local-models/cohere_transcribe_worker.py'), 'synthetic worker')
+  [IO.File]::WriteAllText((Join-Path $scratch 'local-models/cohere_transcribe_worker.py'), 'synthetic worker')
+  $bootstrapRejected = $false
+  try { & $validator -PayloadDirectory $scratch }
+  catch { $bootstrapRejected = $_.Exception.Message -like '*deployment helper is missing*' }
+  if (-not $bootstrapRejected) { throw 'Missing Cohere Python bootstrap was accepted.' }
+  [IO.File]::WriteAllText((Join-Path $scratch 'prepare-cohere-python-runtime.ps1'), 'synthetic bootstrap')
+foreach ($helper in @('cohere_native_runtime.py', 'cohere_runtime_selection.py', 'cohere_quantize.py', 'prepare_cohere_runtime.py')) {
+  $helperPath = Join-Path $scratch "local-models/$helper"
+  $missingRejected = $false
+  try { & $validator -PayloadDirectory $scratch }
+  catch { $missingRejected = $_.Exception.Message -like '*deployment helper is missing*' }
+  if (-not $missingRejected) { throw 'Incomplete Cohere helper deployment was accepted.' }
+  [IO.File]::WriteAllText($helperPath, 'synthetic helper')
+}
 & $validator -PayloadDirectory $scratch
 New-Item -ItemType Directory -Path (Join-Path $scratch 'local-models/fixtures') -Force | Out-Null
 [IO.File]::WriteAllText((Join-Path $scratch 'local-models/fixtures/cohere-healthcheck-jfk.wav'), 'synthetic fixture')

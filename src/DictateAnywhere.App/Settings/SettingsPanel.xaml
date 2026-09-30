@@ -146,6 +146,14 @@
        </Grid>
         <TextBlock x:Name="ModelCapabilityTextBlock" Margin="{DynamicResource Layout.Settings.ContentIndent12}" FontWeight="SemiBold" TextWrapping="Wrap" />
         <TextBlock x:Name="ModelLanguageSummaryTextBlock" Margin="{DynamicResource Layout.Settings.ContentIndent4}" Style="{StaticResource AppCaptionTextBlockStyle}" TextWrapping="Wrap" />
+       <TextBlock Margin="0,16,0,5" Style="{StaticResource SettingsRowLabelStyle}" Text="Compute backend" />
+       <ComboBox x:Name="DictationRuntimeComboBox" DisplayMemberPath="Label" AutomationProperties.Name="Dictation compute backend" SelectionChanged="OnDictationRuntimeChanged" />
+       <TextBlock x:Name="DictationRuntimeStatusTextBlock" Margin="0,8,0,0" TextWrapping="Wrap" Style="{StaticResource AppCaptionTextBlockStyle}" AutomationProperties.LiveSetting="Polite" />
+       <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Style="{StaticResource AppCaptionTextBlockStyle}" Text="Preparation downloads a pinned runtime, converts this model locally, and measures synthetic English speech. Native acceleration supports English with punctuation and requests up to 45 seconds; other input uses the original runtime." />
+       <WrapPanel Margin="0,12,0,0">
+        <Button x:Name="PrepareDictationRuntimeButton" Style="{StaticResource AppActionButtonStyle}" Content="Prepare / remeasure acceleration" Click="OnPrepareDictationRuntimeClicked" />
+        <Button x:Name="CancelDictationPreparationButton" Margin="8,0,0,0" Style="{StaticResource AppActionButtonStyle}" Content="Cancel preparation" Click="OnCancelDictationPreparationClicked" Visibility="Collapsed" />
+       </WrapPanel>
         <WrapPanel Margin="{DynamicResource Layout.Settings.ContentIndent14}">
         <Button x:Name="ActivateModelButton" Style="{StaticResource AppActionButtonStyle}" Click="OnActivateModelClicked" Content="Use model" />
         <Button x:Name="DownloadModelButton" Margin="8,0,0,0" Style="{StaticResource AppActionButtonStyle}" Click="OnDownloadModelClicked" Content="Download" />

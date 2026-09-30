@@ -48,13 +48,17 @@ def run_warmup(runtime, language, punctuation):
 
 
 class TransformersRuntime:
-    def __init__(self, model_dir):
+    def __init__(self, model_dir, force_cpu=False):
         import torch
+        threads = int(os.environ.get("OMP_NUM_THREADS", "4"))
+        torch.set_num_threads(threads)
+        torch.set_num_interop_threads(1)
         import transformers
         from transformers import AutoProcessor, CohereAsrForConditionalGeneration
         self.processor = AutoProcessor.from_pretrained(model_dir, local_files_only=True)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+        use_cuda = torch.cuda.is_available() and not force_cpu
+        device = torch.device("cuda" if use_cuda else "cpu")
+        dtype = torch.float16 if use_cuda else torch.float32
         model_load_started = time.perf_counter()
         self.model = CohereAsrForConditionalGeneration.from_pretrained(
             model_dir, dtype=dtype, low_cpu_mem_usage=True, local_files_only=True)
@@ -63,7 +67,7 @@ class TransformersRuntime:
         model_load_ms = (time.perf_counter() - model_load_started) * 1000.0
         self.metadata = {"device": str(device), "dtype": str(dtype),
                          "backend": "transformers/" + str(device),
-                         "model_load_ms": model_load_ms,
+                         "model_load_ms": model_load_ms, "threads": threads,
                          "torch_version": torch.__version__, "transformers_version": transformers.__version__,
                          "model_class": f"{self.model.__class__.__module__}.{self.model.__class__.__name__}",
                          "processor_class": f"{self.processor.__class__.__module__}.{self.processor.__class__.__name__}"}
@@ -93,19 +97,55 @@ class TransformersRuntime:
         pass
 
 
-def main() -> int:
+def default_original_threads():
+    import psutil
+    from cohere_runtime_selection import thread_candidates
+    return thread_candidates({"cpu": {"physical": psutil.cpu_count(logical=False) or 1,
+                                      "logical": os.cpu_count() or 1,
+                                      "affinity": len(psutil.Process().cpu_affinity())}})[-1]
+
+
+def run_worker_main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", required=True)
     parser.add_argument("--fixture-mode", action="store_true")
+    parser.add_argument("--runtime-mode", choices=("automatic", "cpu", "gpu", "original"), default="automatic")
+    parser.add_argument("--runtime-device")
+    parser.add_argument("--runtime-device-base64")
+    parser.add_argument("--runtime-cache-root", default=os.environ.get("DICTATEANYWHERE_COHERE_SELECTION_ROOT"))
+    parser.add_argument("--threads", type=int)
     args = parser.parse_args()
+    if args.runtime_device_base64:
+        import base64
+        args.runtime_device = base64.b64decode(args.runtime_device_base64, validate=True).decode("utf-8")
 
     model_dir = args.model_dir
     if args.fixture_mode:
         return run_fixture_worker()
 
+    if args.threads is None:
+        args.threads = default_original_threads()
+    if not 1 <= args.threads <= (os.cpu_count() or 1):
+        raise ValueError("Worker thread count exceeds available processors.")
+    os.environ["OMP_NUM_THREADS"] = str(args.threads)
+    os.environ["MKL_NUM_THREADS"] = str(args.threads)
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+
+    def load_original():
+        # Native device tuning must not change the calibrated original-runtime thread budget.
+        os.environ["OMP_NUM_THREADS"] = str(args.threads)
+        os.environ["MKL_NUM_THREADS"] = str(args.threads)
+        return TransformersRuntime(model_dir, force_cpu=True) if args.runtime_mode == "cpu" else TransformersRuntime(model_dir)
+
     try:
         fallback_reason = None
-        native_manifest = os.environ.get("DICTATEANYWHERE_COHERE_NATIVE_MANIFEST")
+        native_manifest = os.environ.get("DICTATEANYWHERE_COHERE_NATIVE_MANIFEST") if args.runtime_mode == "automatic" else None
+        if args.runtime_mode == "original":
+            native_manifest = None
+            fallback_reason = "original_runtime_override"
+        elif not native_manifest:
+            from cohere_runtime_selection import resolve_selection
+            native_manifest, fallback_reason = resolve_selection(model_dir, args.runtime_mode, args.runtime_device, args.runtime_cache_root)
         runtime = None
         if native_manifest:
             try:
@@ -114,7 +154,7 @@ def main() -> int:
             except Exception as exc:
                 fallback_reason = "native_startup_failed:" + type(exc).__name__
         if runtime is None:
-            runtime = TransformersRuntime(model_dir)
+            runtime = load_original()
         warmed = False
         emit(
             {
@@ -122,6 +162,7 @@ def main() -> int:
                 "payload": {**runtime.metadata, "fallback_reason": fallback_reason},
             }
         )
+        report_runtime_status(model_dir, args.runtime_mode, runtime.metadata, fallback_reason)
     except Exception as exc:  # pragma: no cover - surfaced to parent process
         emit(
             {
@@ -167,7 +208,7 @@ def main() -> int:
                 runtime.close()
                 runtime = None  # Release native weights before loading the fallback.
                 fallback_reason = "native_setting_unsupported"
-                runtime = TransformersRuntime(model_dir)
+                runtime = load_original()
                 warmed = False
             try:
                 if operation == "warmup":
@@ -180,7 +221,7 @@ def main() -> int:
                 runtime.close()
                 runtime = None
                 fallback_reason = "native_request_failed:" + type(exc).__name__
-                runtime = TransformersRuntime(model_dir)
+                runtime = load_original()
                 warmed = False
                 if operation == "warmup":
                     text, audio_seconds = "", run_warmup(runtime, language, punctuation)
@@ -189,6 +230,7 @@ def main() -> int:
             if operation == "warmup":
                 warmed = True
             duration_ms = (time.perf_counter() - started) * 1000.0
+            report_runtime_status(model_dir, args.runtime_mode, runtime.metadata, fallback_reason)
             emit(
                 {
                     "status": "ok",
@@ -217,6 +259,43 @@ def main() -> int:
 
     runtime.close()
     return 0
+
+
+def report_runtime_status(model_dir, mode, metadata, reason):
+    if os.environ.get("DICTATEANYWHERE_COHERE_CALIBRATION") == "1":
+        return
+    from cohere_runtime_selection import atomic_json, root_directory
+    try:
+        atomic_json(root_directory() / "last-runtime.json", {"model_dir": model_dir, "mode": mode,
+                    "pid": os.getpid(), "updated_utc": time.time(), "backend": metadata.get("backend"),
+                    "device": metadata.get("device"), "precision": metadata.get("dtype"), "fallback_reason": reason})
+    except OSError:
+        pass  # Status rendering must never interrupt transcription.
+
+
+def inference_lease():
+    from cohere_runtime_selection import root_directory, exclusive_file
+    import contextlib
+    @contextlib.contextmanager
+    def lease():
+        if os.environ.get("DICTATEANYWHERE_COHERE_CALIBRATION") != "1":
+            # A preparation process owns this lock until conversion/calibration is complete.
+            with exclusive_file(root_directory() / "preparation.lock"):
+                pass
+        with exclusive_file(root_directory() / "inference.lock"):
+            yield
+    return lease()
+
+
+def main() -> int:
+    if "--fixture-mode" in sys.argv:
+        return run_worker_main()
+    try:
+        with inference_lease():
+            return run_worker_main()
+    except RuntimeError as exc:
+        emit({"status": "error", "error": str(exc)})
+        return 1
 
 
 def run_fixture_worker() -> int:

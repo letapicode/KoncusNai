@@ -141,6 +141,10 @@ internal sealed class ApplicationComposition
   {
     ModelReadinessCoordinator readiness = CreateModelReadinessCoordinator();
     DictationRuntime runtime = CreateDictationRuntime(readiness, historyChangeNotifier);
+    if (TranscriptionModelManager is AutomaticDictationModelManager automatic)
+      automatic.PreparationCoordinator = (action, token) => runtime.CurrentState != DictationSessionState.Idle
+        ? throw new InvalidOperationException("Finish the current dictation before changing its runtime.")
+        : readiness.PrepareRuntimeAsync(action, token);
     return new ApplicationHost(runtime, readiness, Diagnostics);
   }
 
@@ -359,7 +363,7 @@ internal sealed class ApplicationComposition
 
   internal static IModelManager CreateTranscriptionModelManager()
   {
-    return LocalTranscriptionProviderRegistry.CreateDefault().CreateModelManager();
+    return new AutomaticDictationModelManager(LocalTranscriptionProviderRegistry.CreateDefault().CreateModelManager());
   }
 
   internal static IModelManager CreateChatModelManager() => new LlamaCppChatModelManager();

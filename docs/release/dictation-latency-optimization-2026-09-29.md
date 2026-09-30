@@ -1,5 +1,10 @@
 # Measured dictation latency optimization — 2026-09-29
 
+This records the earlier opt-in implementation. The subsequent
+[automatic preparation and measured selection report](automatic-dictation-runtime-2026-09-29.md)
+supersedes its compiler-based setup and provisioning limitations; the desktop
+measurements below remain historical evidence and have not been remeasured here.
+
 The strongest same-checkpoint configuration tested here is opt-in Cohere Q8_0
 through transcribe.cpp 0.2.4 on Intel Iris Xe Vulkan. In the actual hotkey pipeline,
 warm median stop-to-visible latency improved **32.5% for the medium fixture** and

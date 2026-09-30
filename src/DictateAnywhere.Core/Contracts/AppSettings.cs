@@ -34,6 +34,8 @@ public sealed record AppSettings(
   DateTimeOffset? LegalAcceptanceAcceptedAtUtc = null,
   bool ChatPaperViewEnabled = false)
 {
+  public string DictationRuntimePreference { get; init; } = "automatic";
+  public string? DictationRuntimeDevice { get; init; }
   public const int MinChatOutputFontSize = 10;
   public const int MaxChatOutputFontSize = 36;
   public const int MinRetryWindowSeconds = 10;

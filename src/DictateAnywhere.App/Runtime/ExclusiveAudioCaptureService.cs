@@ -8,7 +8,20 @@ namespace DictateAnywhere.App.Runtime;
 /// <summary>Prevents the global hotkey and Workbench from opening competing microphone sessions.</summary>
 internal sealed class ExclusiveAudioCaptureService(IChunkedAudioCaptureService inner) : IChunkedAudioCaptureService, IAsyncDisposable
 {
-  private static ExclusiveAudioCaptureService? owner;
+  private static object? owner;
+
+  internal static IDisposable ReserveForRuntimePreparation()
+  {
+    PreparationReservation reservation = new();
+    if (Interlocked.CompareExchange(ref owner, reservation, null) is not null)
+      throw new InvalidOperationException("Stop the active dictation recording before preparing acceleration.");
+    return reservation;
+  }
+
+  private sealed class PreparationReservation : IDisposable
+  {
+    public void Dispose() => Interlocked.CompareExchange(ref owner, null, this);
+  }
 
   public bool IsCapturing => inner.IsCapturing;
   public event EventHandler<AudioCaptureChunkAvailableEventArgs>? ChunkAvailable
@@ -24,7 +37,7 @@ internal sealed class ExclusiveAudioCaptureService(IChunkedAudioCaptureService i
   {
     token.ThrowIfCancellationRequested();
     if (Interlocked.CompareExchange(ref owner, this, null) is not null)
-      throw new InvalidOperationException("A dictation recording is already active. Stop it before starting another.");
+      throw new InvalidOperationException("Another recording or acceleration preparation is active. Stop or cancel it before recording.");
     try
     {
       if (chunked) await inner.StartChunkedAsync(token).ConfigureAwait(false);

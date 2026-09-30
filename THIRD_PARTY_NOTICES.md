@@ -84,13 +84,28 @@ navigation aid; the actual upstream license texts control.
 ## Optional native speech and comparison runtimes
 
 The optional Cohere native runtime uses [transcribe.cpp v0.2.4](https://github.com/handy-computer/transcribe.cpp/tree/v0.2.4)
-and its matching Python ctypes bindings under MIT. The opt-in setup preserves
+and its matching Python ctypes bindings under MIT. Explicit automatic preparation preserves
 the release's `licenses/` directory (including ggml and miniz notices) and
 the source license files. Native binaries and converted models are provisioned
 locally, not bundled in the application or Git. The converted Cohere model
 retains its Apache-2.0 license and original checkpoint provenance. Conversion
 uses gguf 0.18.0 (MIT) and the installed local model runtime in an isolated
-environment; it does not update that runtime's dependencies.
+conversion dependency directory; it does not update that runtime's dependencies.
+Explicit automatic Cohere preparation can also prepare or repair the shared
+Python model environment from its existing hashed wheel lock, using wheels only.
+On machines without compatible CPython 3.11 x64 it downloads Python 3.11.9
+(PSF-2.0), verifies the pinned SHA-256 and Python Software Foundation signature,
+and installs for the current user without adding PATH entries or shortcuts.
+The native Windows DLLs depend on Microsoft's Visual C++ runtime. Preparation
+checks the system CRT and, when missing, downloads the pinned Microsoft-signed
+x64 redistributable 14.51.36247.0 directly from Microsoft. It is not included in
+the installer payload. Microsoft's
+[redistributable terms](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files)
+apply; installation can require administrator rights or a Windows restart.
+The Windows CPU/Vulkan release, source ZIP at commit
+`4807edaf210d0d7e8a6f7fb2a44b65966a2797f0`, and gguf wheel are SHA-256 pinned in
+`prepare_cohere_runtime.py` and the supply-chain inventory. Compiler-free Q8_0
+quantization calls the release's ggml C API; no native compilation is required.
 
 The separate research workers use sherpa-onnx (Apache-2.0), ONNX Runtime (MIT),
 faster-whisper (MIT), CTranslate2 (MIT), NumPy (BSD-3-Clause), and the tested

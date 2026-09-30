@@ -346,7 +346,8 @@ if ($LASTEXITCODE -ne 0) {
 $rawResultPath = Join-Path -Path $resolvedOutput -ChildPath "model-benchmark.json"
 $processMetricsPath = Join-Path -Path $resolvedOutput -ChildPath "model-benchmark-process-metrics.json"
 if (-not [string]::IsNullOrWhiteSpace($AudioPath)) {
-  $resolvedAudio = [IO.Path]::GetFullPath((Join-Path -Path $repoRoot -ChildPath $AudioPath))
+  $resolvedAudio = if ([IO.Path]::IsPathRooted($AudioPath)) { [IO.Path]::GetFullPath($AudioPath) }
+    else { [IO.Path]::GetFullPath((Join-Path -Path $repoRoot -ChildPath $AudioPath)) }
   $modelExitCode = Invoke-SampledModelBenchmark `
     -AudioFile $resolvedAudio `
     -ResultFile $rawResultPath `

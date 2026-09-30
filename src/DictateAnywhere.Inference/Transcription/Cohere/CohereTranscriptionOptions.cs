@@ -17,6 +17,8 @@ public sealed record CohereTranscriptionOptions(
   bool EnableAutomaticPunctuation)
 {
   public bool EnableInferenceWarmup { get; init; }
+  public string RuntimePreference { get; init; } = "automatic";
+  public string? RuntimeDevice { get; init; }
 
   public static CohereTranscriptionOptions Default { get; } = new(
     PythonExecutablePath: "python",

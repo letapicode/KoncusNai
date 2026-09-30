@@ -7,6 +7,7 @@ using DictateAnywhere.App.Workbench;
 namespace DictateAnywhere.App.Tests;
 
 [SuppressMessage("Reliability", "CA2000", Justification = "The awaited capture wrapper owns and disposes its inner fake.")]
+[Collection("Exclusive audio capture")]
 public sealed class ExclusiveAudioCaptureServiceTests
 {
   [Fact]
@@ -18,6 +19,25 @@ public sealed class ExclusiveAudioCaptureServiceTests
     await Assert.ThrowsAsync<InvalidOperationException>(() => second.StartChunkedAsync());
     Assert.False(second.IsCapturing);
     await first.StopAsync();
+    await second.StartChunkedAsync();
+    await second.StopAndFlushChunkAsync();
+    await first.StartAsync();
+  }
+
+  [Fact]
+  public async Task PreparationCannotInterruptCaptureAndBlocksBothRecordingModes()
+  {
+    await using ExclusiveAudioCaptureService first = new(new FakeCapture());
+    await using ExclusiveAudioCaptureService second = new(new FakeCapture());
+    await first.StartAsync();
+    Assert.Throws<InvalidOperationException>(() => ExclusiveAudioCaptureService.ReserveForRuntimePreparation());
+    Assert.True(first.IsCapturing);
+    await first.StopAsync();
+    using (ExclusiveAudioCaptureService.ReserveForRuntimePreparation())
+    {
+      await Assert.ThrowsAsync<InvalidOperationException>(() => first.StartAsync());
+      await Assert.ThrowsAsync<InvalidOperationException>(() => second.StartChunkedAsync());
+    }
     await second.StartChunkedAsync();
     await second.StopAndFlushChunkAsync();
     await first.StartAsync();

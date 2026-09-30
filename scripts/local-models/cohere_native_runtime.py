@@ -22,35 +22,70 @@ def file_hash(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-class NativeRuntime:
-    def __init__(self, manifest_path, model_dir):
-        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8-sig"))
-        if (manifest["version"], manifest["commit"], manifest["header_hash"], manifest["precision"]) != (VERSION, COMMIT, HEADER_HASH, "Q8_0"):
-            raise ValueError("Native runtime contract or precision is not supported.")
-        # Bind the conversion to the configured checkpoint, never a different downloaded model.
+def verify_manifest(manifest, model_dir=None):
+    if (manifest["version"], manifest["commit"], manifest["header_hash"], manifest["precision"]) != (VERSION, COMMIT, HEADER_HASH, "Q8_0"):
+        raise ValueError("Native runtime contract or precision is not supported.")
+    required = {str(Path(manifest["library_path"]).resolve())}
+    required.update(str(p.resolve()) for p in Path(manifest["library_path"]).parent.glob("*.dll"))
+    required.update(str(p.resolve()) for p in (Path(manifest["bindings_path"]) / "transcribe_cpp").rglob("*.py"))
+    recorded = {str(Path(p).resolve()) for p in manifest["runtime_hashes"]}
+    if not required.issubset(recorded) or not any(p.endswith("__init__.py") for p in recorded):
+        raise ValueError("Native manifest does not cover every loaded DLL and binding.")
+    for path, expected in manifest["runtime_hashes"].items():
+        if file_hash(path) != expected:
+            raise ValueError("Native runtime integrity check failed.")
+    if model_dir:
         if file_hash(Path(model_dir) / "model.safetensors") != manifest["source_sha256"]:
             raise ValueError("Native conversion does not match the configured model weights.")
+        for name, expected in manifest.get("source_hashes", {}).items():
+            if Path(name).name != name or (name != "model.safetensors" and Path(name).suffix not in (".json", ".model", ".py")):
+                raise ValueError("Unexpected source model identity entry.")
+            if name == "model.safetensors":
+                if expected != manifest["source_sha256"]:
+                    raise ValueError("Native source receipts disagree.")
+                continue
+            if file_hash(Path(model_dir) / name) != expected:
+                raise ValueError("Native conversion model configuration changed.")
         if file_hash(manifest["model_path"]) != manifest["model_sha256"]:
             raise ValueError("Native model integrity check failed.")
-        for path, expected in manifest["runtime_hashes"].items():
-            if file_hash(path) != expected:
-                raise ValueError("Native runtime integrity check failed.")
-        sys.path.insert(0, manifest["bindings_path"])
-        os.environ["TRANSCRIBE_LIBRARY"] = manifest["library_path"]
-        import transcribe_cpp as tc
-        from transcribe_cpp import _generated
-        if tc.native_version() != VERSION or _generated.PUBLIC_HEADER_HASH != HEADER_HASH:
-            raise ValueError("Native binary and bindings do not match the pinned ABI.")
+
+
+def load_bindings(manifest):
+    sys.path.insert(0, manifest["bindings_path"])
+    os.environ["TRANSCRIBE_LIBRARY"] = manifest["library_path"]
+    import transcribe_cpp as tc
+    from transcribe_cpp import _generated
+    if tc.native_version() != VERSION or _generated.PUBLIC_HEADER_HASH != HEADER_HASH:
+        raise ValueError("Native binary and bindings do not match the pinned ABI.")
+    return tc
+
+
+class NativeRuntime:
+    def __init__(self, manifest_path, model_dir):
+        manifest = manifest_path if isinstance(manifest_path, dict) else json.loads(Path(manifest_path).read_text(encoding="utf-8-sig"))
+        verify_manifest(manifest, model_dir)
         backend = manifest["backend"]
         if backend not in ("cpu", "vulkan"):
             raise ValueError("Native backend must be explicitly cpu or vulkan.")
         threads = manifest["threads"]
         if type(threads) is not int or not 1 <= threads <= (os.cpu_count() or 1):
             raise ValueError("Native thread count is invalid.")
+        os.environ["OMP_NUM_THREADS"] = str(threads)
+        os.environ["MKL_NUM_THREADS"] = str(threads)
+        os.environ["OPENBLAS_NUM_THREADS"] = "1"
+        tc = load_bindings(manifest)
         # Explicit device selection prevents a Vulkan request silently executing on CPU.
-        device = next((d for d in tc.backends() if d.kind == backend), None)
+        from cohere_runtime_selection import device_key, admission, hardware_snapshot
+        requested = manifest.get("device_key")
+        devices = [d for d in tc.backends() if d.kind == backend and (not requested or device_key(d) == requested)]
+        if requested and len(devices) != 1:
+            raise ValueError("Persisted compute device is missing or ambiguous; prepare again.")
+        device = devices[0] if devices else None
         if device is None:
             raise ValueError("Requested native compute device is unavailable.")
+        reason = admission(hardware_snapshot(), device)
+        if reason:
+            raise ValueError(reason)
         model_load_started = time.perf_counter()
         self.model = tc.Model(manifest["model_path"], backend=backend, device=device)
         try:
@@ -94,3 +129,17 @@ class NativeRuntime:
     def close(self):
         self.session.close()
         self.model.close()
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--probe", required=True)
+    args = parser.parse_args()
+    manifest = json.loads(Path(args.probe).read_text(encoding="utf-8-sig"))
+    verify_manifest(manifest)
+    tc = load_bindings(manifest)
+    from cohere_runtime_selection import device_key
+    print(json.dumps([{"key": device_key(d), "name": d.name, "description": d.description, "kind": d.kind,
+                       "device_type": d.device_type, "device_id": d.device_id,
+                       "memory_total": d.memory_total, "memory_free": d.memory_free} for d in tc.backends()]))

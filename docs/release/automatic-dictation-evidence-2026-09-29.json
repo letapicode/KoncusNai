@@ -1,0 +1,832 @@
+{
+  "schema_version": 1,
+  "measured_date": "2026-09-29",
+  "base_commit": "44ef37b",
+  "branch": "codex/automatic-dictation-runtime",
+  "scope": "physical English SAPI synthetic tests on one host; full-reference normalized word edits; no real recordings or dictation history",
+  "hardware": {
+    "cpu": "Intel i7-1260P",
+    "physical_cores": 12,
+    "logical_processors": 16,
+    "gpu": "Intel Iris Xe",
+    "driver": "32.0.101.7084",
+    "ram_bytes": 16774152192,
+    "os_kernel": "10.0.26300"
+  },
+  "libraries": {
+    "python": "3.11.9",
+    "torch": "2.14.0+cpu",
+    "transformers": "5.17.0",
+    "numpy": "2.4.6",
+    "psutil": "7.2.2"
+  },
+  "native": {
+    "version": "0.2.4",
+    "commit": "4807edaf210d0d7e8a6f7fb2a44b65966a2797f0",
+    "header_abi": "7df72bf9e667b8c2",
+    "precision": "Q8_0 with F16/F32 tensors",
+    "source_sha256": "987bd3e141c7bfdb5a78f5db11397ee7737308357e6cc0a3f36a4979b158137a",
+    "automatic_q8_sha256": "f2925603c98d7b3e0de3ec81e88ebb420cab88dcc2d2f914d336959933e081cb",
+    "compiled_q8_sha256": "ed7ab13da491112dafb3ed715872fb4088a85d7968e7d29181315852d0ba90df"
+  },
+  "conversion_equivalence": {
+    "tensors_compared": 2103,
+    "different_tensor_payloads_types_shapes": 0,
+    "metadata_fields_compared": 56,
+    "different_metadata_fields": 0,
+    "scope": "current-locked-library compiler-free conversion versus prior compiled quantizer; whole-file layouts differ"
+  },
+  "setup": {
+    "earlier_fresh_native_cache_ms": 224837.65,
+    "earlier_provision_ms": 108679.5,
+    "earlier_calibration_ms": 114916.33,
+    "earlier_libraries": "preexisting Torch 2.11.0+cpu and Transformers 5.8.1; Python already installed",
+    "current_locked_conversion_cached_archives_ms": 110812.46830000001,
+    "final_existing_q8_setup_ms": 190764.71289999972,
+    "final_provision_ms": 20445.131699998456,
+    "final_calibration_ms": 168726.00429999875,
+    "explicit_setup_reuse_ms": 22196.6562,
+    "clean_machine_total": null,
+    "isolated_new_environment_cached_wheels_ms": 469069.9194,
+    "isolated_new_environment_scope": "existing CPython 3.11 and system CRT; all pinned wheels installed into candidate, imports verified, environment promoted; base installers not executed",
+    "isolated_promoted_environment_reuse_ms": 8386.774300000001,
+    "integrated_setup_command_reuse_ms": 39104.019700000004
+  },
+  "selection": {
+    "policy": "cohere-q8-calibration-v1",
+    "selected_backend": "cpu",
+    "selected_threads": 12,
+    "reason": "measured_native_improvement",
+    "candidate_limit": 7,
+    "budget_seconds": 300,
+    "warm_samples_per_fixture": 5,
+    "candidates": [
+      {
+        "backend": "original",
+        "threads": 12,
+        "eligible": true,
+        "quality_pass": true,
+        "rejected_reason": null,
+        "ready_ms": 35614.89449999863,
+        "peak_private_bytes": 11136757760,
+        "scheduler_lag_p95_ms": 35.153900000295835,
+        "score_ms": 5152.164535000338,
+        "fixtures": {
+          "short": {
+            "first_ms": 11288.94819999914,
+            "p50_ms": 1892.8328000001784,
+            "p95_ms": 2127.4851000016497,
+            "warm_samples": 5,
+            "audio_seconds": 2.395,
+            "rtf": 0.7903268475992394,
+            "word_errors": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "reference_words": 5,
+            "audio_sha256": "b602e6281da63542d60806cf57d7bcc385fbc50d829b1adeff1127badcd93007"
+          },
+          "medium": {
+            "first_ms": 4117.975199998909,
+            "p50_ms": 3844.7696000002907,
+            "p95_ms": 4079.8993999997037,
+            "warm_samples": 5,
+            "audio_seconds": 6.675,
+            "rtf": 0.5759954456929275,
+            "word_errors": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "reference_words": 15,
+            "audio_sha256": "837eb549042392c39b79166b49979a070241d83c1688b201e6be94699e310bbb"
+          }
+        }
+      },
+      {
+        "backend": "vulkan",
+        "threads": 4,
+        "eligible": true,
+        "quality_pass": true,
+        "rejected_reason": null,
+        "ready_ms": 15328.080299997964,
+        "peak_private_bytes": 3113250816,
+        "scheduler_lag_p95_ms": 44.161599998915335,
+        "score_ms": 1801.3141124997674,
+        "fixtures": {
+          "short": {
+            "first_ms": 722.9581000028702,
+            "p50_ms": 743.8581999995222,
+            "p95_ms": 747.664899998199,
+            "warm_samples": 5,
+            "audio_seconds": 2.395,
+            "rtf": 0.3105879749476084,
+            "word_errors": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "reference_words": 5,
+            "audio_sha256": "b602e6281da63542d60806cf57d7bcc385fbc50d829b1adeff1127badcd93007"
+          },
+          "medium": {
+            "first_ms": 1284.3047999995179,
+            "p50_ms": 1215.9553000019514,
+            "p95_ms": 1231.4356999995653,
+            "warm_samples": 5,
+            "audio_seconds": 6.675,
+            "rtf": 0.1821655880152736,
+            "word_errors": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "reference_words": 15,
+            "audio_sha256": "837eb549042392c39b79166b49979a070241d83c1688b201e6be94699e310bbb"
+          }
+        }
+      },
+      {
+        "backend": "cpu",
+        "threads": 4,
+        "eligible": true,
+        "quality_pass": true,
+        "rejected_reason": null,
+        "ready_ms": 15074.864300000627,
+        "peak_private_bytes": 3914113024,
+        "scheduler_lag_p95_ms": 30.517600000166567,
+        "score_ms": 2178.502474999641,
+        "fixtures": {
+          "short": {
+            "first_ms": 738.6369999985618,
+            "p50_ms": 705.3226999996696,
+            "p95_ms": 718.4233000007225,
+            "warm_samples": 5,
+            "audio_seconds": 2.395,
+            "rtf": 0.2944979958244967,
+            "word_errors": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "reference_words": 5,
+            "audio_sha256": "b602e6281da63542d60806cf57d7bcc385fbc50d829b1adeff1127badcd93007"
+          },
+          "medium": {
+            "first_ms": 2043.195400001423,
+            "p50_ms": 1981.1129000008805,
+            "p95_ms": 2015.9948999971675,
+            "warm_samples": 5,
+            "audio_seconds": 6.675,
+            "rtf": 0.2967959400750383,
+            "word_errors": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "reference_words": 15,
+            "audio_sha256": "837eb549042392c39b79166b49979a070241d83c1688b201e6be94699e310bbb"
+          }
+        }
+      },
+      {
+        "backend": "cpu",
+        "threads": 12,
+        "eligible": true,
+        "quality_pass": true,
+        "rejected_reason": null,
+        "ready_ms": 13501.11360000301,
+        "peak_private_bytes": 3916210176,
+        "scheduler_lag_p95_ms": 27.83379999891622,
+        "score_ms": 2025.4076924989931,
+        "fixtures": {
+          "short": {
+            "first_ms": 677.5750999986485,
+            "p50_ms": 624.2858999976306,
+            "p95_ms": 638.5668000002624,
+            "warm_samples": 5,
+            "audio_seconds": 2.395,
+            "rtf": 0.2606621711889898,
+            "word_errors": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "reference_words": 5,
+            "audio_sha256": "b602e6281da63542d60806cf57d7bcc385fbc50d829b1adeff1127badcd93007"
+          },
+          "medium": {
+            "first_ms": 1804.3973999992886,
+            "p50_ms": 1835.0179999979446,
+            "p95_ms": 2055.3400999997393,
+            "warm_samples": 5,
+            "audio_seconds": 6.675,
+            "rtf": 0.27490906367010404,
+            "word_errors": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "reference_words": 15,
+            "audio_sha256": "837eb549042392c39b79166b49979a070241d83c1688b201e6be94699e310bbb"
+          }
+        }
+      }
+    ]
+  },
+  "comparisons": {
+    "automatic": {
+      "metric": "request-to-worker-response (not stop-to-visible)",
+      "ready_ms": 15091.040699997393,
+      "peak_private_bytes": 3132305408,
+      "peak_working_set_bytes": 2784595968,
+      "fixtures": [
+        {
+          "id": "short",
+          "audio_seconds": 2.395,
+          "audio_sha256": "b602e6281da63542d60806cf57d7bcc385fbc50d829b1adeff1127badcd93007",
+          "first_ms": 824.3249000006472,
+          "warm_p50_ms": 695.5787000006239,
+          "warm_p95_ms": 745.7804000005126,
+          "warm_rtf": 0.2904295198332459,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 5,
+          "backends": [
+            "transcribe.cpp/Vulkan0"
+          ],
+          "threads": [
+            4
+          ],
+          "fallback_reasons": []
+        },
+        {
+          "id": "medium",
+          "audio_seconds": 6.675,
+          "audio_sha256": "837eb549042392c39b79166b49979a070241d83c1688b201e6be94699e310bbb",
+          "first_ms": 1217.9175999990548,
+          "warm_p50_ms": 1180.8530000016617,
+          "warm_p95_ms": 1206.916999999521,
+          "warm_rtf": 0.1769068164796497,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 15,
+          "backends": [
+            "transcribe.cpp/Vulkan0"
+          ],
+          "threads": [
+            4
+          ],
+          "fallback_reasons": []
+        },
+        {
+          "id": "numbers",
+          "audio_seconds": 8.605,
+          "audio_sha256": "367e590bd1004d72a7ca6e0bed2f3492bc2e126a86187ae24028d2150d9bd127",
+          "first_ms": 1234.2610999985482,
+          "warm_p50_ms": 1180.3078999982972,
+          "warm_p95_ms": 1207.3073999999906,
+          "warm_rtf": 0.1371653573501798,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 14,
+          "backends": [
+            "transcribe.cpp/Vulkan0"
+          ],
+          "threads": [
+            4
+          ],
+          "fallback_reasons": []
+        }
+      ]
+    },
+    "manual-cpu": {
+      "metric": "request-to-worker-response (not stop-to-visible)",
+      "ready_ms": 15122.021499999391,
+      "peak_private_bytes": 3945979904,
+      "peak_working_set_bytes": 3596828672,
+      "fixtures": [
+        {
+          "id": "short",
+          "audio_seconds": 2.395,
+          "audio_sha256": "b602e6281da63542d60806cf57d7bcc385fbc50d829b1adeff1127badcd93007",
+          "first_ms": 685.7213000002957,
+          "warm_p50_ms": 641.7216999980155,
+          "warm_p95_ms": 653.5258000003523,
+          "warm_rtf": 0.26794225469645744,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 5,
+          "backends": [
+            "transcribe.cpp/CPU"
+          ],
+          "threads": [
+            12
+          ],
+          "fallback_reasons": []
+        },
+        {
+          "id": "medium",
+          "audio_seconds": 6.675,
+          "audio_sha256": "837eb549042392c39b79166b49979a070241d83c1688b201e6be94699e310bbb",
+          "first_ms": 1782.048200002464,
+          "warm_p50_ms": 1786.0842999980377,
+          "warm_p95_ms": 1863.1697999990138,
+          "warm_rtf": 0.2675781722843502,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 15,
+          "backends": [
+            "transcribe.cpp/CPU"
+          ],
+          "threads": [
+            12
+          ],
+          "fallback_reasons": []
+        },
+        {
+          "id": "numbers",
+          "audio_seconds": 8.605,
+          "audio_sha256": "367e590bd1004d72a7ca6e0bed2f3492bc2e126a86187ae24028d2150d9bd127",
+          "first_ms": 2368.3507000023383,
+          "warm_p50_ms": 2668.1905000004917,
+          "warm_p95_ms": 2675.8516000008967,
+          "warm_rtf": 0.31007443346897057,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 14,
+          "backends": [
+            "transcribe.cpp/CPU"
+          ],
+          "threads": [
+            12
+          ],
+          "fallback_reasons": []
+        }
+      ]
+    },
+    "manual-vulkan": {
+      "metric": "request-to-worker-response (not stop-to-visible)",
+      "ready_ms": 12959.05440000206,
+      "peak_private_bytes": 3132190720,
+      "peak_working_set_bytes": 2784309248,
+      "fixtures": [
+        {
+          "id": "short",
+          "audio_seconds": 2.395,
+          "audio_sha256": "b602e6281da63542d60806cf57d7bcc385fbc50d829b1adeff1127badcd93007",
+          "first_ms": 744.2819999996573,
+          "warm_p50_ms": 710.6658000011521,
+          "warm_p95_ms": 735.5695999976888,
+          "warm_rtf": 0.2967289352823182,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 5,
+          "backends": [
+            "transcribe.cpp/Vulkan0"
+          ],
+          "threads": [
+            12
+          ],
+          "fallback_reasons": []
+        },
+        {
+          "id": "medium",
+          "audio_seconds": 6.675,
+          "audio_sha256": "837eb549042392c39b79166b49979a070241d83c1688b201e6be94699e310bbb",
+          "first_ms": 1243.7640999996802,
+          "warm_p50_ms": 1183.096699998714,
+          "warm_p95_ms": 1202.8011000002152,
+          "warm_rtf": 0.17724295131066878,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 15,
+          "backends": [
+            "transcribe.cpp/Vulkan0"
+          ],
+          "threads": [
+            12
+          ],
+          "fallback_reasons": []
+        },
+        {
+          "id": "numbers",
+          "audio_seconds": 8.605,
+          "audio_sha256": "367e590bd1004d72a7ca6e0bed2f3492bc2e126a86187ae24028d2150d9bd127",
+          "first_ms": 1179.5252000010805,
+          "warm_p50_ms": 1229.2386000008264,
+          "warm_p95_ms": 1245.043099999748,
+          "warm_rtf": 0.14285166763519191,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 14,
+          "backends": [
+            "transcribe.cpp/Vulkan0"
+          ],
+          "threads": [
+            12
+          ],
+          "fallback_reasons": []
+        }
+      ]
+    },
+    "original": {
+      "metric": "request-to-worker-response (not stop-to-visible)",
+      "ready_ms": 27112.618600000133,
+      "peak_private_bytes": 11197718528,
+      "peak_working_set_bytes": 8616603648,
+      "fixtures": [
+        {
+          "id": "short",
+          "audio_seconds": 2.395,
+          "audio_sha256": "b602e6281da63542d60806cf57d7bcc385fbc50d829b1adeff1127badcd93007",
+          "first_ms": 9705.85310000024,
+          "warm_p50_ms": 1754.544800001895,
+          "warm_p95_ms": 1911.309600000095,
+          "warm_rtf": 0.7325865553243821,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 5,
+          "backends": [
+            "transformers/cpu"
+          ],
+          "threads": [
+            null
+          ],
+          "fallback_reasons": [
+            "original_runtime_override"
+          ]
+        },
+        {
+          "id": "medium",
+          "audio_seconds": 6.675,
+          "audio_sha256": "837eb549042392c39b79166b49979a070241d83c1688b201e6be94699e310bbb",
+          "first_ms": 3769.9593999968783,
+          "warm_p50_ms": 3728.5467000001518,
+          "warm_p95_ms": 3753.6572000026354,
+          "warm_rtf": 0.5585837752809216,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 15,
+          "backends": [
+            "transformers/cpu"
+          ],
+          "threads": [
+            null
+          ],
+          "fallback_reasons": [
+            "original_runtime_override"
+          ]
+        },
+        {
+          "id": "numbers",
+          "audio_seconds": 8.605,
+          "audio_sha256": "367e590bd1004d72a7ca6e0bed2f3492bc2e126a86187ae24028d2150d9bd127",
+          "first_ms": 4301.429900002404,
+          "warm_p50_ms": 4371.297699999559,
+          "warm_p95_ms": 4554.940100002568,
+          "warm_rtf": 0.5079950842532898,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 14,
+          "backends": [
+            "transformers/cpu"
+          ],
+          "threads": [
+            null
+          ],
+          "fallback_reasons": [
+            "original_runtime_override"
+          ]
+        }
+      ]
+    },
+    "automatic-final": {
+      "metric": "request-to-worker-response (not stop-to-visible)",
+      "ready_ms": 16727.43780000019,
+      "peak_private_bytes": 3946536960,
+      "peak_working_set_bytes": 3596734464,
+      "fixtures": [
+        {
+          "id": "short",
+          "audio_seconds": 2.395,
+          "audio_sha256": "b602e6281da63542d60806cf57d7bcc385fbc50d829b1adeff1127badcd93007",
+          "first_ms": 690.7825000016601,
+          "warm_p50_ms": 636.5637999988394,
+          "warm_p95_ms": 638.0386000018916,
+          "warm_rtf": 0.2657886430057784,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 5,
+          "backends": [
+            "transcribe.cpp/CPU"
+          ],
+          "threads": [
+            12
+          ],
+          "fallback_reasons": []
+        },
+        {
+          "id": "medium",
+          "audio_seconds": 6.675,
+          "audio_sha256": "837eb549042392c39b79166b49979a070241d83c1688b201e6be94699e310bbb",
+          "first_ms": 1765.0390000017069,
+          "warm_p50_ms": 1793.704700001399,
+          "warm_p95_ms": 1858.3426999975927,
+          "warm_rtf": 0.2687198052436553,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 15,
+          "backends": [
+            "transcribe.cpp/CPU"
+          ],
+          "threads": [
+            12
+          ],
+          "fallback_reasons": []
+        },
+        {
+          "id": "numbers",
+          "audio_seconds": 8.605,
+          "audio_sha256": "367e590bd1004d72a7ca6e0bed2f3492bc2e126a86187ae24028d2150d9bd127",
+          "first_ms": 2281.549499999528,
+          "warm_p50_ms": 2342.8654999988794,
+          "warm_p95_ms": 2628.2527999974263,
+          "warm_rtf": 0.2722679256245066,
+          "samples": 6,
+          "warm_samples": 5,
+          "word_errors": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference_words": 14,
+          "backends": [
+            "transcribe.cpp/CPU"
+          ],
+          "threads": [
+            12
+          ],
+          "fallback_reasons": []
+        }
+      ]
+    }
+  },
+  "dotnet_lifecycle": {
+    "earlier_vulkan": {
+      "iterations": 20,
+      "first_ms": 1289.22,
+      "warm_p50_ms": 1209.78,
+      "warm_p95_ms": 1583.89,
+      "word_errors": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "reference_words": 15,
+      "backends": [
+        "transcribe.cpp/Vulkan0"
+      ],
+      "warmup": {
+        "WorkerStartupMs": 16123.5613,
+        "InferenceMs": 766.1082,
+        "TotalMs": 16946.6661
+      },
+      "peak_private_bytes": 3158540288,
+      "peak_working_set_bytes": 2892361728,
+      "max_model_workers": 1,
+      "cancellation_observed": true,
+      "post_cancel_observation_seconds": 5,
+      "final_model_workers": 0
+    },
+    "final_automatic_cpu": {
+      "iterations": 20,
+      "first_ms": 1784.88,
+      "warm_p50_ms": 2123.14,
+      "warm_p95_ms": 2202.85,
+      "word_errors": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "reference_words": 15,
+      "backends": [
+        "transcribe.cpp/CPU"
+      ],
+      "warmup": {
+        "WorkerStartupMs": 17146.9873,
+        "InferenceMs": 783.9724,
+        "TotalMs": 17983.3386
+      },
+      "peak_private_bytes": 3964223488,
+      "peak_working_set_bytes": 3695783936,
+      "max_model_workers": 1,
+      "cancellation_observed": true,
+      "post_cancel_observation_seconds": 5,
+      "final_model_workers": 0
+    }
+  },
+  "limitations": [
+    "New timings are worker/provider roundtrip, not desktop stop-to-visible.",
+    "No new physical microphone/keyboard/insertion test.",
+    "Small-sample p95 is the sample maximum, not a population estimate.",
+    "Private commit includes owned workers, excludes GPU residency.",
+    "50ms scheduler sampler is not UI frame rate.",
+    "Other hardware and clean Windows/no-Python/missing-CRT installs are unverified.",
+    "Synthetic English results do not establish real-speaker/noisy/multilingual quality."
+  ],
+  "verification": {
+    "release_build": "PASS, zero warnings/errors",
+    "full_solution_tests": {
+      "passed": 1643,
+      "skipped": 6,
+      "failed": 0
+    },
+    "python_tests": {
+      "passed": 17,
+      "failed": 0
+    },
+    "public_api": "PASS, reviewed additive preference/device properties only",
+    "security_supply_chain": "PASS",
+    "documentation": "PASS",
+    "size_budgets": "PASS, isolated index of complete source candidate; reviewed source cap adjustments",
+    "published_payload": "PASS, self-contained win-x64 app and UIAccess helper; helper bytes match source",
+    "synthetic_payload_cases": "PASS, positive, six contamination, missing-helper and retired-fixture cases",
+    "github_actions": "not run during recorded local validation; check the GitHub PR for CI results",
+    "push_merge": "not performed at measurement time; no merge authorized"
+  }
+}

@@ -131,3 +131,10 @@ candidate, establish every affected consumer and compatibility consequence, and
 promote it through an explicit repository edit. API cleanup, renaming, or
 internalization requires a separately bounded migration when a real consumer or
 ownership boundary could be affected.
+
+Automatic dictation preparation adds only init properties to `AppSettings`
+(`DictationRuntimePreference`, `DictationRuntimeDevice`) and
+`CohereTranscriptionOptions` (`RuntimePreference`, `RuntimeDevice`). Existing
+constructors and deconstruction signatures remain unchanged. Settings documents
+without these fields default to automatic selection and no device override;
+provider and configured checkpoint identity remain independent of backend choice.
