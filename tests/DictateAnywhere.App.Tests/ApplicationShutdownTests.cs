@@ -1,4 +1,5 @@
 using DictateAnywhere.App.Lifecycle;
+using Xunit;
 
 namespace DictateAnywhere.App.Tests;
 
@@ -6,26 +7,31 @@ public sealed class ApplicationShutdownTests
 {
   private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-  [Xunit.Fact]
-  public async Task QuitWaitsForOwnedCleanupAndRepeatedRequestsShareCompletion()
+  [Fact]
+  public void QuitWaitsForOwnedCleanupAndRepeatedRequestsShareCompletion() => LifecycleTestContext.Run(async context =>
   {
     TaskCompletionSource release = Gate();
+    context.ReleaseOnTimeout(() => release.TrySetResult());
     bool finalStage = false;
-    ApplicationShutdown shutdown = new(TimeSpan.FromSeconds(2), (_, _) => { });
+    ApplicationShutdown shutdown = new(TimeSpan.FromSeconds(2), (_, _) => { }, _ => Gate().Task);
     Task<bool> first = shutdown.RunAsync(
       new CleanupStep("Owned work", () => release.Task),
       LifecycleCleanup.Sync("Dispatcher exit", () => finalStage = true));
     Task<bool> second = shutdown.RunAsync(LifecycleCleanup.Sync("Unexpected second quit", () => throw new InvalidOperationException()));
-    Xunit.Assert.Same(first, second);
-    Xunit.Assert.False(first.IsCompleted);
-    Xunit.Assert.False(finalStage);
-    release.SetResult();
-    Xunit.Assert.True(await first.WaitAsync(TimeSpan.FromSeconds(3)));
-    Xunit.Assert.True(finalStage);
-  }
+    try
+    {
+      Assert.Same(first, second);
+      Assert.False(first.IsCompleted);
+      Assert.False(finalStage);
+      release.SetResult();
+      Assert.True(await first);
+      Assert.True(finalStage);
+    }
+    finally { release.TrySetResult(); await first; }
+  });
 
-  [Xunit.Fact]
-  public async Task ReentrantQuitSeesPublishedCompletionAndRunsOnce()
+  [Fact]
+  public void ReentrantQuitSeesPublishedCompletionAndRunsOnce() => LifecycleTestContext.Run(async _ =>
   {
     Task<bool>? reentrant = null;
     int calls = 0;
@@ -35,13 +41,13 @@ public sealed class ApplicationShutdownTests
       calls++;
       reentrant = shutdown.RunAsync();
     }));
-    Xunit.Assert.Same(result, reentrant);
-    Xunit.Assert.True(await result);
-    Xunit.Assert.Equal(1, calls);
-  }
+    Assert.Same(result, reentrant);
+    Assert.True(await result);
+    Assert.Equal(1, calls);
+  });
 
-  [Xunit.Fact]
-  public async Task FaultCancellationAndFailingReporterDoNotPreventOtherCleanup()
+  [Fact]
+  public void FaultCancellationAndFailingReporterDoNotPreventOtherCleanup() => LifecycleTestContext.Run(async _ =>
   {
     int attempts = 0;
     bool finalStage = false;
@@ -55,17 +61,18 @@ public sealed class ApplicationShutdownTests
       new CleanupStep("Asynchronous failure", () => Task.FromException(new InvalidOperationException())),
       new CleanupStep("Cancelled", () => Task.FromCanceled(new CancellationToken(true))),
       LifecycleCleanup.Sync("Remaining owner", () => finalStage = true));
-    Xunit.Assert.False(complete);
-    Xunit.Assert.Equal(3, attempts);
-    Xunit.Assert.True(finalStage);
-  }
+    Assert.False(complete);
+    Assert.Equal(3, attempts);
+    Assert.True(finalStage);
+  });
 
-  [Xunit.Fact]
-  public async Task DeadlineReportsIncompleteCleanupAndObservesItsLaterFault()
+  [Fact]
+  public void DeadlineReportsIncompleteCleanupAndObservesItsLaterFault() => LifecycleTestContext.Run(async context =>
   {
     TaskCompletionSource deadline = Gate();
     TaskCompletionSource work = Gate();
     TaskCompletionSource lateFault = Gate();
+    context.ReleaseOnTimeout(() => { deadline.TrySetResult(); work.TrySetException(new IOException()); });
     int reports = 0;
     bool otherOwnerCleaned = false;
     ApplicationShutdown shutdown = new(TimeSpan.FromSeconds(5), (_, exception) =>
@@ -76,27 +83,42 @@ public sealed class ApplicationShutdownTests
     Task<bool> result = shutdown.RunAsync(
       new CleanupStep("Hung worker", () => work.Task),
       LifecycleCleanup.Sync("Independent owner", () => otherOwnerCleaned = true));
-    Xunit.Assert.False(result.IsCompleted);
-    deadline.SetResult();
-    Xunit.Assert.False(await result.WaitAsync(TimeSpan.FromSeconds(2)));
-    Xunit.Assert.True(otherOwnerCleaned);
-    Xunit.Assert.False(work.Task.IsCompleted);
-    Xunit.Assert.Equal(1, reports);
-    work.SetException(new IOException("Worker eventually failed"));
-    await lateFault.Task.WaitAsync(TimeSpan.FromSeconds(2));
-    Xunit.Assert.Equal(2, reports);
-  }
+    try
+    {
+      Assert.False(result.IsCompleted);
+      deadline.SetResult();
+      Assert.False(await result);
+      Assert.True(otherOwnerCleaned);
+      Assert.False(work.Task.IsCompleted);
+      Assert.Equal(1, reports);
+      work.SetException(new IOException("Worker eventually failed"));
+      await lateFault.Task;
+      Assert.Equal(2, reports);
+    }
+    finally
+    {
+      deadline.TrySetResult();
+      await result;
+      work.TrySetException(new IOException("Worker eventually failed"));
+      await lateFault.Task;
+    }
+  });
 
-  [Xunit.Fact]
-  public async Task CleanupAggregatesFaultsOnlyAfterIndependentOwnersFinish()
+  [Fact]
+  public void CleanupAggregatesFaultsOnlyAfterIndependentOwnersFinish() => LifecycleTestContext.Run(async context =>
   {
     TaskCompletionSource release = Gate();
+    context.ReleaseOnTimeout(() => release.TrySetResult());
     Task result = LifecycleCleanup.RunAsync(
       new CleanupStep("First", () => throw new IOException()),
       new CleanupStep("Second", () => release.Task));
-    Xunit.Assert.False(result.IsCompleted);
-    release.SetResult();
-    AggregateException exception = await Xunit.Assert.ThrowsAsync<AggregateException>(() => result);
-    Xunit.Assert.Single(exception.InnerExceptions);
-  }
+    try
+    {
+      Assert.False(result.IsCompleted);
+      release.SetResult();
+      AggregateException exception = await Assert.ThrowsAsync<AggregateException>(() => result);
+      Assert.Single(exception.InnerExceptions);
+    }
+    finally { release.TrySetResult(); await Assert.ThrowsAsync<AggregateException>(() => result); }
+  });
 }

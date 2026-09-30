@@ -178,3 +178,20 @@ set and I/O during long recordings and repeated Reader reopening, worker counts,
 shutdown stage p50/p95 and orphan counts, and model-selection performance across
 physical accelerators. These are inferred opportunities, not measured wins from
 this batch. No architectural rewrite is proposed.
+
+## PR #13 CI correction
+
+At `e46edc7`, the isolated test passed; Deterministic/Diagnostics reproduced
+the timeout with two logical CPUs. The pinned
+[xUnit context](https://github.com/xunit/xunit/blob/v2-2.6.6/src/xunit.execution/Sdk/MaxConcurrencySyncContext.cs)
+uses limited worker queues. A controlled test proves completed cleanup can
+leave quit pending until its queue resumes. Original CI queue occupants are unknown.
+
+Tests use a serial pump (15s plus 15s failure drain), release barriers
+and restore context. Production affinity/deadlines stay intact. A red test
+proved reentrant removal hid failure; quit now retains snapshot entries and
+removes owners before completion.
+
+Checks: lifecycle/tray 24x3; focused 27; Deterministic 1308; WPF 344; full
+1680 passed/6 skipped. Build and repository gates passed. Physical desktop,
+logoff, runtime/GPU and prior process-invariance limits remain.

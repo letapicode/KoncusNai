@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace DictateAnywhere.App.Lifecycle;
 
-/// <summary>Retains open and already-closing windows until their asynchronous cleanup settles.</summary>
+/// <summary>Dispatcher-owned registry retaining windows until their asynchronous cleanup settles.</summary>
 internal sealed class WindowLifetimeRegistry
 {
   private readonly Dictionary<object, Entry> entries = new();
@@ -24,6 +24,11 @@ internal sealed class WindowLifetimeRegistry
   internal Task CloseAsync(object window, bool alreadyClosed = false)
   {
     if (!entries.TryGetValue(window, out Entry? entry)) return Task.CompletedTask;
+    return CloseAsync(window, entry, alreadyClosed);
+  }
+
+  private Task CloseAsync(object window, Entry entry, bool alreadyClosed)
+  {
     if (entry.Completion is not null) return entry.Completion;
     TaskCompletionSource source = new(TaskCreationOptions.RunContinuationsAsynchronously);
     entry.Completion = source.Task;
@@ -47,7 +52,8 @@ internal sealed class WindowLifetimeRegistry
   {
     try
     {
-      await Task.WhenAll(entries.Keys.ToArray().Select(window => CloseAsync(window))).ConfigureAwait(true);
+      // Callbacks can close/remove another snapshot owner before enumeration reaches it.
+      await Task.WhenAll(entries.ToArray().Select(pair => CloseAsync(pair.Key, pair.Value, false))).ConfigureAwait(true);
       source.TrySetResult();
     }
     catch (Exception exception) { source.TrySetException(exception); }
@@ -57,15 +63,17 @@ internal sealed class WindowLifetimeRegistry
     Justification = "The retained task carries close/cleanup faults to the application shutdown owner.")]
   private async Task CloseCoreAsync(object window, Entry entry, TaskCompletionSource source, bool alreadyClosed)
   {
+    Exception? failure = null;
     try
     {
       await LifecycleCleanup.RunAsync(
         LifecycleCleanup.Sync("Close window", () => { if (!alreadyClosed) entry.Close(); }),
         new CleanupStep("Dispose window", entry.Cleanup)).ConfigureAwait(true);
-      source.TrySetResult();
     }
-    catch (Exception exception) { source.TrySetException(exception); }
-    finally { entries.Remove(window); }
+    catch (Exception exception) { failure = exception; }
+    entries.Remove(window);
+    if (failure is null) source.TrySetResult();
+    else source.TrySetException(failure);
   }
 
   private sealed class Entry(Action close, Func<Task> cleanup)

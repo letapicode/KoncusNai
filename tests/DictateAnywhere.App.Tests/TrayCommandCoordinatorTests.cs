@@ -159,11 +159,11 @@ public sealed class TrayCommandCoordinatorTests
   }
 
   [Xunit.Fact]
-  public async Task QuitInsideActiveCommandReturnsBeforeDrainingThatCommand()
+  public void QuitInsideActiveCommandReturnsBeforeDrainingThatCommand() => LifecycleTestContext.Run(async _ =>
   {
     FakeTrayIconHost host = new();
     TaskCompletionSource requested = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    ApplicationShutdown shutdown = new(TimeSpan.FromSeconds(2), (_, _) => { });
+    ApplicationShutdown shutdown = new(TimeSpan.FromSeconds(2), (_, _) => { }, _ => new TaskCompletionSource().Task);
     TrayCommandCoordinator? coordinator = null;
     Task<bool>? quit = null;
     async Task<bool> DrainAsync()
@@ -181,17 +181,21 @@ public sealed class TrayCommandCoordinatorTests
       },
     };
     coordinator = new TrayCommandCoordinator(host, handlers, () => DictationSessionState.Idle);
-    await coordinator.RunAsync(() =>
+    try
     {
-      host.RaiseQuit();
-      Xunit.Assert.False(quit!.IsCompleted);
-      return Task.CompletedTask;
-    });
-    await requested.Task.WaitAsync(TimeSpan.FromSeconds(2));
-    Xunit.Assert.True(await quit!.WaitAsync(TimeSpan.FromSeconds(3)));
-    Xunit.Assert.True(host.Disposed);
-    coordinator.SetStatus(DictationSessionState.Idle);
-  }
+      await coordinator.RunAsync(() =>
+      {
+        host.RaiseQuit();
+        Xunit.Assert.False(quit!.IsCompleted);
+        return Task.CompletedTask;
+      });
+      await requested.Task;
+      Xunit.Assert.True(await quit!);
+      Xunit.Assert.True(host.Disposed);
+      coordinator.SetStatus(DictationSessionState.Idle);
+    }
+    finally { await coordinator.DisposeAsync(); if (quit is not null) await quit; }
+  });
 
   private static TrayCommandCoordinator CreateCoordinator(FakeTrayIconHost host) => new(
     host,
