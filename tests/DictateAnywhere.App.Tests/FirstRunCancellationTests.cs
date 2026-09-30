@@ -25,7 +25,7 @@ public sealed class FirstRunCancellationTests
       {
         if (Application.Current is null)
         {
-          App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
@@ -45,6 +45,7 @@ public sealed class FirstRunCancellationTests
         Dispatcher.PushFrame(frame);
         Assert.True(refresh.IsCanceled);
         Assert.Null(window.CompletedSettings);
+        TestResourceApplication.Drain(() => window.DisposeAsync().AsTask());
       }
       catch (Exception ex) { failure = ex; }
     });

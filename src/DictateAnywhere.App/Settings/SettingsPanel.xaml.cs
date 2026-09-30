@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using DictateAnywhere.App.Lifecycle;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using System.Threading;
@@ -46,6 +48,9 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   private bool isUpdatingUi;
   private bool disposed;
+  private Task? disposalTask;
+  private readonly System.Collections.Generic.HashSet<Task> activeViewOperations = [];
+  private readonly CancellationTokenSource viewCancellation = new();
 
   internal SettingsPanel(
     SettingsOperationController controller,
@@ -141,20 +146,20 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   internal bool FocusInitialControl() => BackButton.Focus();
 
-  public async ValueTask DisposeAsync()
+  public ValueTask DisposeAsync()
   {
-    if (disposed)
-    {
-      return;
-    }
-
+    if (disposalTask is not null) return new ValueTask(disposalTask);
     disposed = true;
+    disposalTask = DisposeCoreAsync();
+    return new ValueTask(disposalTask);
+  }
+
+  private async Task DisposeCoreAsync()
+  {
+    await System.Windows.Threading.Dispatcher.Yield();
     runtimeStatusTimer.Stop();
     runtimeStatusTimer.Tick -= OnRuntimeStatusTick;
     Unloaded -= OnRuntimePanelUnloaded;
-    dictationPreparationCancellation?.Cancel();
-    if (dictationPreparationTask is not null) await dictationPreparationTask.ConfigureAwait(false);
-
     controller.DraftChanged -= OnDraftChanged;
     controller.StatusChanged -= OnStatusChanged;
     controller.SettingsSaved -= OnSettingsSaved;
@@ -163,26 +168,47 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
     UndoHotkeyCaptureControl.HotkeyChanged -= OnUndoHotkeyChanged;
     RetryLastDictationHotkeyCaptureControl.HotkeyChanged -= OnRetryLastDictationHotkeyChanged;
 
-    await controller.DisposeAsync().ConfigureAwait(false);
+    await LifecycleCleanup.RunAsync(
+      LifecycleCleanup.Sync("Cancel settings view", viewCancellation.Cancel),
+      LifecycleCleanup.Sync("Cancel runtime preparation", () => dictationPreparationCancellation?.Cancel()),
+      new CleanupStep("Runtime preparation", () => dictationPreparationTask ?? Task.CompletedTask),
+      new CleanupStep("Accepted settings view operations", () => Task.WhenAll(activeViewOperations.ToArray())),
+      new CleanupStep("Settings operations", () => controller.DisposeAsync().AsTask()),
+      LifecycleCleanup.Sync("Settings view lifetime", viewCancellation.Dispose)).ConfigureAwait(true);
+  }
+
+  private async Task RunViewOperationAsync(Func<Task> action)
+  {
+    if (disposed) return;
+    Task operation = action();
+    activeViewOperations.Add(operation);
+    try { await LifecycleCleanup.ObserveAsync(operation, diagnostics.Error, "Settings view operation").ConfigureAwait(true); }
+    finally { activeViewOperations.Remove(operation); }
   }
 
   ValueTask IAsyncDisposable.DisposeAsync() => DisposeAsync();
 
   private Window? HostWindow => Window.GetWindow(this);
 
-  private async void OnLoaded(object sender, RoutedEventArgs e)
+  private async void OnLoaded(object sender, RoutedEventArgs e) =>
+    await RunViewOperationAsync(OnLoadedAsync).ConfigureAwait(true);
+
+  private async Task OnLoadedAsync()
   {
     runtimeStatusTimer.Start();
     ChatTypefaceComboBox.ItemsSource = ChatTypefaceCatalog.Options;
     speechPresenter.PopulateProviders();
 
-    await controller.InitializeAsync().ConfigureAwait(true);
-    await controller.RefreshModelsAsync(controller.CurrentDraft.ToSettings().GetConfiguredTranscriptionSelection()).ConfigureAwait(true);
-    await controller.RefreshAudioDevicesAsync().ConfigureAwait(true);
+    await controller.InitializeAsync(viewCancellation.Token).ConfigureAwait(true);
+    if (disposed) return;
+    await controller.RefreshModelsAsync(controller.CurrentDraft.ToSettings().GetConfiguredTranscriptionSelection(), viewCancellation.Token).ConfigureAwait(true);
+    if (disposed) return;
+    await controller.RefreshAudioDevicesAsync(viewCancellation.Token).ConfigureAwait(true);
   }
 
   private void OnDraftChanged(object? sender, SettingsDraft draft)
   {
+    if (disposed) return;
     if (!Dispatcher.CheckAccess())
     {
       _ = Dispatcher.BeginInvoke(() => OnDraftChanged(sender, draft));
@@ -227,7 +253,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   private void OnAssistantFeaturesEnabledChanged(object sender, RoutedEventArgs e)
   {
-    if (!isUpdatingUi)
+    if (!isUpdatingUi && !disposed)
     {
       controller.UpdateDraft(draft => draft with
       {
@@ -238,6 +264,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   private void OnStatusChanged(object? sender, SettingsOperationStatus status)
   {
+    if (disposed) return;
     if (!Dispatcher.CheckAccess())
     {
       _ = Dispatcher.BeginInvoke(() => OnStatusChanged(sender, status));
@@ -283,6 +310,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   private void OnSettingsSaved(object? sender, AppSettings saved)
   {
+    if (disposed) return;
     if (!Dispatcher.CheckAccess())
     {
       _ = Dispatcher.BeginInvoke(() => OnSettingsSaved(sender, saved));
@@ -319,33 +347,36 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
     }
   }
 
-  private async void OnAudioDeviceDropDownOpened(object sender, EventArgs e)
+  private async void OnAudioDeviceDropDownOpened(object sender, EventArgs e) =>
+    await RunViewOperationAsync(OnAudioDeviceDropDownOpenedAsync).ConfigureAwait(true);
+
+  private async Task OnAudioDeviceDropDownOpenedAsync()
   {
     if (controller.IsBusy) return;
-    await controller.RefreshAudioDevicesAsync().ConfigureAwait(true);
+    await controller.RefreshAudioDevicesAsync(viewCancellation.Token).ConfigureAwait(true);
   }
 
   private void OnTranscriptionProviderSelectionChanged(object sender, SelectionChangedEventArgs e)
   {
-    if (isUpdatingUi) return;
+    if (disposed || isUpdatingUi) return;
     speechPresenter.HandleProviderSelectionChanged(WithUpdatingGuard);
   }
 
   private void OnTranscriptionModelSelectionChanged(object sender, SelectionChangedEventArgs e)
   {
-    if (isUpdatingUi) return;
+    if (disposed || isUpdatingUi) return;
     speechPresenter.HandleModelSelectionChanged(WithUpdatingGuard);
   }
 
   private void OnTranscriptionLanguageSelectionChanged(object sender, SelectionChangedEventArgs e)
   {
-    if (isUpdatingUi) return;
+    if (disposed || isUpdatingUi) return;
     speechPresenter.HandleLanguageSelectionChanged();
   }
 
   private void OnEnableAutomaticPunctuationCheckedChanged(object sender, RoutedEventArgs e)
   {
-    if (isUpdatingUi) return;
+    if (disposed || isUpdatingUi) return;
     bool isChecked = EnableAutomaticPunctuationCheckBox.IsChecked == true;
     if (controller.CurrentDraft.EnableAutomaticPunctuation != isChecked)
     {
@@ -355,7 +386,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   private void OnEnableSecureFieldDetectionCheckedChanged(object sender, RoutedEventArgs e)
   {
-    if (isUpdatingUi) return;
+    if (disposed || isUpdatingUi) return;
     bool isChecked = EnableSecureFieldDetectionCheckBox.IsChecked == true;
     if (controller.CurrentDraft.EnableSecureFieldDetection != isChecked)
     {
@@ -365,7 +396,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   private void OnEnableElevatedInsertionCheckedChanged(object sender, RoutedEventArgs e)
   {
-    if (isUpdatingUi) return;
+    if (disposed || isUpdatingUi) return;
     bool isChecked = EnableElevatedInsertionCheckBox.IsChecked == true;
     if (controller.CurrentDraft.EnableElevatedInsertion != isChecked)
     {
@@ -375,7 +406,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   private void OnEnableDictationCommandsCheckedChanged(object sender, RoutedEventArgs e)
   {
-    if (isUpdatingUi) return;
+    if (disposed || isUpdatingUi) return;
     bool isChecked = EnableDictationCommandsCheckBox.IsChecked == true;
     if (controller.CurrentDraft.EnableDictationCommands != isChecked)
     {
@@ -393,11 +424,14 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
   }
 
   private async void OnRefreshModelsClicked(object sender, RoutedEventArgs e) =>
-    await speechPresenter.RefreshModelsAsync().ConfigureAwait(true);
+    await RunViewOperationAsync(() => speechPresenter.RefreshModelsAsync()).ConfigureAwait(true);
 
-  private async void OnDownloadModelClicked(object sender, RoutedEventArgs e)
+  private async void OnDownloadModelClicked(object sender, RoutedEventArgs e) =>
+    await RunViewOperationAsync(OnDownloadModelClickedAsync).ConfigureAwait(true);
+
+  private async Task OnDownloadModelClickedAsync()
   {
-    if (dictationPreparationCancellation is not null) return;
+    if (disposed || dictationPreparationCancellation is not null) return;
     using CancellationTokenSource cancellation = new();
     dictationPreparationCancellation = cancellation;
     CancelDictationPreparationButton.Visibility = Visibility.Visible;
@@ -405,7 +439,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
     {
       Task<bool> preparation = speechPresenter.DownloadModelAsync(cancellation.Token);
       dictationPreparationTask = preparation;
-      if (await preparation.ConfigureAwait(true)) SettingsSaved?.Invoke(this, EventArgs.Empty);
+      if (await preparation.ConfigureAwait(true) && !disposed) SettingsSaved?.Invoke(this, EventArgs.Empty);
     }
     finally { dictationPreparationCancellation = null; CancelDictationPreparationButton.Visibility = Visibility.Collapsed; }
   }
@@ -438,9 +472,12 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
     controller.UpdateDraft(draft => draft with { DictationRuntimePreference = choice.Preference, DictationRuntimeDevice = choice.Device });
   }
 
-  private async void OnPrepareDictationRuntimeClicked(object sender, RoutedEventArgs e)
+  private async void OnPrepareDictationRuntimeClicked(object sender, RoutedEventArgs e) =>
+    await RunViewOperationAsync(OnPrepareDictationRuntimeClickedAsync).ConfigureAwait(true);
+
+  private async Task OnPrepareDictationRuntimeClickedAsync()
   {
-    if (dictationPreparationCancellation is not null || controller.IsBusy) return;
+    if (disposed || dictationPreparationCancellation is not null || controller.IsBusy) return;
     using CancellationTokenSource cancellation = new();
     dictationPreparationCancellation = cancellation;
     CancelDictationPreparationButton.Visibility = Visibility.Visible;
@@ -448,7 +485,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
     {
       Task<bool> preparation = controller.PrepareRuntimeAsync(controller.CurrentDraft.ToSettings().GetConfiguredTranscriptionSelection(), cancellation.Token);
       dictationPreparationTask = preparation;
-      if (await preparation.ConfigureAwait(true))
+      if (await preparation.ConfigureAwait(true) && !disposed)
       {
         isUpdatingUi = true;
         try { RefreshRuntimeChoices(controller.CurrentDraft); }
@@ -462,20 +499,23 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
   private void OnCancelDictationPreparationClicked(object sender, RoutedEventArgs e) => dictationPreparationCancellation?.Cancel();
 
   private async void OnActivateModelClicked(object sender, RoutedEventArgs e) =>
-    await speechPresenter.ActivateModelAsync().ConfigureAwait(true);
+    await RunViewOperationAsync(() => speechPresenter.ActivateModelAsync()).ConfigureAwait(true);
 
   private async void OnDeleteModelClicked(object sender, RoutedEventArgs e) =>
-    await speechPresenter.DeleteModelAsync().ConfigureAwait(true);
+    await RunViewOperationAsync(() => speechPresenter.DeleteModelAsync()).ConfigureAwait(true);
 
   private async void OnRunBenchmarkClicked(object sender, RoutedEventArgs e) =>
-    await speechPresenter.RunBenchmarkAsync().ConfigureAwait(true);
+    await RunViewOperationAsync(() => speechPresenter.RunBenchmarkAsync()).ConfigureAwait(true);
 
   private void OnManageHistoryClicked(object sender, RoutedEventArgs e) =>
     ManageHistoryRequested?.Invoke(this, EventArgs.Empty);
 
-  private async void OnBackClicked(object sender, RoutedEventArgs e)
+  private async void OnBackClicked(object sender, RoutedEventArgs e) =>
+    await RunViewOperationAsync(OnBackClickedAsync).ConfigureAwait(true);
+
+  private async Task OnBackClickedAsync()
   {
-    if (await controller.FlushSaveAsync().ConfigureAwait(true))
+    if (await controller.FlushSaveAsync().ConfigureAwait(true) && !disposed)
     {
       BackRequested?.Invoke(this, EventArgs.Empty);
     }
@@ -483,18 +523,26 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
 
   internal async Task<bool> ImportSettingsAsync()
   {
+    if (disposed) return false;
     Window? owner = HostWindow;
     if (owner is null) return false;
     if (!settingsFileDialogService.TryGetImportPath(owner, out string importPath)) return false;
-    return await controller.ImportAsync(importPath).ConfigureAwait(true);
+    Task<bool> work = controller.ImportAsync(importPath, viewCancellation.Token);
+    activeViewOperations.Add(work);
+    try { return await work.ConfigureAwait(true); }
+    finally { activeViewOperations.Remove(work); }
   }
 
   internal async Task<bool> ExportSettingsAsync()
   {
+    if (disposed) return false;
     Window? owner = HostWindow;
     if (owner is null) return false;
     if (!settingsFileDialogService.TryGetExportPath(owner, out string exportPath)) return false;
-    return await controller.ExportAsync(exportPath).ConfigureAwait(true);
+    Task<bool> work = controller.ExportAsync(exportPath, viewCancellation.Token);
+    activeViewOperations.Add(work);
+    try { return await work.ConfigureAwait(true); }
+    finally { activeViewOperations.Remove(work); }
   }
 
   private void WithUpdatingGuard(Action action)

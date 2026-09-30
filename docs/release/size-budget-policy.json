@@ -22,8 +22,8 @@
       "baselineBytes": 9190329,
       "minimumFiles": 1000,
       "minimumBytes": 8271296,
-      "maximumBytes": 10150000,
-      "rationale": "September 22 source baseline after removal of generated previews and the unlicensed Cohere fixture. September 29 automatic runtime setup adds compiler-free provisioning, selection tests and speech-free measured evidence: reviewed source inventory approximately 10.08 MB. The 10.15 MB cap permits this source-only feature; bundled asset, native/model payload and all other budgets remain unchanged. A ten percent lower bound catches incomplete exports."
+      "maximumBytes": 10175000,
+      "rationale": "September 22 source baseline after removal of generated previews and the unlicensed Cohere fixture. September 29 automatic runtime setup adds compiler-free provisioning, selection tests and speech-free measured evidence. September 30 awaitable shutdown adds lifecycle ownership, isolated dispatcher/barrier tests and its review report: candidate Git inventory approximately 10.165 MB. The 10.175 MB source cap adds 25 KB for this measured remediation; bundled asset, native/model payload and all other budgets remain unchanged. A ten percent lower bound catches incomplete exports."
     },
     {
       "id": "production-source",

@@ -22,7 +22,7 @@ public sealed class ReadingStudioHelpWindowInitializationTests
       {
         if (System.Windows.Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 
@@ -32,13 +32,8 @@ public sealed class ReadingStudioHelpWindowInitializationTests
           && window.MinWidth >= 700
           && window.ResizeMode == System.Windows.ResizeMode.CanResize;
         string markup = File.ReadAllText(Path.Combine(
-          AppContext.BaseDirectory,
-          "..",
-          "..",
-          "..",
-          "..",
-          "..",
-          "src",
+          TestSourcePaths.RepositoryRoot(),
+      "src",
           "DictateAnywhere.App",
           "Workbench",
           "Reading",

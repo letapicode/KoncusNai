@@ -193,7 +193,7 @@ public sealed class HistoryWindowStateTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 
@@ -239,7 +239,7 @@ public sealed class HistoryWindowStateTests
 
     public void Dispose()
     {
-      Window.DisposeAsync().AsTask().GetAwaiter().GetResult();
+      TestResourceApplication.Drain(() => Window.DisposeAsync().AsTask());
       Window.Close();
     }
   }

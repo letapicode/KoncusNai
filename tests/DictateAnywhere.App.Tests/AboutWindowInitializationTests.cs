@@ -29,7 +29,7 @@ public sealed class AboutWindowInitializationTests
       {
         if (System.Windows.Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
         window = new AboutWindow();
@@ -92,7 +92,7 @@ public sealed class AboutWindowInitializationTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 
@@ -156,7 +156,7 @@ public sealed class AboutWindowInitializationTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 

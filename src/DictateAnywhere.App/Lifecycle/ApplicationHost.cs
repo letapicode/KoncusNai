@@ -11,6 +11,7 @@ namespace DictateAnywhere.App.Lifecycle;
 internal interface IApplicationRuntimeSession : IRuntimeSupervisor, IAsyncDisposable
 {
   DictationSessionState CurrentState { get; }
+  Task StopAsync(CancellationToken cancellationToken = default);
   Task<bool> TryRestartWhenIdleAsync(CancellationToken cancellationToken = default);
   RuntimeStartupNotice? ConsumeStartupNotice();
 }
@@ -38,7 +39,11 @@ internal sealed class ApplicationHost : IRuntimeSupervisor, IAsyncDisposable
   private readonly SemaphoreSlim lifecycleLock = new(1, 1);
   private AppSettings? activeSettings;
   private AppSettings? pendingSettings;
-  private bool disposed;
+  private volatile bool disposed;
+  private readonly object disposalSync = new();
+  private readonly CancellationTokenSource stopping = new();
+  private Task? disposalTask;
+  private Task runtimeStopping = Task.CompletedTask;
 
   public ApplicationHost(
     IApplicationRuntimeSession runtime,
@@ -59,12 +64,34 @@ internal sealed class ApplicationHost : IRuntimeSupervisor, IAsyncDisposable
   public bool HasPendingSettings => pendingSettings is not null;
 
   public ITranscriptionService CreateTranscriptionService(AppSettings settings, IDiagnostics runtimeDiagnostics) =>
-    modelReadiness.CreateTranscriptionService(settings, runtimeDiagnostics);
+    disposed ? throw new ObjectDisposedException(nameof(ApplicationHost))
+      : modelReadiness.CreateTranscriptionService(settings, runtimeDiagnostics);
 
-  public Task RefreshReadinessAsync(AppSettings settings, CancellationToken cancellationToken = default) =>
-    modelReadiness.RefreshAsync(settings, cancellationToken);
+  public async Task RefreshReadinessAsync(AppSettings settings, CancellationToken cancellationToken = default)
+  {
+    ObjectDisposedException.ThrowIf(disposed, this);
+    using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopping.Token);
+    await lifecycleLock.WaitAsync(linked.Token).ConfigureAwait(false);
+    try
+    {
+      ObjectDisposedException.ThrowIf(disposed, this);
+      await modelReadiness.RefreshAsync(settings, linked.Token).ConfigureAwait(false);
+    }
+    finally { lifecycleLock.Release(); }
+  }
 
-  public Task StartAsync(CancellationToken cancellationToken = default) => runtime.StartAsync(cancellationToken);
+  public async Task StartAsync(CancellationToken cancellationToken = default)
+  {
+    ObjectDisposedException.ThrowIf(disposed, this);
+    using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopping.Token);
+    await lifecycleLock.WaitAsync(linked.Token).ConfigureAwait(false);
+    try
+    {
+      ObjectDisposedException.ThrowIf(disposed, this);
+      await runtime.StartAsync(linked.Token).ConfigureAwait(false);
+    }
+    finally { lifecycleLock.Release(); }
+  }
 
   public async Task<RuntimeSettingsApplyResult> ApplyRuntimeSettingsAsync(
     AppSettings settings,
@@ -72,9 +99,12 @@ internal sealed class ApplicationHost : IRuntimeSupervisor, IAsyncDisposable
   {
     ArgumentNullException.ThrowIfNull(settings);
     ObjectDisposedException.ThrowIf(disposed, this);
+    using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopping.Token);
+    cancellationToken = linked.Token;
     await lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
     try
     {
+      ObjectDisposedException.ThrowIf(disposed, this);
       if (runtime.IsRunning && !RuntimeSettingsRestartPolicy.RequiresRestart(activeSettings, settings))
       {
         pendingSettings = null;
@@ -89,6 +119,7 @@ internal sealed class ApplicationHost : IRuntimeSupervisor, IAsyncDisposable
       }
 
       await modelReadiness.RefreshAsync(settings, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       bool started;
       try
       {
@@ -131,26 +162,62 @@ internal sealed class ApplicationHost : IRuntimeSupervisor, IAsyncDisposable
     return await ApplyRuntimeSettingsAsync(pending, cancellationToken).ConfigureAwait(false);
   }
 
-  public async ValueTask DisposeAsync()
+  public void BeginShutdown()
   {
-    if (disposed)
+    TaskCompletionSource source;
+    lock (disposalSync)
     {
-      return;
+      if (disposed) return;
+      disposed = true;
+      source = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      runtimeStopping = source.Task;
     }
+    // Do not hold the publication lock while user cancellation callbacks run.
+    _ = LifecycleCleanup.ObserveAsync(runtimeStopping, diagnostics.Error, "Runtime stop");
+    _ = StopCoreAsync(source);
+  }
 
-    disposed = true;
-    modelReadiness.SnapshotChanged -= OnModelReadinessSnapshotChanged;
-    await lifecycleLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "Transfers every stop failure to the published, owned completion task.")]
+  private async Task StopCoreAsync(TaskCompletionSource source)
+  {
     try
     {
-      await runtime.DisposeAsync().ConfigureAwait(false);
-      await modelReadiness.DisposeAsync().ConfigureAwait(false);
+      await LifecycleCleanup.RunAsync(
+        LifecycleCleanup.Sync("Detach readiness", () => modelReadiness.SnapshotChanged -= OnModelReadinessSnapshotChanged),
+        LifecycleCleanup.Sync("Cancel lifecycle operations", stopping.Cancel),
+        new CleanupStep("Stop runtime admission", () => runtime.StopAsync())).ConfigureAwait(false);
+      source.TrySetResult();
     }
-    finally
-    {
-      lifecycleLock.Release();
-      lifecycleLock.Dispose();
-    }
+    catch (Exception error) { source.TrySetException(error); }
+  }
+
+  public ValueTask DisposeAsync()
+  {
+    Task task;
+    lock (disposalSync) task = disposalTask ??= DisposeCoreAsync();
+    BeginShutdown(); // Close admission before returning, including direct disposal callers.
+    return new ValueTask(task);
+  }
+
+  private async Task DisposeCoreAsync()
+  {
+    await Task.Yield(); // Publish the shared disposal task before cancellation callbacks run.
+    await LifecycleCleanup.RunAsync(
+      LifecycleCleanup.Sync("Stop runtime admission", BeginShutdown),
+      new CleanupStep("Drain runtime lifecycle", async () =>
+      {
+        await lifecycleLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+          await LifecycleCleanup.RunAsync(
+            new CleanupStep("Stop dictation runtime", () => runtimeStopping),
+            new CleanupStep("Dictation runtime", () => runtime.DisposeAsync().AsTask()),
+            new CleanupStep("Model readiness", () => modelReadiness.DisposeAsync().AsTask())).ConfigureAwait(false);
+        }
+        finally { lifecycleLock.Release(); }
+      })).ConfigureAwait(false);
+    // Cancellation registrations/queued callers can still unwind after cancellation.
+    // These managed synchronization objects are reclaimed with this host.
   }
 
   private async Task<bool> StartRuntimeAsync(CancellationToken cancellationToken)

@@ -24,7 +24,8 @@ public sealed partial class BackgroundOperationOwnershipGuardrailTests
       string[] lines = File.ReadAllLines(path);
       for (int index = 0; index < lines.Length; index++)
       {
-        if (DiscardedTaskPattern().IsMatch(lines[index]))
+        if (DiscardedTaskPattern().IsMatch(lines[index])
+            && !IsObservedLifecycleBridge(Path.GetRelativePath(repoRoot, path), lines[index]))
         {
           violations.Add($"{Path.GetRelativePath(repoRoot, path)}:{index + 1}: {lines[index].Trim()}");
         }
@@ -36,6 +37,34 @@ public sealed partial class BackgroundOperationOwnershipGuardrailTests
       "Background tasks must be returned, awaited, or stored by a lifecycle owner."
       + Environment.NewLine
       + string.Join(Environment.NewLine, violations));
+  }
+
+  // Terminal observers catch/report every fault; the original operation remains
+  // owned by the window, watchdog, or shutdown task. The two TCS-based owners
+  // publish their shared completion before invoking reentrant callbacks.
+  private static bool IsObservedLifecycleBridge(string path, string line)
+  {
+    string statement = line.Trim();
+    if (statement.StartsWith("_ = LifecycleCleanup.ObserveAsync(", StringComparison.Ordinal)) return true;
+    string normalized = path.Replace('\\', '/');
+    return (normalized == "src/DictateAnywhere.App/Lifecycle/ApplicationShutdown.cs"
+        && statement == "_ = RunCoreAsync(source, steps);")
+      || (normalized == "src/DictateAnywhere.App/Lifecycle/WindowLifetimeRegistry.cs"
+        && (statement == "_ = CloseCoreAsync(window, entry, source, alreadyClosed);"
+          || statement == "_ = DisposeCoreAsync(source);"))
+      || (normalized == "src/DictateAnywhere.App/Lifecycle/ApplicationHost.cs"
+        && statement == "_ = StopCoreAsync(source);")
+      || (normalized == "src/DictateAnywhere.App/App.xaml.cs"
+        && statement == "_ = StopAdmissionAsync(admission);");
+  }
+
+  [Xunit.Fact]
+  public void LifecycleExceptionsDoNotPermitUnownedWorkOrOtherTcsBridges()
+  {
+    Xunit.Assert.False(IsObservedLifecycleBridge("src/Other.cs", "_ = Task.Run(Work);"));
+    Xunit.Assert.False(IsObservedLifecycleBridge("src/Other.cs", "_ = WorkAsync();"));
+    Xunit.Assert.False(IsObservedLifecycleBridge("src/Other.cs", "_ = RunCoreAsync(source, steps);"));
+    Xunit.Assert.False(IsObservedLifecycleBridge("src/DictateAnywhere.App/Lifecycle/ApplicationShutdown.cs", "_ = WorkAsync();"));
   }
 
   private static bool IsGeneratedPath(string path) =>

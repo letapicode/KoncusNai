@@ -36,7 +36,7 @@ public sealed class WindowShellPrimitivesTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 
@@ -115,7 +115,7 @@ public sealed class WindowShellPrimitivesTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 
@@ -250,7 +250,7 @@ public sealed class WindowShellPrimitivesTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 
@@ -312,7 +312,7 @@ public sealed class WindowShellPrimitivesTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 

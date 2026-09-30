@@ -61,6 +61,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
   private IInputElement? quickSettingsFocusReturnTarget;
   private IInputElement? inlineSettingsFocusReturnTarget;
   private bool disposed;
+  private Task? disposalTask;
 
   public event Action? OpenSettingsRequested;
   public event EventHandler? SettingsSaved;
@@ -231,14 +232,17 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     SettingsSaved?.Invoke(this, EventArgs.Empty);
   }
 
-  public async ValueTask DisposeAsync()
+  public ValueTask DisposeAsync()
   {
-    if (disposed)
-    {
-      return;
-    }
-
+    if (disposalTask is not null) return new ValueTask(disposalTask);
     disposed = true;
+    disposalTask = DisposeCoreAsync();
+    return new ValueTask(disposalTask);
+  }
+
+  private async Task DisposeCoreAsync()
+  {
+    await System.Windows.Threading.Dispatcher.Yield();
     StateChanged -= OnWindowStateChanged;
     SizeChanged -= OnWindowSizeChanged;
     HideInlineSettings(restoreFocus: false);
@@ -272,15 +276,15 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     ValueTask settingsApplicationDisposal = settingsApplicationController.DisposeAsync();
     ValueTask quickSettingsDisposal = quickSettingsController.DisposeAsync();
     ValueTask operationDisposal = operationSession.DisposeAsync();
-    await settingsApplicationDisposal.ConfigureAwait(true);
-    await quickSettingsDisposal.ConfigureAwait(true);
-    await operationDisposal.ConfigureAwait(true);
-    await historyController.DisposeAsync().ConfigureAwait(true);
     dictationController.ToggleRequested -= OnDictationToggleRequested;
-    await dictationController.DisposeAsync().ConfigureAwait(true);
-    await chatController.DisposeAsync().ConfigureAwait(true);
-    await fileImportCommandController.DisposeAsync().ConfigureAwait(true);
-    await readAloudController.DisposeAsync().ConfigureAwait(true);
+    await LifecycleCleanup.RunAsync(
+      new CleanupStep("Workbench operations", () => Task.WhenAll(
+        settingsApplicationDisposal.AsTask(), quickSettingsDisposal.AsTask(), operationDisposal.AsTask())),
+      new CleanupStep("History", () => historyController.DisposeAsync().AsTask()),
+      new CleanupStep("Dictation", () => dictationController.DisposeAsync().AsTask()),
+      new CleanupStep("Chat", () => chatController.DisposeAsync().AsTask()),
+      new CleanupStep("Import", () => fileImportCommandController.DisposeAsync().AsTask()),
+      new CleanupStep("Read aloud", () => readAloudController.DisposeAsync().AsTask())).ConfigureAwait(true);
   }
 
   [SuppressMessage(
@@ -787,6 +791,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
 
   private void OnReadDocumentClicked(object sender, RoutedEventArgs e)
   {
+    if (disposed) return;
     try
     {
       ReaderWindow reader = readerWindowFactory();

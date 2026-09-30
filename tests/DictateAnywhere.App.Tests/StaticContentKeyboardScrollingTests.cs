@@ -248,7 +248,7 @@ public sealed class StaticContentKeyboardScrollingTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
         action();

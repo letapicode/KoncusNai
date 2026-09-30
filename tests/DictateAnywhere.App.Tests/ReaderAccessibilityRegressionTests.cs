@@ -418,7 +418,7 @@ public sealed class ReaderAccessibilityRegressionTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
         action();

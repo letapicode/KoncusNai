@@ -449,7 +449,7 @@ public sealed class AccessibilityFocusAutomationTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 

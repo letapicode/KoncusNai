@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using DictateAnywhere.App.Experience;
+using DictateAnywhere.App.Lifecycle;
 using DictateAnywhere.App.Presentation;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Core.Services;
@@ -71,10 +72,8 @@ public partial class HistoryWindow : Window
     await RefreshHistoryAsync(lifetimeCancellationSource.Token).ConfigureAwait(true);
   }
 
-  private async void OnClosed(object? sender, EventArgs e)
-  {
-    await DisposeAsync().ConfigureAwait(true);
-  }
+  private void OnClosed(object? sender, EventArgs e) =>
+    _ = LifecycleCleanup.ObserveAsync(DisposeAsync().AsTask(), diagnostics.Error, "History close");
 
   internal ValueTask DisposeAsync()
   {
@@ -84,17 +83,23 @@ public partial class HistoryWindow : Window
     }
 
     disposed = true;
-    lifetimeCancellationSource.Cancel();
     disposalTask = DisposeCoreAsync();
     return new ValueTask(disposalTask);
   }
 
   private async Task DisposeCoreAsync()
   {
+    await System.Windows.Threading.Dispatcher.Yield();
+    await LifecycleCleanup.RunAsync(
+      LifecycleCleanup.Sync("Cancel history", lifetimeCancellationSource.Cancel),
+      new CleanupStep("History owners", DisposeOwnersAsync)).ConfigureAwait(true);
+  }
+
+  private async Task DisposeOwnersAsync()
+  {
     ValueTask queryDisposal = queryCoordinator.DisposeAsync();
     ValueTask commandDisposal = commandCoordinator.DisposeAsync();
-    await queryDisposal.ConfigureAwait(true);
-    await commandDisposal.ConfigureAwait(true);
+    await Task.WhenAll(queryDisposal.AsTask(), commandDisposal.AsTask()).ConfigureAwait(true);
     lifetimeCancellationSource.Dispose();
   }
 

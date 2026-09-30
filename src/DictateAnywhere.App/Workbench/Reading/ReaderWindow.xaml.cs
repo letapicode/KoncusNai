@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using DictateAnywhere.App.Composition;
+using DictateAnywhere.App.Lifecycle;
 using DictateAnywhere.App.Presentation;
 using DictateAnywhere.App.Workbench.Publishing;
 using DictateAnywhere.Core.Contracts;
@@ -17,7 +18,7 @@ using DictateAnywhere.Core.Contracts;
 namespace DictateAnywhere.App.Workbench.Reading;
 
 /// <summary>Top-level Reading Studio intent routing, dialogs, composition, and lifetime boundary.</summary>
-public partial class ReaderWindow : Window
+public partial class ReaderWindow : Window, IAsyncDisposable
 {
   private const double StandardChromeHeight = 46d;
   private readonly ReaderDocumentSession documentSession;
@@ -53,6 +54,7 @@ public partial class ReaderWindow : Window
   private WindowState windowStateBeforeDistractionFree;
   private bool hasLoaded;
   private bool disposed;
+  private Task? disposalTask;
 
   internal ReaderWindow(ReaderWindowDependencies dependencies)
   {
@@ -137,13 +139,17 @@ public partial class ReaderWindow : Window
     RenderPresentation();
   }
 
-  private async void OnSidebarIntent(ReaderSidebarIntent intent)
+  private async void OnSidebarIntent(ReaderSidebarIntent intent) =>
+    await RunIntentAsync(() => HandleSidebarIntentAsync(intent), "Reader intent").ConfigureAwait(true);
+
+  private async Task RunIntentAsync(Func<Task> action, string name)
   {
-    Task intentTask = HandleSidebarIntentAsync(intent);
+    if (disposed) return;
+    Task intentTask = action();
     activeSidebarIntentTasks.Add(intentTask);
     try
     {
-      await intentTask.ConfigureAwait(true);
+      await LifecycleCleanup.ObserveAsync(intentTask, diagnostics.Error, name).ConfigureAwait(true);
     }
     finally
     {
@@ -203,10 +209,8 @@ public partial class ReaderWindow : Window
 
   private void OnSeekWordRequested(int wordIndex) => SeekToWord(wordIndex, play: true);
 
-  private async void OnTransportIntent(ReaderTransportIntent intent)
-  {
-    await HandleTransportIntentAsync(intent).ConfigureAwait(true);
-  }
+  private async void OnTransportIntent(ReaderTransportIntent intent) =>
+    await RunIntentAsync(() => HandleTransportIntentAsync(intent), "Reader transport").ConfigureAwait(true);
 
   private async Task HandleTransportIntentAsync(ReaderTransportIntent intent)
   {
@@ -339,7 +343,10 @@ public partial class ReaderWindow : Window
     idleStatus = "Paused.";
   }
 
-  private async void OnMediaEnded(object? sender, EventArgs e)
+  private async void OnMediaEnded(object? sender, EventArgs e) =>
+    await RunIntentAsync(HandleMediaEndedAsync, "Reader media completion").ConfigureAwait(true);
+
+  private async Task HandleMediaEndedAsync()
   {
     if (disposed) return;
     playbackTimer.Stop();
@@ -543,7 +550,7 @@ public partial class ReaderWindow : Window
     activeDraftPreviewTasks.Add(previewTask);
     try
     {
-      await previewTask.ConfigureAwait(true);
+      await LifecycleCleanup.ObserveAsync(previewTask, diagnostics.Error, "Reader preview").ConfigureAwait(true);
     }
     finally
     {
@@ -714,7 +721,9 @@ public partial class ReaderWindow : Window
       recoverableJob: recoverable,
       theme: Selection.Theme,
       diagnostics: diagnostics) { Owner = this };
-    if (modal.ShowDialog() != true || modal.PublishingPlan is not YouTubePublishingPlan plan) return;
+    bool? approved = modal.ShowDialog();
+    await modal.DisposeAsync().ConfigureAwait(true);
+    if (disposed || approved != true || modal.PublishingPlan is not YouTubePublishingPlan plan) return;
     YouTubePublishingJob? job = recoverable;
     if (!modal.ResumeRequested || job is null)
     {
@@ -889,13 +898,33 @@ public partial class ReaderWindow : Window
     return string.IsNullOrWhiteSpace(safe) ? "reading" : safe;
   }
 
-  private async void OnClosed(object? sender, EventArgs e)
+  private void OnClosed(object? sender, EventArgs e) =>
+    _ = LifecycleCleanup.ObserveAsync(DisposeAsync().AsTask(), diagnostics.Error, "Reader close");
+
+  public ValueTask DisposeAsync()
   {
-    if (disposed) return;
+    if (disposalTask is not null) return new ValueTask(disposalTask);
     disposed = true;
-    viewLifetimeCancellation.Cancel();
-    activeDocumentImportOperation?.Cancel();
-    voicePreviewSession.Dispose();
+    disposalTask = DisposeCoreAsync();
+    return new ValueTask(disposalTask);
+  }
+
+  private async Task DisposeCoreAsync()
+  {
+    await System.Windows.Threading.Dispatcher.Yield();
+    await LifecycleCleanup.RunAsync(
+      LifecycleCleanup.Sync("Cancel reader lifetime", viewLifetimeCancellation.Cancel),
+      LifecycleCleanup.Sync("Cancel document import", () => activeDocumentImportOperation?.Cancel()),
+      LifecycleCleanup.Sync("Cancel preview", () => voicePreviewSession.Dispose()),
+      LifecycleCleanup.Sync("Cancel export", exportController.Cancel),
+      LifecycleCleanup.Sync("Cancel publishing", publishingController.Cancel),
+      LifecycleCleanup.Sync("Cancel preparation", preparationController.Cancel),
+      LifecycleCleanup.Sync("Cancel prefetch", narrationPrefetchSession.Cancel),
+      new CleanupStep("Reader resources", DisposeResourcesAsync)).ConfigureAwait(true);
+  }
+
+  private async Task DisposeResourcesAsync()
+  {
     playbackTimer.Stop();
     playbackTimer.Tick -= OnPlaybackTick;
     preparationController.StateChanged -= OnPreparationStateChanged;
@@ -913,31 +942,25 @@ public partial class ReaderWindow : Window
     TransportView.IntentRequested -= OnTransportIntent;
     TransportView.SeekRequested -= SeekToPosition;
     SidebarView.StopVoicePreview();
-    SidebarView.Dispose();
-    DocumentView.Dispose();
-    exportController.Cancel();
-    publishingController.Cancel();
-    preparationController.Cancel();
-    narrationPrefetchSession.Cancel();
-    await activeDocumentImportTask.ConfigureAwait(true);
-    if (activeDraftPreviewTasks.Count > 0)
-    {
-      await Task.WhenAll(activeDraftPreviewTasks.ToArray()).ConfigureAwait(true);
-    }
-    await exportController.DisposeAsync().ConfigureAwait(true);
-    await publishingController.DisposeAsync().ConfigureAwait(true);
-    await preparationController.DisposeAsync().ConfigureAwait(true);
-    await narrationPrefetchSession.DisposeAsync().ConfigureAwait(true);
-    if (activeSidebarIntentTasks.Count > 0)
-    {
-      await Task.WhenAll(activeSidebarIntentTasks.ToArray()).ConfigureAwait(true);
-    }
-    operationSession.Dispose();
-    completionToast?.Close();
-    completionToast = null;
-    await narrationSession.DisposeAsync().ConfigureAwait(true);
-    if (speechService is IAsyncDisposable asyncSpeech) await asyncSpeech.DisposeAsync().ConfigureAwait(true);
-    await documentOcrService.DisposeAsync().ConfigureAwait(true);
-    viewLifetimeCancellation.Dispose();
+    await LifecycleCleanup.RunAsync(
+      new CleanupStep("Accepted reader operations", () => Task.WhenAll(
+        activeDraftPreviewTasks.Concat(activeSidebarIntentTasks).Append(activeDocumentImportTask).ToArray())),
+      new CleanupStep("Export", () => exportController.DisposeAsync().AsTask()),
+      new CleanupStep("Publishing", () => publishingController.DisposeAsync().AsTask()),
+      new CleanupStep("Preparation", () => preparationController.DisposeAsync().AsTask()),
+      new CleanupStep("Prefetch", async () => await narrationPrefetchSession.DisposeAsync().ConfigureAwait(true)),
+      LifecycleCleanup.Sync("Reader presentation", () =>
+      {
+        SidebarView.Dispose();
+        DocumentView.Dispose();
+        operationSession.Dispose();
+        completionToast?.Close();
+        completionToast = null;
+      }),
+      new CleanupStep("Narration", () => narrationSession.DisposeAsync().AsTask()),
+      new CleanupStep("Speech worker", () => speechService is IAsyncDisposable asyncSpeech
+        ? asyncSpeech.DisposeAsync().AsTask() : Task.CompletedTask),
+      new CleanupStep("OCR", () => documentOcrService.DisposeAsync().AsTask()),
+      LifecycleCleanup.Sync("Reader lifetime", viewLifetimeCancellation.Dispose)).ConfigureAwait(true);
   }
 }
