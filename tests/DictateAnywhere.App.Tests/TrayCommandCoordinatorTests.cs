@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using DictateAnywhere.App.Runtime;
+using DictateAnywhere.App.Lifecycle;
 using DictateAnywhere.App.Tray;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Core.Domain;
@@ -157,6 +158,45 @@ public sealed class TrayCommandCoordinatorTests
     await called.Task.WaitAsync(TimeSpan.FromSeconds(2));
   }
 
+  [Xunit.Fact]
+  public void QuitInsideActiveCommandReturnsBeforeDrainingThatCommand() => LifecycleTestContext.Run(async _ =>
+  {
+    FakeTrayIconHost host = new();
+    TaskCompletionSource requested = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    ApplicationShutdown shutdown = new(TimeSpan.FromSeconds(2), (_, _) => { }, _ => new TaskCompletionSource().Task);
+    TrayCommandCoordinator? coordinator = null;
+    Task<bool>? quit = null;
+    async Task<bool> DrainAsync()
+    {
+      await Task.Yield();
+      return await shutdown.RunAsync(new CleanupStep("Tray", () => coordinator!.DisposeAsync().AsTask()));
+    }
+    TrayCommandHandlers handlers = CreateHandlers((_, _, _) => { }) with
+    {
+      Quit = () =>
+      {
+        coordinator!.BeginShutdown();
+        quit = DrainAsync();
+        requested.TrySetResult();
+      },
+    };
+    coordinator = new TrayCommandCoordinator(host, handlers, () => DictationSessionState.Idle);
+    try
+    {
+      await coordinator.RunAsync(() =>
+      {
+        host.RaiseQuit();
+        Xunit.Assert.False(quit!.IsCompleted);
+        return Task.CompletedTask;
+      });
+      await requested.Task;
+      Xunit.Assert.True(await quit!);
+      Xunit.Assert.True(host.Disposed);
+      coordinator.SetStatus(DictationSessionState.Idle);
+    }
+    finally { await coordinator.DisposeAsync(); if (quit is not null) await quit; }
+  });
+
   private static TrayCommandCoordinator CreateCoordinator(FakeTrayIconHost host) => new(
     host,
     CreateHandlers((_, _, _) => { }),
@@ -191,7 +231,8 @@ public sealed class TrayCommandCoordinatorTests
     public event EventHandler? OpenSettingsRequested;
     public event EventHandler? OpenWorkbenchRequested { add { } remove { } }
     public event EventHandler? OpenHistoryRequested { add { } remove { } }
-    public event EventHandler? QuitRequested { add { } remove { } }
+    public event EventHandler? QuitRequested;
+    public void RaiseQuit() => QuitRequested?.Invoke(this, EventArgs.Empty);
     public event EventHandler<bool>? StartupToggleRequested { add { } remove { } }
     public event EventHandler? RetryLastDictationRequested { add { } remove { } }
     public event EventHandler<TranscriptionModelSelection>? QuickModelSwitchRequested { add { } remove { } }

@@ -131,7 +131,7 @@ public sealed class ReadingStudioHelpWindowLayoutTests
   {
     if (Application.Current is null)
     {
-      DictateAnywhere.App.App app = new();
+      TestResourceApplication app = new();
       app.InitializeComponent();
     }
     return Application.Current ?? throw new InvalidOperationException("WPF application was not initialized.");

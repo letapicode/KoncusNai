@@ -104,6 +104,59 @@ public sealed class ApplicationHostTests
     Xunit.Assert.Equal(["runtime", "readiness"], disposalOrder);
   }
 
+  [Xunit.Fact]
+  public async Task ShutdownCancelsActiveAndQueuedReadinessAndDoesNotStartRuntimeAfterRelease()
+  {
+    TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    FakeRuntimeSession runtime = new();
+    FakeReadinessSession readiness = new()
+    {
+      Refresh = async _ => { started.TrySetResult(); await release.Task; },
+    };
+    ApplicationHost host = new(runtime, readiness, new RecordingDiagnostics());
+    Task active = host.ApplyRuntimeSettingsAsync(AppSettings.Default);
+    await started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    Task queued = host.ApplyRuntimeSettingsAsync(AppSettings.Default);
+    host.BeginShutdown();
+    Xunit.Assert.Equal(1, runtime.StopCount);
+    Task firstDisposal = host.DisposeAsync().AsTask();
+    Task secondDisposal = host.DisposeAsync().AsTask();
+    Xunit.Assert.Same(firstDisposal, secondDisposal);
+    Xunit.Assert.False(firstDisposal.IsCompleted);
+    await Xunit.Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued);
+    release.SetResult();
+    await Xunit.Assert.ThrowsAnyAsync<OperationCanceledException>(() => active);
+    await firstDisposal.WaitAsync(TimeSpan.FromSeconds(2));
+    Xunit.Assert.Equal(0, runtime.StartCount);
+    Xunit.Assert.Equal(1, runtime.DisposeCount);
+    Xunit.Assert.Equal(1, readiness.DisposeCount);
+    await Xunit.Assert.ThrowsAsync<ObjectDisposedException>(() => host.StartAsync());
+  }
+
+  [Xunit.Fact]
+  public async Task DirectDisposalClosesAdmissionBeforeReturning()
+  {
+    FakeRuntimeSession runtime = new();
+    ApplicationHost host = new(runtime, new FakeReadinessSession(), new RecordingDiagnostics());
+    Task disposal = host.DisposeAsync().AsTask();
+    Xunit.Assert.Equal(1, runtime.StopCount);
+    await Xunit.Assert.ThrowsAsync<ObjectDisposedException>(() => host.StartAsync());
+    await disposal;
+    Xunit.Assert.Equal(0, runtime.StartCount);
+  }
+
+  [Xunit.Fact]
+  public async Task RuntimeDisposalFailureDoesNotSkipReadinessDisposal()
+  {
+    FakeRuntimeSession runtime = new() { DisposeFailure = new IOException("Worker exit failed") };
+    FakeReadinessSession readiness = new();
+    ApplicationHost host = new(runtime, readiness, new RecordingDiagnostics());
+    await Xunit.Assert.ThrowsAsync<AggregateException>(() => host.DisposeAsync().AsTask());
+    Xunit.Assert.Equal(1, runtime.DisposeCount);
+    Xunit.Assert.Equal(1, readiness.DisposeCount);
+  }
+
   private sealed class FakeRuntimeSession : IApplicationRuntimeSession
   {
     private readonly List<string>? disposalOrder;
@@ -118,6 +171,9 @@ public sealed class ApplicationHostTests
     public int StartCount { get; private set; }
     public int RestartCount { get; private set; }
     public Exception? StartFailure { get; set; }
+    public Exception? DisposeFailure { get; set; }
+    public int DisposeCount { get; private set; }
+    public int StopCount { get; private set; }
     public RuntimeStartupNotice? StartupNotice { get; set; }
 
     public Task StartAsync(CancellationToken cancellationToken = default)
@@ -129,6 +185,13 @@ public sealed class ApplicationHostTests
       }
 
       IsRunning = true;
+      return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+      StopCount++;
+      IsRunning = false;
       return Task.CompletedTask;
     }
 
@@ -148,8 +211,9 @@ public sealed class ApplicationHostTests
 
     public ValueTask DisposeAsync()
     {
+      DisposeCount++;
       disposalOrder?.Add("runtime");
-      return ValueTask.CompletedTask;
+      return DisposeFailure is null ? ValueTask.CompletedTask : ValueTask.FromException(DisposeFailure);
     }
   }
 
@@ -165,11 +229,13 @@ public sealed class ApplicationHostTests
     public event EventHandler<ModelReadinessSnapshot>? SnapshotChanged;
     public ModelReadinessSnapshot CurrentSnapshot { get; private set; } = ModelReadinessSnapshot.Empty;
     public int RefreshCount { get; private set; }
+    public int DisposeCount { get; private set; }
+    public Func<CancellationToken, Task>? Refresh { get; init; }
 
     public Task RefreshAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
       RefreshCount++;
-      return Task.CompletedTask;
+      return Refresh?.Invoke(cancellationToken) ?? Task.CompletedTask;
     }
 
     public ITranscriptionService CreateTranscriptionService(AppSettings settings, IDiagnostics diagnostics) =>
@@ -183,6 +249,7 @@ public sealed class ApplicationHostTests
 
     public ValueTask DisposeAsync()
     {
+      DisposeCount++;
       disposalOrder?.Add("readiness");
       return ValueTask.CompletedTask;
     }

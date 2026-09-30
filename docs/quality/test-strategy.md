@@ -55,6 +55,8 @@ The focused runner performs filtered discovery first and fails if the selected s
 
 Use `-NoBuild` after an explicit Release build. Model, hardware, and FFmpeg tests remain discoverable but report an explicit skip until their documented environment variable and prerequisite are present. [GitHub Actions CI](github-actions-ci.md) runs deterministic and Windows WPF focused suites, then the full solution test gate.
 
+WPF view tests load production theme dictionaries through a resource-only `Application`; they must not run production startup. Dispatcher pumping can otherwise execute startup, touch per-user state, or trigger duplicate-instance shutdown inside the test runner. Tests of actual application quit run in explicitly owned child test hosts, override production startup, and exercise dispatcher cleanup before `Exit`. Their session-ending test invokes the WPF notification contract; it does not simulate an actual Windows logoff or guarantee cleanup under forced termination.
+
 Solution-level discovery is deliberately serialized with `--maxcpucount:1`. The test list is parsed to reject zero-test filters, and parallel MSBuild output can otherwise interleave test names and transiently undercount a real suite.
 
 ## Coverage gate

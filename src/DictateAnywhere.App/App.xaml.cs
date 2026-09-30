@@ -51,77 +51,100 @@ public partial class App : Application
   private EventWaitHandle? activationSignal;
   private DispatcherTimer? activationTimer;
   private bool isShuttingDown;
+  private readonly CancellationTokenSource shutdownCancellation = new();
+  private Task startupTask = Task.CompletedTask;
+  private Task watchdogTask = Task.CompletedTask;
+  private ApplicationShutdown? shutdown;
+  private Task? quitTask;
+  private int requestedExitCode;
+  private Task admissionTask = Task.CompletedTask;
+  private Task windowCleanup = Task.CompletedTask;
 
-  protected override async void OnStartup(StartupEventArgs e)
+  protected override void OnStartup(StartupEventArgs e)
   {
     base.OnStartup(e);
-    Activated += OnApplicationActivated;
-    AppTextScaleManager.ApplyCurrent(Resources);
-    textScaleSubscription = AppTextScaleManager.Subscribe(Dispatcher, Resources);
-    AppThemeManager.ApplyThemeResources(AppSettings.Default.ThemePreference);
+    startupTask = StartApplicationAsync(e);
+  }
 
-    activationSignal = new EventWaitHandle(false, EventResetMode.AutoReset,
-      @"Local\DictateAnywhere.Activate." + Environment.UserName);
-    instanceGuard = new SingleInstanceMutexGuard(SingleInstanceMutexGuard.DefaultMutexName);
-    if (!instanceGuard.TryAcquire())
-    {
-      if (!e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase)) activationSignal.Set();
-      Shutdown(0);
-      return;
-    }
-
-    composition = ApplicationComposition.CreateProduction();
-    settingsStore = composition.SettingsStore;
-    modelManager = composition.TranscriptionModelManager;
-    startupRegistrationService = composition.CreateStartupRegistrationService();
-    diagnostics = composition.Diagnostics;
-    applicationHost = composition.CreateApplicationHost(historyChangeNotifier);
-    applicationHost.ModelReadinessChanged += OnModelReadinessSnapshotChanged;
-    productivityHotkeyCoordinator = composition.CreateProductivityHotkeyCoordinator();
-    windowCoordinator = composition.CreateWindowCoordinator(Dispatcher, historyChangeNotifier);
-    windowCoordinator.SettingsRequested += OnWorkbenchOpenSettingsRequested;
-    windowCoordinator.SettingsSaved += OnSettingsSaved;
-    windowCoordinator.HistoryRequested += OnSettingsManageHistoryRequested;
-    windowCoordinator.ThemePreferenceRequested += OnWorkbenchThemePreferenceRequested;
-    windowCoordinator.TranscriptionModelSelectionRequested += OnWorkbenchTranscriptionModelSelectionRequested;
-    windowCoordinator.ChatOutputFontSizeRequested += OnWorkbenchChatOutputFontSizeRequested;
-    windowCoordinator.ChatPaperViewRequested += OnWorkbenchChatPaperViewRequested;
-    windowCoordinator.WorkbenchZoomRequested += OnWorkbenchZoomRequested;
-    activationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-    activationTimer.Tick += OnActivationRequested;
-    activationTimer.Start();
-    TrayCommandHandlers trayHandlers = new(
-      OpenSettingsAsync,
-      OpenWorkbenchAsync,
-      OpenHistoryAsync,
-      ApplyStartupToggleAsync,
-      RetryLastDictationAsync,
-      ApplyQuickModelSwitchAsync,
-      ExportDiagnosticsBundleAsync,
-      () => Shutdown(),
-      (operation, message, exception) => ReportUserFacingError(operation, message, exception, MessageBoxImage.Warning));
-    trayCommandCoordinator = composition.CreateTrayCommandCoordinator(
-      trayHandlers,
-      () => applicationHost?.IsRunning == true
-        ? applicationHost.CurrentState
-        : DictationSessionState.Error);
-
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Startup is an async WPF event boundary; all failures must enter owned shutdown.")]
+  private async Task StartApplicationAsync(StartupEventArgs e)
+  {
+    // Publish startup ownership before a nested modal dispatcher can request quit.
+    await Task.Yield();
     try
     {
-      AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+      shutdownCancellation.Token.ThrowIfCancellationRequested();
+      Activated += OnApplicationActivated;
+      AppTextScaleManager.ApplyCurrent(Resources);
+      textScaleSubscription = AppTextScaleManager.Subscribe(Dispatcher, Resources);
+      AppThemeManager.ApplyThemeResources(AppSettings.Default.ThemePreference);
+
+      activationSignal = new EventWaitHandle(false, EventResetMode.AutoReset,
+        @"Local\DictateAnywhere.Activate." + Environment.UserName);
+      instanceGuard = new SingleInstanceMutexGuard(SingleInstanceMutexGuard.DefaultMutexName);
+      if (!instanceGuard.TryAcquire())
+      {
+        if (!e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase)) activationSignal.Set();
+        RequestShutdown(0);
+        return;
+      }
+
+      composition = ApplicationComposition.CreateProduction();
+      settingsStore = composition.SettingsStore;
+      modelManager = composition.TranscriptionModelManager;
+      startupRegistrationService = composition.CreateStartupRegistrationService();
+      diagnostics = composition.Diagnostics;
+      applicationHost = composition.CreateApplicationHost(historyChangeNotifier);
+      applicationHost.ModelReadinessChanged += OnModelReadinessSnapshotChanged;
+      productivityHotkeyCoordinator = composition.CreateProductivityHotkeyCoordinator();
+      windowCoordinator = composition.CreateWindowCoordinator(Dispatcher, historyChangeNotifier);
+      windowCoordinator.SettingsRequested += OnWorkbenchOpenSettingsRequested;
+      windowCoordinator.SettingsSaved += OnSettingsSaved;
+      windowCoordinator.HistoryRequested += OnSettingsManageHistoryRequested;
+      windowCoordinator.ThemePreferenceRequested += OnWorkbenchThemePreferenceRequested;
+      windowCoordinator.TranscriptionModelSelectionRequested += OnWorkbenchTranscriptionModelSelectionRequested;
+      windowCoordinator.ChatOutputFontSizeRequested += OnWorkbenchChatOutputFontSizeRequested;
+      windowCoordinator.ChatPaperViewRequested += OnWorkbenchChatPaperViewRequested;
+      windowCoordinator.WorkbenchZoomRequested += OnWorkbenchZoomRequested;
+      activationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+      activationTimer.Tick += OnActivationRequested;
+      activationTimer.Start();
+      TrayCommandHandlers trayHandlers = new(
+        OpenSettingsAsync,
+        OpenWorkbenchAsync,
+        OpenHistoryAsync,
+        ApplyStartupToggleAsync,
+        RetryLastDictationAsync,
+        ApplyQuickModelSwitchAsync,
+        ExportDiagnosticsBundleAsync,
+        () => RequestShutdown(),
+        (operation, message, exception) => ReportUserFacingError(operation, message, exception, MessageBoxImage.Warning));
+      trayCommandCoordinator = composition.CreateTrayCommandCoordinator(
+        trayHandlers,
+        () => applicationHost?.IsRunning == true
+          ? applicationHost.CurrentState
+          : DictationSessionState.Error);
+
+      AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
+      shutdownCancellation.Token.ThrowIfCancellationRequested();
       AppThemeManager.ApplyThemeResources(settings.ThemePreference);
       _ = OllamaStartupShortcutPolicy.TryDisableAutomaticStartup();
       if (!AppLegalAcceptancePolicy.HasCurrentAcceptance(settings))
       {
         LegalAcknowledgementWindow legalAcknowledgement = new();
+        composition.WindowLifetimes.Register(legalAcknowledgement, legalAcknowledgement.Close, () => Task.CompletedTask);
+        legalAcknowledgement.Closed += (_, _) => _ = LifecycleCleanup.ObserveAsync(
+          composition.WindowLifetimes.CloseAsync(legalAcknowledgement, alreadyClosed: true),
+          diagnostics.Error, "Legal acknowledgement close");
         if (legalAcknowledgement.ShowDialog() != true)
         {
-          Shutdown();
+          RequestShutdown();
           return;
         }
 
         settings = AppLegalAcceptancePolicy.AcceptCurrentVersion(settings, DateTimeOffset.UtcNow);
-        await settingsStore.SaveAsync(settings).ConfigureAwait(true);
+        await settingsStore.SaveAsync(settings, shutdownCancellation.Token).ConfigureAwait(true);
       }
 
       if (FirstRunWizardGuard.ShouldShowWizard(settings))
@@ -131,14 +154,15 @@ public partial class App : Application
         bool? wizardResult = wizard.ShowDialog();
         if (wizardResult != true)
         {
-          Shutdown();
+          RequestShutdown();
           return;
         }
 
-        settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+        settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
         AppThemeManager.ApplyThemeResources(settings.ThemePreference);
       }
 
+      shutdownCancellation.Token.ThrowIfCancellationRequested();
       trayCommandCoordinator.Start(
         applicationHost.CurrentReadiness,
         startupRegistrationService.IsEnabled());
@@ -152,86 +176,131 @@ public partial class App : Application
         trayCommandCoordinator?.SetStatus(DictationSessionState.Error);
       }
     }
-    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ModelManagementException)
+    catch (OperationCanceledException) when (isShuttingDown) { }
+    catch (Exception ex)
     {
-      ReportUserFacingError("Application startup", "Application startup failed.", ex, MessageBoxImage.Error);
-      Shutdown(-1);
+      LifecycleCleanup.Report((_, error) => ReportUserFacingError("Application startup", "Application startup failed.", error, MessageBoxImage.Error),
+        "Application startup", ex);
+      RequestShutdown(-1);
     }
   }
 
-  protected override async void OnExit(ExitEventArgs e)
+  protected override void OnExit(ExitEventArgs e)
   {
-    isShuttingDown = true;
-    trayCommandCoordinator?.BeginShutdown();
-    activationTimer?.Stop();
-    if (activationTimer is not null) activationTimer.Tick -= OnActivationRequested;
-    activationSignal?.Dispose();
-    activationSignal = null;
-    Activated -= OnApplicationActivated;
-    textScaleSubscription?.Dispose();
-    textScaleSubscription = null;
-
-    if (runtimeWatchdogTimer is not null)
-    {
-      runtimeWatchdogTimer.Stop();
-      runtimeWatchdogTimer.Tick -= OnRuntimeWatchdogTimerTick;
-      runtimeWatchdogTimer = null;
-    }
-
-    if (trayCommandCoordinator is not null)
-    {
-      await trayCommandCoordinator.DisposeAsync().ConfigureAwait(true);
-      trayCommandCoordinator = null;
-    }
-
-    if (windowCoordinator is not null)
-    {
-      windowCoordinator.SettingsRequested -= OnWorkbenchOpenSettingsRequested;
-      windowCoordinator.SettingsSaved -= OnSettingsSaved;
-      windowCoordinator.HistoryRequested -= OnSettingsManageHistoryRequested;
-      windowCoordinator.ThemePreferenceRequested -= OnWorkbenchThemePreferenceRequested;
-      windowCoordinator.TranscriptionModelSelectionRequested -= OnWorkbenchTranscriptionModelSelectionRequested;
-      windowCoordinator.ChatOutputFontSizeRequested -= OnWorkbenchChatOutputFontSizeRequested;
-      windowCoordinator.ChatPaperViewRequested -= OnWorkbenchChatPaperViewRequested;
-      windowCoordinator.WorkbenchZoomRequested -= OnWorkbenchZoomRequested;
-      await windowCoordinator.DisposeAsync().ConfigureAwait(true);
-      windowCoordinator = null;
-    }
-
-    if (applicationHost is not null)
-    {
-      applicationHost.ModelReadinessChanged -= OnModelReadinessSnapshotChanged;
-      await applicationHost.DisposeAsync().ConfigureAwait(true);
-      applicationHost = null;
-    }
-
-    if (productivityHotkeyCoordinator is not null)
-    {
-      await productivityHotkeyCoordinator.DisposeAsync().ConfigureAwait(true);
-      productivityHotkeyCoordinator = null;
-    }
-
-    await OllamaProcessOwnership.StopOwnedAsync().ConfigureAwait(true);
-
-    diagnostics?.Dispose();
-    diagnostics = null;
-
-    instanceGuard?.Dispose();
-    instanceGuard = null;
-
-    // An in-flight async timer callback may still release this lock after OnExit returns.
-    // The process is exiting, so disposing it here would create a shutdown race.
+    // Cooperative paths finish cleanup before calling Shutdown. Forced termination
+    // cannot be made awaitable from this synchronous WPF notification.
     base.OnExit(e);
+  }
+
+  protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+  {
+    // Veto this cooperative request while our dispatcher drains. Windows may still
+    // force termination; this is not a guarantee against logoff deadlines/power loss.
+    e.Cancel = true;
+    RequestShutdown();
+    base.OnSessionEnding(e);
+  }
+
+  private void RequestShutdown(int exitCode = 0)
+  {
+    if (exitCode != 0) requestedExitCode = exitCode;
+    if (quitTask is not null) return;
+    shutdown ??= new ApplicationShutdown(TimeSpan.FromSeconds(10),
+      (name, exception) => diagnostics?.Error($"Shutdown incomplete: {name}", exception));
+    // Begin synchronously: queued input must not sneak in before the next UI turn.
+    isShuttingDown = true;
+    TaskCompletionSource admission = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    admissionTask = admission.Task;
+    quitTask = QuitAsync();
+    _ = StopAdmissionAsync(admission);
+  }
+
+  [SuppressMessage("Design", "CA1031", Justification = "Transfers cancellation and admission failures to the published shutdown task.")]
+  private async Task StopAdmissionAsync(TaskCompletionSource source)
+  {
+    try
+    {
+      await LifecycleCleanup.RunAsync(
+        LifecycleCleanup.Sync("Stop tray input", () => trayCommandCoordinator?.BeginShutdown()),
+        LifecycleCleanup.Sync("Cancel application startup", shutdownCancellation.Cancel),
+        LifecycleCleanup.Sync("Stop runtime admission", () => applicationHost?.BeginShutdown()),
+        LifecycleCleanup.Sync("Stop activation timer", () =>
+        {
+          activationTimer?.Stop();
+          if (activationTimer is not null) activationTimer.Tick -= OnActivationRequested;
+          Activated -= OnApplicationActivated;
+        }),
+        LifecycleCleanup.Sync("Stop watchdog", StopRuntimeWatchdog),
+        LifecycleCleanup.Sync("Start window cleanup", () =>
+        {
+          windowCleanup = windowCoordinator?.DisposeAsync().AsTask()
+            ?? composition?.WindowLifetimes.DisposeAsync() ?? Task.CompletedTask;
+        })).ConfigureAwait(true);
+      source.TrySetResult();
+    }
+    catch (Exception error) { source.TrySetException(error); }
+  }
+
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Final logger disposal must not prevent dispatcher shutdown.")]
+  private async Task QuitAsync()
+  {
+    await Task.Yield(); // Never await a tray command from within that command's stack.
+    bool shellDrained = false;
+    bool windowsDrained = false;
+    bool completed = await shutdown!.RunAsync(
+      new CleanupStep("Stop admission", () => admissionTask),
+      new CleanupStep("Drain application commands", async () =>
+      {
+        try
+        {
+          await LifecycleCleanup.RunAsync(
+            new CleanupStep("Startup", () => startupTask),
+            new CleanupStep("Tray", () => trayCommandCoordinator?.DisposeAsync().AsTask() ?? Task.CompletedTask),
+            new CleanupStep("Watchdog", () => watchdogTask)).ConfigureAwait(true);
+        }
+        finally { shellDrained = startupTask.IsCompleted && watchdogTask.IsCompleted
+          && (trayCommandCoordinator is null || trayCommandCoordinator.IsDisposed); }
+      }),
+      new CleanupStep("Drain windows", async () =>
+      {
+        try { await windowCleanup.ConfigureAwait(true); }
+        finally { windowsDrained = windowCleanup.IsCompletedSuccessfully; }
+      }),
+      new CleanupStep("Runtime and readiness", () => shellDrained && windowsDrained
+        ? applicationHost?.DisposeAsync().AsTask() ?? Task.CompletedTask
+        : Task.FromException(new InvalidOperationException("Runtime retained because dependent work has not drained."))),
+      new CleanupStep("Productivity hotkeys", () => shellDrained
+        ? productivityHotkeyCoordinator?.DisposeAsync().AsTask() ?? Task.CompletedTask
+        : Task.FromException(new InvalidOperationException("Hotkey resources retained because commands have not drained."))),
+      new CleanupStep("Owned Ollama", () => composition is not null && shellDrained && windowsDrained
+        ? OllamaProcessOwnership.StopOwnedAsync() : Task.CompletedTask),
+      new CleanupStep("Final process resources", () => LifecycleCleanup.RunAsync(
+        LifecycleCleanup.Sync("Activation signal", () => activationSignal?.Dispose()),
+        LifecycleCleanup.Sync("Theme subscription", () => textScaleSubscription?.Dispose()),
+        LifecycleCleanup.Sync("Instance guard", () => instanceGuard?.Dispose())))).ConfigureAwait(true);
+    // Timed-out tasks may still report; retain their logger until process exit.
+    if (completed)
+    {
+      try { diagnostics?.Dispose(); }
+      catch (Exception exception)
+      {
+        completed = false;
+        LifecycleCleanup.Report((name, error) => diagnostics?.Error(name, error), "Diagnostics disposal", exception);
+      }
+    }
+    Shutdown(requestedExitCode != 0 ? requestedExitCode : completed ? 0 : -1);
   }
 
   private void OnApplicationActivated(object? sender, EventArgs e)
   {
+    if (isShuttingDown) return;
     AppThemeManager.ApplyThemeResources(AppThemeManager.CurrentPreference);
   }
 
   private async void OnActivationRequested(object? sender, EventArgs e)
   {
-    if (activationSignal?.WaitOne(0) == true)
+    if (!isShuttingDown && activationSignal?.WaitOne(0) == true)
       await RunTrayActionAsync(OpenWorkbenchAsync).ConfigureAwait(true);
   }
 
@@ -278,7 +347,7 @@ public partial class App : Application
         throw new InvalidOperationException("Settings store is not initialized.");
       }
 
-      AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+      AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
       AppThemeManager.ApplyThemeResources(settings.ThemePreference);
       if (windowCoordinator is not null)
       {
@@ -313,14 +382,16 @@ public partial class App : Application
 
   private async Task<bool> RestartRuntimeForSettingsAsync(AppSettings settings)
   {
+    if (isShuttingDown) return false;
     if (applicationHost is null)
     {
       throw new InvalidOperationException("Application host is not initialized.");
     }
 
     RuntimeSettingsApplyResult result = await applicationHost
-      .ApplyRuntimeSettingsAsync(settings)
+      .ApplyRuntimeSettingsAsync(settings, shutdownCancellation.Token)
       .ConfigureAwait(true);
+    if (isShuttingDown) return false;
     QueueRuntimeNotice(result.Notice);
     if (result.Deferred)
     {
@@ -350,6 +421,7 @@ public partial class App : Application
 
   private Task EnsureWorkbenchAsync(AppSettings settings, bool registerWorkbenchHotkey = true)
   {
+    if (isShuttingDown) return Task.CompletedTask;
     if (windowCoordinator is null)
     {
       throw new InvalidOperationException("Window coordinator is not initialized.");
@@ -398,7 +470,7 @@ public partial class App : Application
       throw new InvalidOperationException("Settings store is not initialized.");
     }
 
-    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
     AppSettings updated = settings with
     {
       ThemePreference = preference,
@@ -414,7 +486,7 @@ public partial class App : Application
       throw new InvalidOperationException("Settings store is not initialized.");
     }
 
-    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
     AppSettings updated = settings with
     {
       ChatOutputFontSize = ChatTextSizePolicy.Normalize(fontSize),
@@ -427,7 +499,7 @@ public partial class App : Application
     if (settingsStore is null)
       throw new InvalidOperationException("Settings store is not initialized.");
 
-    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
     await settingsStore.SaveAsync(settings with { ChatPaperViewEnabled = enabled }).ConfigureAwait(true);
   }
 
@@ -438,7 +510,7 @@ public partial class App : Application
       throw new InvalidOperationException("Settings store is not initialized.");
     }
 
-    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
     AppSettings updated = settings with
     {
       WorkbenchZoomPercent = Math.Clamp(percent, 80, 150),
@@ -474,7 +546,7 @@ public partial class App : Application
       throw new InvalidOperationException("Settings store is not initialized.");
     }
 
-    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
     if (isShuttingDown) return;
     if (!settings.AssistantFeaturesEnabled)
     {
@@ -523,7 +595,7 @@ public partial class App : Application
       throw new InvalidOperationException("Application services are not initialized.");
     }
 
-    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
     if (composition is null)
     {
       throw new InvalidOperationException("Application composition is not initialized.");
@@ -565,7 +637,7 @@ public partial class App : Application
       throw new InvalidOperationException("Application services are not initialized.");
     }
 
-    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
     if (isShuttingDown) return;
     if (!CrisperWhisperLicenseConfirmation.EnsureAccepted(
           Current?.MainWindow,
@@ -610,14 +682,14 @@ public partial class App : Application
     }
 
     IReadOnlyList<ModelInfo> models = await modelManager.GetModelsAsync().ConfigureAwait(true);
-    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
     if (isShuttingDown) return;
     trayCommandCoordinator.SetModelMenu(models, settings.GetConfiguredTranscriptionSelection());
   }
 
   private Task RestartProductivityHotkeysAsync(AppSettings settings)
   {
-    if (productivityHotkeyCoordinator is null)
+    if (isShuttingDown || productivityHotkeyCoordinator is null)
     {
       return Task.CompletedTask;
     }
@@ -663,13 +735,21 @@ public partial class App : Application
   {
     _ = Dispatcher.BeginInvoke(new Action(() =>
     {
-      trayCommandCoordinator?.SetModelReadiness(snapshot);
+      if (!isShuttingDown) trayCommandCoordinator?.SetModelReadiness(snapshot);
     }));
   }
 
-  private async void OnRuntimeWatchdogTimerTick(object? sender, EventArgs e)
+  private void OnRuntimeWatchdogTimerTick(object? sender, EventArgs e)
   {
-    if (runtimeWatchdog is null)
+    if (isShuttingDown || !watchdogTask.IsCompleted) return;
+    watchdogTask = RunWatchdogTickAsync();
+    _ = LifecycleCleanup.ObserveAsync(watchdogTask,
+      (name, error) => diagnostics?.Error(name, error), "Watchdog callback");
+  }
+
+  private async Task RunWatchdogTickAsync()
+  {
+    if (isShuttingDown || runtimeWatchdog is null)
     {
       return;
     }
@@ -681,10 +761,12 @@ public partial class App : Application
 
     try
     {
-      await runtimeWatchdog.TickAsync().ConfigureAwait(true);
+      await runtimeWatchdog.TickAsync(shutdownCancellation.Token).ConfigureAwait(true);
+      if (isShuttingDown) return;
       await TryApplyPendingRuntimeSettingsAsync().ConfigureAwait(true);
       trayCommandCoordinator?.SetStatus(applicationHost?.CurrentState ?? DictationSessionState.Idle);
     }
+    catch (OperationCanceledException) when (isShuttingDown) { }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
     {
       diagnostics?.Warning($"Runtime watchdog tick failed: {ex.Message}");

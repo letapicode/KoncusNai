@@ -6,6 +6,8 @@ using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Threading;
+using DictateAnywhere.App.Lifecycle;
 using System.Windows;
 using System.Windows.Controls;
 using DictateAnywhere.App.Presentation;
@@ -14,7 +16,7 @@ using DictateAnywhere.Core.Contracts;
 
 namespace DictateAnywhere.App.Workbench.Publishing;
 
-internal partial class YouTubePublishingWindow : Window
+internal partial class YouTubePublishingWindow : Window, IAsyncDisposable
 {
   private readonly IYouTubeVideoPublisher publisher;
   private readonly YouTubeOAuthConfigurationStore configurationStore;
@@ -22,6 +24,10 @@ internal partial class YouTubePublishingWindow : Window
   private readonly YouTubePublishingJob? recoverableJob;
   private readonly IDiagnostics? diagnostics;
   private bool isConnecting;
+  private bool closed;
+  private Task? disposalTask;
+  private readonly CancellationTokenSource lifetime = new();
+  private readonly HashSet<Task> activeOperations = [];
 
   public YouTubePublishingWindow(
     string documentTitle,
@@ -65,7 +71,36 @@ internal partial class YouTubePublishingWindow : Window
       ResumePanel.Visibility = Visibility.Visible;
     }
     Loaded += OnLoaded;
+    Closed += (_, _) => _ = LifecycleCleanup.ObserveAsync(DisposeAsync().AsTask(), ReportCleanupFailure, "Publishing dialog close");
   }
+
+  public ValueTask DisposeAsync()
+  {
+    if (disposalTask is not null) return new ValueTask(disposalTask);
+    closed = true;
+    disposalTask = DisposeCoreAsync();
+    return new ValueTask(disposalTask);
+  }
+
+  private async Task DisposeCoreAsync()
+  {
+    await System.Windows.Threading.Dispatcher.Yield();
+    await LifecycleCleanup.RunAsync(
+      LifecycleCleanup.Sync("Cancel authorization", lifetime.Cancel),
+      new CleanupStep("Publishing dialog operations", () => Task.WhenAll(activeOperations.ToArray())),
+      LifecycleCleanup.Sync("Publishing dialog lifetime", lifetime.Dispose)).ConfigureAwait(true);
+  }
+
+  private async Task RunOperationAsync(Func<Task> action)
+  {
+    if (closed) return;
+    Task task = action();
+    activeOperations.Add(task);
+    try { await LifecycleCleanup.ObserveAsync(task, ReportCleanupFailure, "Publishing dialog operation").ConfigureAwait(true); }
+    finally { activeOperations.Remove(task); }
+  }
+
+  private void ReportCleanupFailure(string name, Exception exception) => diagnostics?.Error(name, exception);
 
   public YouTubePublishingPlan? PublishingPlan { get; private set; }
 
@@ -77,15 +112,22 @@ internal partial class YouTubePublishingWindow : Window
     "Design",
     "CA1031:Do not catch general exception types",
     Justification = "The window-loaded boundary must observe connection-status failures without terminating the dispatcher.")]
-  private async void OnLoaded(object sender, RoutedEventArgs e)
+  private async void OnLoaded(object sender, RoutedEventArgs e) =>
+    await RunOperationAsync(OnLoadedAsync).ConfigureAwait(true);
+
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Connection status is a UI boundary; all failures are observed without aborting cleanup.")]
+  private async Task OnLoadedAsync()
   {
     Loaded -= OnLoaded;
     try
     {
       await RefreshConnectionStatusAsync().ConfigureAwait(true);
     }
+    catch (OperationCanceledException) when (closed) { }
     catch (Exception ex)
     {
+      if (closed) return;
       ReportFailure("YouTube connection-status check", ex);
       ConnectionStatusTextBlock.Text = "YouTube connection status is unavailable. See Diagnostics.";
       ConnectionStatusTextBlock.Foreground = (System.Windows.Media.Brush)FindResource("Brush.Status.Error");
@@ -94,7 +136,8 @@ internal partial class YouTubePublishingWindow : Window
 
   private async Task RefreshConnectionStatusAsync()
   {
-    bool connected = await publisher.HasStoredAuthorizationAsync().ConfigureAwait(true);
+    bool connected = await publisher.HasStoredAuthorizationAsync(lifetime.Token).ConfigureAwait(true);
+    if (closed) return;
     ConnectionStatusTextBlock.Text = connected
       ? "Connected authorization found on this device. Connect again to choose a different account."
       : "Not connected. Google will open in your browser when you connect.";
@@ -103,7 +146,10 @@ internal partial class YouTubePublishingWindow : Window
       : (System.Windows.Media.Brush)FindResource("Brush.Text.Secondary");
   }
 
-  private async void OnConnectClicked(object sender, RoutedEventArgs e)
+  private async void OnConnectClicked(object sender, RoutedEventArgs e) =>
+    await RunOperationAsync(OnConnectClickedAsync).ConfigureAwait(true);
+
+  private async Task OnConnectClickedAsync()
   {
     if (isConnecting)
     {
@@ -124,24 +170,33 @@ internal partial class YouTubePublishingWindow : Window
     configurationStore.Save(configuration);
     try
     {
-      await publisher.ConnectAsync(configuration).ConfigureAwait(true);
+      await publisher.ConnectAsync(configuration, lifetime.Token).ConfigureAwait(true);
+      if (closed) return;
       ConnectionStatusTextBlock.Text = "YouTube connected. This authorization is encrypted for your Windows account.";
       ConnectionStatusTextBlock.Foreground = (System.Windows.Media.Brush)FindResource("Brush.Status.Success");
     }
+    catch (OperationCanceledException) when (closed) { }
     catch (Exception ex) when (ex is InvalidOperationException or Google.GoogleApiException or HttpRequestException)
     {
+      if (closed) return;
       ReportFailure("YouTube connection", ex);
       ValidationTextBlock.Text = "YouTube could not connect. See Diagnostics.";
     }
     finally
     {
       isConnecting = false;
-      ConnectButton.IsEnabled = true;
-      ConnectButton.Content = "Connect YouTube";
+      if (!closed)
+      {
+        ConnectButton.IsEnabled = true;
+        ConnectButton.Content = "Connect YouTube";
+      }
     }
   }
 
-  private async void OnStartPublishingClicked(object sender, RoutedEventArgs e)
+  private async void OnStartPublishingClicked(object sender, RoutedEventArgs e) =>
+    await RunOperationAsync(OnStartPublishingClickedAsync).ConfigureAwait(true);
+
+  private async Task OnStartPublishingClickedAsync()
   {
     ValidationTextBlock.Text = string.Empty;
     if (RightsCheckBox.IsChecked != true)
@@ -157,7 +212,9 @@ internal partial class YouTubePublishingWindow : Window
       return;
     }
 
-    if (!await publisher.HasStoredAuthorizationAsync().ConfigureAwait(true))
+    bool authorized = await publisher.HasStoredAuthorizationAsync(lifetime.Token).ConfigureAwait(true);
+    if (closed) return;
+    if (!authorized)
     {
       ValidationTextBlock.Text = "Connect your YouTube account before approving the series. This prevents an unattended run from stopping for sign-in.";
       return;
@@ -191,6 +248,7 @@ internal partial class YouTubePublishingWindow : Window
       }
     }
 
+    if (closed) return;
     configurationStore.Save(configuration);
     PublishingPlan = new YouTubePublishingPlan(
       SeriesTitleTextBox.Text,
@@ -208,7 +266,10 @@ internal partial class YouTubePublishingWindow : Window
     Close();
   }
 
-  private async void OnResumePublishingClicked(object sender, RoutedEventArgs e)
+  private async void OnResumePublishingClicked(object sender, RoutedEventArgs e) =>
+    await RunOperationAsync(OnResumePublishingClickedAsync).ConfigureAwait(true);
+
+  private async Task OnResumePublishingClickedAsync()
   {
     if (recoverableJob is null)
     {
@@ -217,12 +278,13 @@ internal partial class YouTubePublishingWindow : Window
 
     ValidationTextBlock.Text = string.Empty;
     YouTubeOAuthConfiguration configuration = OAuthConfiguration.Normalize();
-    if (!configuration.IsConfigured || !await publisher.HasStoredAuthorizationAsync().ConfigureAwait(true))
+    if (!configuration.IsConfigured || !await publisher.HasStoredAuthorizationAsync(lifetime.Token).ConfigureAwait(true))
     {
       ValidationTextBlock.Text = "Reconnect the YouTube account before resuming this saved series.";
       return;
     }
 
+    if (closed) return;
     configurationStore.Save(configuration);
     PublishingPlan = recoverableJob.Plan;
     ResumeRequested = true;

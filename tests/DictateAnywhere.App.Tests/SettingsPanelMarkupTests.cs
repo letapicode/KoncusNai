@@ -9,8 +9,7 @@ public sealed class SettingsPanelMarkupTests
   public void SettingsPanel_UsesOnePageAndOmitsRemovedAdvancedControls()
   {
     string path = Path.GetFullPath(Path.Combine(
-      AppContext.BaseDirectory,
-      "..", "..", "..", "..", "..",
+      TestSourcePaths.RepositoryRoot(),
       "src", "DictateAnywhere.App", "Settings", "SettingsPanel.xaml"));
     string markup = File.ReadAllText(path);
 
@@ -51,8 +50,7 @@ public sealed class SettingsPanelMarkupTests
   public void CompactSettings_UsesContinuousTextSizeAndCompactChatActions()
   {
     string workbenchRoot = Path.GetFullPath(Path.Combine(
-      AppContext.BaseDirectory,
-      "..", "..", "..", "..", "..",
+      TestSourcePaths.RepositoryRoot(),
       "src", "DictateAnywhere.App", "Workbench"));
     string markup = string.Join(
       Environment.NewLine,
@@ -91,8 +89,7 @@ public sealed class SettingsPanelMarkupTests
   public void FirstRunWizard_OffersDictationOnlyAndFullAssistantModes()
   {
     string path = Path.GetFullPath(Path.Combine(
-      AppContext.BaseDirectory,
-      "..", "..", "..", "..", "..",
+      TestSourcePaths.RepositoryRoot(),
       "src", "DictateAnywhere.App", "FirstRun", "FirstRunWizardWindow.xaml"));
     string markup = File.ReadAllText(path);
 
@@ -106,8 +103,7 @@ public sealed class SettingsPanelMarkupTests
   public void SharedDangerAction_UsesSolidThemeAwareSurfaces()
   {
     string root = Path.GetFullPath(Path.Combine(
-      AppContext.BaseDirectory,
-      "..", "..", "..", "..", "..",
+      TestSourcePaths.RepositoryRoot(),
       "src", "DictateAnywhere.App"));
     string styles = File.ReadAllText(Path.Combine(root, "Theming", "ControlStyles.xaml"));
     string tokens = File.ReadAllText(Path.Combine(root, "Theming", "DesignTokens.xaml"));

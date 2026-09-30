@@ -130,6 +130,55 @@ public sealed class ReaderWindowInitializationTests
   }
 
   [Xunit.Fact]
+  public void PublishingDialogCloseCancelsAndDrainsAuthorizationWithoutStartingAnUpload()
+  {
+    RunOnStaAsync(async () =>
+    {
+      string root = Path.Combine(Path.GetTempPath(), $"koncus-shutdown-dialog-{Guid.NewGuid():N}");
+      try
+      {
+        BlockingAuthorization publisher = new();
+        YouTubePublishingWindow window = new("Test document", 1, publisher,
+          new YouTubeOAuthConfigurationStore(Path.Combine(root, "client.bin")), diagnostics: new NoOpDiagnostics());
+        ((TextBox)window.FindName("ClientIdTextBox")).Text = "isolated-test-client";
+        ((Button)window.FindName("ConnectButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await publisher.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        window.Close();
+        Task cleanup = window.DisposeAsync().AsTask();
+        Xunit.Assert.Same(cleanup, window.DisposeAsync().AsTask());
+        await publisher.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Xunit.Assert.False(cleanup.IsCompleted);
+        publisher.Release.SetResult();
+        await cleanup.WaitAsync(TimeSpan.FromSeconds(2));
+        Xunit.Assert.Equal(0, publisher.UploadCount);
+        Xunit.Assert.Null(window.PublishingPlan);
+      }
+      finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+    });
+  }
+
+  [Xunit.Fact]
+  public void ShutdownSharesCleanupCompletionAndContinuesAfterSpeechDisposeFailure()
+  {
+    RunOnStaAsync(async () =>
+    {
+      BlockingDisposeSpeech speech = new();
+      BlockingOcrService ocr = new();
+      ReaderWindow window = CreateReader("Draft", "Some text.", speech, documentOcrService: ocr);
+      window.Close();
+      Task first = window.DisposeAsync().AsTask();
+      Xunit.Assert.Same(first, window.DisposeAsync().AsTask());
+      await speech.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+      Xunit.Assert.False(first.IsCompleted);
+      Xunit.Assert.False(ocr.Disposed.IsCompleted);
+      speech.Release.SetResult();
+      await Xunit.Assert.ThrowsAsync<AggregateException>(() => first);
+      await ocr.Disposed.WaitAsync(TimeSpan.FromSeconds(2));
+      Xunit.Assert.Equal(1, speech.DisposeCount);
+    });
+  }
+
+  [Xunit.Fact]
   public void Shutdown_WaitsForPreviewPreparationBeforeDisposingSpeech()
   {
     RunOnStaAsync(async () =>
@@ -260,7 +309,7 @@ public sealed class ReaderWindowInitializationTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
         CountingTextToSpeechService speech = new();
@@ -504,6 +553,22 @@ public sealed class ReaderWindowInitializationTests
     return null;
   }
 
+  private sealed class BlockingDisposeSpeech : ITextToSpeechService, IAsyncDisposable
+  {
+    internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal int DisposeCount { get; private set; }
+    public Task<TextToSpeechResult> SynthesizeAsync(TextToSpeechRequest request, CancellationToken cancellationToken = default) =>
+      throw new NotSupportedException();
+    public async ValueTask DisposeAsync()
+    {
+      DisposeCount++;
+      Started.TrySetResult();
+      await Release.Task;
+      throw new IOException("Speech worker cleanup failed");
+    }
+  }
+
   private sealed class CountingTextToSpeechService : ITextToSpeechService
   {
     public int CallCount { get; private set; }
@@ -574,7 +639,7 @@ public sealed class ReaderWindowInitializationTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
         DispatcherSynchronizationContext context = new(Dispatcher.CurrentDispatcher);
@@ -720,6 +785,29 @@ public sealed class ReaderWindowInitializationTests
     {
       disposed.TrySetResult();
       return ValueTask.CompletedTask;
+    }
+  }
+
+  private sealed class BlockingAuthorization : IYouTubeVideoPublisher
+  {
+    internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal int UploadCount { get; private set; }
+    public async Task ConnectAsync(YouTubeOAuthConfiguration configuration, CancellationToken cancellationToken = default)
+    {
+      using CancellationTokenRegistration registration = cancellationToken.Register(() => Cancelled.TrySetResult());
+      Started.TrySetResult();
+      await Release.Task;
+      cancellationToken.ThrowIfCancellationRequested();
+    }
+    public Task<bool> HasStoredAuthorizationAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
+    public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task<YouTubeUploadResult> UploadAsync(YouTubeOAuthConfiguration configuration, YouTubeUploadRequest request,
+      IProgress<YouTubeUploadProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+      UploadCount++;
+      return Task.FromException<YouTubeUploadResult>(new InvalidOperationException("Shutdown must not publish."));
     }
   }
 

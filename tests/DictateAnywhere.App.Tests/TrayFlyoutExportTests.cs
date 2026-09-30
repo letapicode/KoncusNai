@@ -232,7 +232,7 @@ public sealed class TrayFlyoutExportTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
         action();

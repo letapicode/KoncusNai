@@ -34,6 +34,16 @@ namespace DictateAnywhere.App.Composition;
 /// </summary>
 internal sealed class ApplicationComposition
 {
+  internal WindowLifetimeRegistry WindowLifetimes { get; } = new();
+
+  private T OwnWindow<T>(T window, Func<Task> cleanup) where T : Window
+  {
+    WindowLifetimes.Register(window, window.Close, cleanup);
+    window.Closed += (_, _) => _ = LifecycleCleanup.ObserveAsync(
+      WindowLifetimes.CloseAsync(window, alreadyClosed: true), Diagnostics.Error, "Window close cleanup");
+    return window;
+  }
+
   private ApplicationComposition(
     ISettingsStore settingsStore,
     IHotkeyRegistrationValidator hotkeyValidator,
@@ -113,12 +123,13 @@ internal sealed class ApplicationComposition
       new LocalFileDiagnostics());
   }
 
-  public FirstRunWizardWindow CreateFirstRunWizard() => new(
-    SettingsStore,
-    HotkeyValidator,
-    TranscriptionModelManager,
-    BenchmarkService,
-    Diagnostics);
+  public FirstRunWizardWindow CreateFirstRunWizard()
+  {
+    WindowLifetimes.ThrowIfStopping();
+    FirstRunWizardWindow window = new(SettingsStore, HotkeyValidator,
+      TranscriptionModelManager, BenchmarkService, Diagnostics);
+    return OwnWindow(window, () => window.DisposeAsync().AsTask());
+  }
 
   public IStartupRegistrationService CreateStartupRegistrationService() => new WindowsStartupRegistrationService();
 
@@ -176,6 +187,7 @@ internal sealed class ApplicationComposition
   public TextboxWorkbenchWindow CreateWorkbenchWindow(
     Func<AppSettings, IDiagnostics, ITranscriptionService>? transcriptionServiceFactory = null)
   {
+    WindowLifetimes.ThrowIfStopping();
     Func<AppSettings, IDiagnostics, ITranscriptionService> effectiveTranscriptionFactory =
       transcriptionServiceFactory
       ?? ((settings, diagnostics) => RuntimeServiceFactory.CreateTranscriptionService(settings, registry: null, diagnostics));
@@ -269,7 +281,8 @@ internal sealed class ApplicationComposition
         readAloudController),
       historyController,
       new WorkbenchHistoryInteractionController(historyController, chatController));
-    return new TextboxWorkbenchWindow(Diagnostics, dependencies);
+    TextboxWorkbenchWindow window = new(Diagnostics, dependencies);
+    return OwnWindow(window, () => window.DisposeAsync().AsTask());
   }
 
   [SuppressMessage(
@@ -278,6 +291,7 @@ internal sealed class ApplicationComposition
     Justification = "ReaderWindow and ReaderNarrationSession take ownership of the per-window OCR and alignment services.")]
   public ReaderWindow CreateReaderWindow(string title, string text, bool beginInEditor = false)
   {
+    WindowLifetimes.ThrowIfStopping();
     ITextToSpeechService speechService = RuntimeServiceFactory.CreateTextToSpeechService();
     ReaderDocumentSession documentSession = new(title, text, beginInEditor);
     ReaderPlaybackSession playbackSession = new(documentSession.Document.Sections.Count);
@@ -291,7 +305,7 @@ internal sealed class ApplicationComposition
     IYouTubeVideoPublisher publisher = new GoogleYouTubeVideoPublisher();
     IYouTubePublishingJobStore jobStore = new YouTubePublishingJobStore();
     YouTubePublishingCoordinator publishingCoordinator = new(publisher, jobStore);
-    return new ReaderWindow(new ReaderWindowDependencies(
+    ReaderWindow window = new(new ReaderWindowDependencies(
       speechService,
       documentSession,
       playbackSession,
@@ -313,17 +327,20 @@ internal sealed class ApplicationComposition
       ReaderVideoExportFileDialogService,
       ReadableDocumentFileDialogService,
       Diagnostics));
+    return OwnWindow(window, () => window.DisposeAsync().AsTask());
   }
 
   [SuppressMessage(
     "Reliability",
     "CA2000:Dispose objects before losing scope",
     Justification = "HistoryWindow owns and disposes its query and command coordinators.")]
-  public HistoryWindow CreateHistoryWindow(AppSettings settings) => new(
-    settings,
-    Diagnostics,
-    CreateHistoryQueryCoordinator(),
-    CreateHistoryCommandCoordinator());
+  public HistoryWindow CreateHistoryWindow(AppSettings settings)
+  {
+    WindowLifetimes.ThrowIfStopping();
+    HistoryWindow window = new(settings, Diagnostics,
+      CreateHistoryQueryCoordinator(), CreateHistoryCommandCoordinator());
+    return OwnWindow(window, () => window.DisposeAsync().AsTask());
+  }
 
   public Task<ProductivityActionResult> RetryLastDictationAsync(
     AppSettings settings,

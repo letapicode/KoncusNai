@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using DictateAnywhere.App.Runtime;
+using DictateAnywhere.App.Lifecycle;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Core.Domain;
 using DictateAnywhere.Models;
@@ -72,14 +73,27 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
     statusTimer.Start();
   }
 
-  public void SetStatus(DictationSessionState state) => trayHost.SetStatus(state);
+  internal bool IsDisposed => disposalTask?.IsCompletedSuccessfully == true;
 
-  public void SetModelReadiness(ModelReadinessSnapshot snapshot) => trayHost.SetModelReadiness(snapshot);
+  public void SetStatus(DictationSessionState state)
+  {
+    if (!shuttingDown && !disposed) trayHost.SetStatus(state);
+  }
 
-  public void SetStartOnLoginEnabled(bool enabled) => trayHost.SetStartOnLoginEnabled(enabled);
+  public void SetModelReadiness(ModelReadinessSnapshot snapshot)
+  {
+    if (!shuttingDown && !disposed) trayHost.SetModelReadiness(snapshot);
+  }
 
-  public void SetModelMenu(IReadOnlyList<ModelInfo> models, TranscriptionModelSelection selection) =>
-    trayHost.SetModelMenu(models, selection);
+  public void SetStartOnLoginEnabled(bool enabled)
+  {
+    if (!shuttingDown && !disposed) trayHost.SetStartOnLoginEnabled(enabled);
+  }
+
+  public void SetModelMenu(IReadOnlyList<ModelInfo> models, TranscriptionModelSelection selection)
+  {
+    if (!shuttingDown && !disposed) trayHost.SetModelMenu(models, selection);
+  }
 
   public void ShowNotification(string title, string message, Forms.ToolTipIcon icon)
   {
@@ -90,9 +104,9 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
   {
     if (shuttingDown || disposed) return;
     shuttingDown = true;
-    shutdownCancellation.Cancel();
     statusTimer.Stop();
-    trayHost.BeginShutdown();
+    try { shutdownCancellation.Cancel(); }
+    finally { trayHost.BeginShutdown(); }
   }
 
   public Task RunAsync(Func<Task> action)
@@ -117,12 +131,14 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
 
   private async Task DisposeCoreAsync()
   {
-    if (disposed)
-    {
-      return;
-    }
+    await Task.Yield();
+    await LifecycleCleanup.RunAsync(
+      LifecycleCleanup.Sync("Stop tray input", BeginShutdown),
+      new CleanupStep("Tray resources", DisposeHostAsync)).ConfigureAwait(true);
+  }
 
-    BeginShutdown();
+  private async Task DisposeHostAsync()
+  {
     disposed = true;
     statusTimer.Tick -= OnStatusTimerTick;
     trayHost.OpenSettingsRequested -= OnOpenSettingsRequested;
@@ -141,8 +157,8 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
     finally
     {
       commandLock.Release();
-      commandLock.Dispose();
-      shutdownCancellation.Dispose();
+      // Cancelled queued callers may still be unwinding; do not invalidate
+      // their token/semaphore while they release their accepted command scope.
     }
   }
 
@@ -193,14 +209,8 @@ internal sealed class TrayCommandCoordinator : IAsyncDisposable
     Justification = "The error reporter is the final tray event boundary; its own failure must not crash the dispatcher.")]
   private void ReportFailureSafely(string message, Exception exception)
   {
-    try
-    {
-      handlers.ReportFailure("Tray action", message, exception);
-    }
-    catch (Exception reportingFailure)
-    {
-      Trace.TraceError("Tray error reporting failed: {0}", reportingFailure.GetType().FullName);
-    }
+    LifecycleCleanup.Report((_, error) => handlers.ReportFailure("Tray action", message, error),
+      "Tray error reporting", exception);
   }
 
   private async Task<bool> WaitForTurnAsync()

@@ -303,12 +303,14 @@ The final UI-002 ownership audit records one authority for each mutable Reader c
 | Sidebar/document/transport WPF mechanics | Respective cohesive view | Selection suppression; rendering/highlight/debounce timers; and seek suppression remain view-local, unsubscribe, and dispose with the view. |
 | Dialogs, chrome, cross-view routing, import, and shutdown | `ReaderWindow` | Top-level WPF boundary; owns the import lease/task, observes draft-preview and sidebar-intent continuations, rejects callbacks after disposal, and coordinates dependency-ordered shutdown. |
 
-Reader shutdown first rejects new intents, cancels the window-lifetime token and active import, and
-stops preview/playback callbacks. It then unsubscribes and disposes the views, cancels all command and
-prefetch owners, awaits import and draft preview work, disposes export/publishing/preparation controllers,
-awaits prefetch and remaining sidebar-intent continuations (including voice preview), disposes operation
-and completion UI state, and only then disposes narration/alignment, speech, and OCR resources. Queued
-dispatcher callbacks re-check disposal before mutating presentation.
+Reader shutdown rejects new intents, cancels lifetime/import/preview/command and
+prefetch work, and detaches callbacks. It drains accepted import, draft-preview,
+sidebar-intent and publishing-dialog operations before disposing views,
+controllers, narration/alignment, speech and OCR resources. Composition retains
+independent Readers and already-closing windows until their cleanup settles.
+Application quit awaits this work before stopping the dispatcher, with explicit
+failure/deadline limits described in [application composition and lifetimes](application-composition-root.md).
+Queued dispatcher callbacks re-check disposal before mutating presentation.
 
 Focused evidence is in the matching `ReaderDocumentSessionTests`, `ReaderPlaybackSessionTests`,
 `ReaderOperationSessionTests`, three `Reader*ControllerTests`, narration/prefetch/preview session tests,

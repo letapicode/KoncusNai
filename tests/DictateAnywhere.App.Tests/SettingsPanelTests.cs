@@ -73,7 +73,7 @@ public sealed class SettingsPanelTests
       finally
       {
         host.Close();
-        panel.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        TestResourceApplication.Drain(() => panel.DisposeAsync().AsTask());
       }
     });
   }
@@ -227,7 +227,7 @@ public sealed class SettingsPanelTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
 

@@ -411,7 +411,7 @@ public sealed class WindowShellPreflightTests
       {
         if (Application.Current is null)
         {
-          DictateAnywhere.App.App app = new();
+          TestResourceApplication app = new();
           app.InitializeComponent();
         }
         action();

@@ -27,6 +27,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
   private HistoryWindow? historyWindow;
   private SettingsPanel? settingsPanel;
   private bool disposed;
+  private Task? disposalTask;
 
   public WindowCoordinator(
     ApplicationComposition composition,
@@ -67,7 +68,9 @@ internal sealed class WindowCoordinator : IAsyncDisposable
       SubscribeToWorkbench(workbenchWindow);
     }
 
-    await workbenchWindow.ApplySettingsAsync(settings, registerWorkbenchHotkey).ConfigureAwait(true);
+    TextboxWorkbenchWindow window = workbenchWindow;
+    await window.ApplySettingsAsync(settings, registerWorkbenchHotkey).ConfigureAwait(true);
+    if (disposed || !ReferenceEquals(workbenchWindow, window)) return;
     if (!workbenchWindow.IsVisible)
     {
       workbenchWindow.Show();
@@ -88,6 +91,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
     if (workbenchWindow is null)
     {
       AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+      if (disposed) return;
       await EnsureWorkbenchAsync(settings, registerWorkbenchHotkey, transcriptionServiceFactory).ConfigureAwait(true);
     }
     else
@@ -113,11 +117,12 @@ internal sealed class WindowCoordinator : IAsyncDisposable
         await Dispatcher.Yield(DispatcherPriority.Render);
       }
 
+      if (disposed || workbenchWindow is null) return;
       workbenchWindow.ShowInlineSettings(GetOrCreateSettingsPanel());
     }
     catch
     {
-      workbenchWindow.HideInlineSettings();
+      workbenchWindow?.HideInlineSettings();
       throw;
     }
   }
@@ -137,6 +142,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
     }
 
     AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync().ConfigureAwait(true));
+    if (disposed) return;
     HistoryWindow window = composition.CreateHistoryWindow(settings);
     window.Closed += OnHistoryWindowClosed;
     historyWindow = window;
@@ -153,35 +159,21 @@ internal sealed class WindowCoordinator : IAsyncDisposable
       : historyWindow.ApplySettingsAsync(settings);
   }
 
-  public async ValueTask DisposeAsync()
-  {
-    if (disposed)
-    {
-      return;
-    }
+  public ValueTask DisposeAsync() => new(disposalTask ??= DisposeCoreAsync());
 
+  private async Task DisposeCoreAsync()
+  {
     disposed = true;
     historyChangeNotifier.RecordAdded -= OnDictationHistoryRecordAdded;
-    await historyRefreshSession.DisposeAsync().ConfigureAwait(true);
-
-    if (settingsPanel is not null)
-    {
-      SettingsPanel panel = settingsPanel;
-      settingsPanel = null;
-      panel.ManageHistoryRequested -= OnSettingsManageHistoryRequested;
-      await panel.DisposeAsync().ConfigureAwait(true);
-    }
-
-    if (historyWindow is not null)
-    {
-      HistoryWindow window = historyWindow;
-      historyWindow = null;
-      window.Closed -= OnHistoryWindowClosed;
-      window.Close();
-      await window.DisposeAsync().ConfigureAwait(true);
-    }
-
-    await CloseWorkbenchAsync().ConfigureAwait(true);
+    if (workbenchWindow is not null) UnsubscribeFromWorkbench(workbenchWindow);
+    if (historyWindow is not null) historyWindow.Closed -= OnHistoryWindowClosed;
+    if (settingsPanel is not null) settingsPanel.ManageHistoryRequested -= OnSettingsManageHistoryRequested;
+    // Start all window cancellation before awaiting any one owner. The registry
+    // includes windows already closed and Reader windows outliving their Workbench.
+    Task windowCleanup = composition.WindowLifetimes.DisposeAsync();
+    await LifecycleCleanup.RunAsync(
+      new CleanupStep("History refresh", () => historyRefreshSession.DisposeAsync().AsTask()),
+      new CleanupStep("Windows", () => windowCleanup)).ConfigureAwait(true);
   }
 
   private SettingsPanel GetOrCreateSettingsPanel()
@@ -189,6 +181,8 @@ internal sealed class WindowCoordinator : IAsyncDisposable
     if (settingsPanel is null)
     {
       settingsPanel = composition.CreateSettingsPanel();
+      SettingsPanel panel = settingsPanel;
+      composition.WindowLifetimes.Register(panel, () => { }, () => panel.DisposeAsync().AsTask());
       settingsPanel.ManageHistoryRequested += OnSettingsManageHistoryRequested;
     }
 
@@ -219,45 +213,13 @@ internal sealed class WindowCoordinator : IAsyncDisposable
     window.Closed -= OnWorkbenchWindowClosed;
   }
 
-  private async Task CloseWorkbenchAsync()
+  private void OnWorkbenchWindowClosed(object? sender, EventArgs e)
   {
-    if (workbenchWindow is null)
-    {
-      return;
-    }
-
-    TextboxWorkbenchWindow window = workbenchWindow;
-    workbenchWindow = null;
+    if (sender is not TextboxWorkbenchWindow window) return;
     UnsubscribeFromWorkbench(window);
-    window.Close();
-    await window.DisposeAsync().ConfigureAwait(true);
-  }
-
-  [SuppressMessage(
-    "Design",
-    "CA1031:Do not catch general exception types",
-    Justification = "WPF close events cannot return a Task; disposal failures are observed and logged.")]
-  private async void OnWorkbenchWindowClosed(object? sender, EventArgs e)
-  {
-    if (sender is not TextboxWorkbenchWindow window)
-    {
-      return;
-    }
-
-    UnsubscribeFromWorkbench(window);
-    if (ReferenceEquals(workbenchWindow, window))
-    {
-      workbenchWindow = null;
-    }
-
-    try
-    {
-      await window.DisposeAsync().ConfigureAwait(true);
-    }
-    catch (Exception ex)
-    {
-      diagnostics.Error("Workbench window disposal failed.", ex);
-    }
+    if (ReferenceEquals(workbenchWindow, window)) workbenchWindow = null;
+    // Composition's registry retains and observes cleanup even after this reference
+    // is released, permitting a fresh Workbench without abandoning the old owner.
   }
 
   private void OnHistoryWindowClosed(object? sender, EventArgs e)
@@ -287,7 +249,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
 
   private void OnDictationHistoryRecordAdded(object? sender, DictationHistoryRecord record)
   {
-    _ = dispatcher.BeginInvoke(new Action(QueueOpenHistoryViewRefresh));
+    if (!disposed) _ = dispatcher.BeginInvoke(new Action(QueueOpenHistoryViewRefresh));
   }
 
   [SuppressMessage(
@@ -296,7 +258,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
     Justification = "The notifier event boundary must observe unexpected refresh failures.")]
   private async void QueueOpenHistoryViewRefresh()
   {
-    if (!historyRefreshSession.TryRequestRefresh(out Task refreshRun))
+    if (disposed || !historyRefreshSession.TryRequestRefresh(out Task refreshRun))
     {
       return;
     }

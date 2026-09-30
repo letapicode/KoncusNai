@@ -259,22 +259,15 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
     startupNotice = null;
     isRunning = false;
 
-    if (undoCoordinatorToStop is not null)
-    {
-      await undoCoordinatorToStop.StopAsync(cancellationToken).ConfigureAwait(false);
-      await undoCoordinatorToStop.DisposeAsync().ConfigureAwait(false);
-    }
-
-    if (coordinatorToStop is not null)
-    {
-      await coordinatorToStop.StopAsync(cancellationToken).ConfigureAwait(false);
-      await coordinatorToStop.DisposeAsync().ConfigureAwait(false);
-    }
-
-    if (servicesToDispose is not null)
-    {
-      await servicesToDispose.DisposeAsync().ConfigureAwait(false);
-    }
+    // Stop both event admissions before awaiting either drain. An undo operation
+    // must not leave global dictation hotkeys accepting new capture during quit.
+    Task undoStop = undoCoordinatorToStop?.StopAsync(cancellationToken) ?? Task.CompletedTask;
+    Task dictationStop = coordinatorToStop?.StopAsync(cancellationToken) ?? Task.CompletedTask;
+    await Task.WhenAll(undoStop, dictationStop).ConfigureAwait(false);
+    await LifecycleCleanup.RunAsync(
+      new CleanupStep("Undo coordinator", () => undoCoordinatorToStop?.DisposeAsync().AsTask() ?? Task.CompletedTask),
+      new CleanupStep("Dictation coordinator", () => coordinatorToStop?.DisposeAsync().AsTask() ?? Task.CompletedTask),
+      new CleanupStep("Runtime services", () => servicesToDispose?.DisposeAsync().AsTask() ?? Task.CompletedTask)).ConfigureAwait(false);
   }
 
   internal sealed class RuntimeServices : IAsyncDisposable
@@ -385,38 +378,16 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
         historyRecorder: historyRecorder);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-      if (HotkeyService is IAsyncDisposable hotkeyDisposable)
-      {
-        await hotkeyDisposable.DisposeAsync().ConfigureAwait(false);
-      }
+    public ValueTask DisposeAsync() => new(LifecycleCleanup.RunAsync(
+      new CleanupStep("Hotkey service", () => DisposeOwnedAsync(HotkeyService)),
+      new CleanupStep("Undo hotkey service", () => DisposeOwnedAsync(UndoHotkeyService)),
+      new CleanupStep("Audio capture", () => DisposeOwnedAsync(AudioCaptureService)),
+      new CleanupStep("Transcription", () => DisposeOwnedAsync(TranscriptionService)),
+      new CleanupStep("Transformation", () => DisposeOwnedAsync(TextTransformationService)),
+      new CleanupStep("Overlay", () => DisposeOwnedAsync(OverlayService))));
 
-      if (UndoHotkeyService is IAsyncDisposable undoHotkeyDisposable)
-      {
-        await undoHotkeyDisposable.DisposeAsync().ConfigureAwait(false);
-      }
-
-      if (AudioCaptureService is IAsyncDisposable captureDisposable)
-      {
-        await captureDisposable.DisposeAsync().ConfigureAwait(false);
-      }
-
-      if (TranscriptionService is IAsyncDisposable transcriptionDisposable)
-      {
-        await transcriptionDisposable.DisposeAsync().ConfigureAwait(false);
-      }
-
-      if (TextTransformationService is IAsyncDisposable textTransformationDisposable)
-      {
-        await textTransformationDisposable.DisposeAsync().ConfigureAwait(false);
-      }
-
-      if (OverlayService is IAsyncDisposable overlayDisposable)
-      {
-        await overlayDisposable.DisposeAsync().ConfigureAwait(false);
-      }
-    }
+    private static Task DisposeOwnedAsync(object service) => service is IAsyncDisposable disposable
+      ? disposable.DisposeAsync().AsTask() : Task.CompletedTask;
   }
 
   private static RuntimeStartupNotice? BuildStartupNotice(AppSettings settings, RuntimeServices runtimeServices)

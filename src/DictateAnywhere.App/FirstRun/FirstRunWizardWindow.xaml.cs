@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Linq;
+using DictateAnywhere.App.Lifecycle;
 using System.Windows;
 using DictateAnywhere.App.Benchmarking;
 using DictateAnywhere.App.Hotkeys;
@@ -26,6 +29,8 @@ public partial class FirstRunWizardWindow : Window
   private readonly CancellationTokenSource lifetime = new();
   private readonly CancellationToken lifetimeToken;
   private bool closed;
+  private Task? disposalTask;
+  private readonly HashSet<Task> activeOperations = [];
 
   public FirstRunWizardWindow(
     ISettingsStore settingsStore,
@@ -53,10 +58,37 @@ public partial class FirstRunWizardWindow : Window
     closed = true;
     if (modelManager is AutomaticDictationModelManager automatic)
       automatic.PreparationProgress -= OnPreparationProgress;
-    lifetime.Cancel();
-    lifetime.Dispose();
+    try { lifetime.Cancel(); }
+    catch (AggregateException exception) { LifecycleCleanup.Report(diagnostics.Error, "First-run cancellation", exception); }
+    _ = LifecycleCleanup.ObserveAsync(DisposeAsync().AsTask(), diagnostics.Error, "First-run close");
     HotkeyCaptureControl.HotkeyChanged -= OnHotkeyChanged;
     base.OnClosed(e);
+  }
+
+  internal ValueTask DisposeAsync()
+  {
+    if (disposalTask is not null) return new ValueTask(disposalTask);
+    closed = true;
+    disposalTask = DisposeCoreAsync();
+    return new ValueTask(disposalTask);
+  }
+
+  private async Task DisposeCoreAsync()
+  {
+    await System.Windows.Threading.Dispatcher.Yield();
+    await LifecycleCleanup.RunAsync(
+      LifecycleCleanup.Sync("Cancel first-run", lifetime.Cancel),
+      new CleanupStep("First-run operations", () => Task.WhenAll(activeOperations.ToArray())),
+      LifecycleCleanup.Sync("First-run lifetime", lifetime.Dispose)).ConfigureAwait(true);
+  }
+
+  private async Task RunOperationAsync(Func<Task> action)
+  {
+    if (closed) return;
+    Task task = action();
+    activeOperations.Add(task);
+    try { await LifecycleCleanup.ObserveAsync(task, diagnostics.Error, "First-run operation").ConfigureAwait(true); }
+    finally { activeOperations.Remove(task); }
   }
 
   public AppSettings? CompletedSettings { get; private set; }
@@ -71,7 +103,10 @@ public partial class FirstRunWizardWindow : Window
     });
   }
 
-  private async void OnLoaded(object sender, RoutedEventArgs e)
+  private async void OnLoaded(object sender, RoutedEventArgs e) =>
+    await RunOperationAsync(OnLoadedAsync).ConfigureAwait(true);
+
+  private async Task OnLoadedAsync()
   {
     try
     {
@@ -101,10 +136,13 @@ public partial class FirstRunWizardWindow : Window
 
   private async void OnRunBenchmarkClicked(object sender, RoutedEventArgs e)
   {
-    await RunBenchmarkAsync(isAutomatic: false).ConfigureAwait(true);
+    await RunOperationAsync(() => RunBenchmarkAsync(isAutomatic: false)).ConfigureAwait(true);
   }
 
-  private async void OnRefreshModelsClicked(object sender, RoutedEventArgs e)
+  private async void OnRefreshModelsClicked(object sender, RoutedEventArgs e) =>
+    await RunOperationAsync(OnRefreshModelsClickedAsync).ConfigureAwait(true);
+
+  private async Task OnRefreshModelsClickedAsync()
   {
     if (isBusy || closed) return;
     try
@@ -119,7 +157,10 @@ public partial class FirstRunWizardWindow : Window
     }
   }
 
-  private async void OnFinishClicked(object sender, RoutedEventArgs e)
+  private async void OnFinishClicked(object sender, RoutedEventArgs e) =>
+    await RunOperationAsync(OnFinishClickedAsync).ConfigureAwait(true);
+
+  private async Task OnFinishClickedAsync()
   {
     if (isBusy || closed)
     {
@@ -223,7 +264,7 @@ public partial class FirstRunWizardWindow : Window
 
   private async Task RunBenchmarkAsync(bool isAutomatic)
   {
-    if (isBusy)
+    if (isBusy || closed)
     {
       return;
     }

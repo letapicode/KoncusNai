@@ -39,8 +39,8 @@ public sealed class HistoryViewRefreshArchitectureGuardrailTests
 
     Xunit.Assert.Contains("windowCoordinator.ApplySettingsToOpenHistoryAsync(settings)", appSource, StringComparison.Ordinal);
     Xunit.Assert.Contains("historyWindow.ApplySettingsAsync(settings)", coordinatorSource, StringComparison.Ordinal);
-    Xunit.Assert.Contains("await window.DisposeAsync()", coordinatorSource, StringComparison.Ordinal);
-    Xunit.Assert.Contains("await CloseWorkbenchAsync()", coordinatorSource, StringComparison.Ordinal);
+    Xunit.Assert.Contains("composition.WindowLifetimes.DisposeAsync()", coordinatorSource, StringComparison.Ordinal);
+    Xunit.Assert.Contains("new CleanupStep(\"Windows\", () => windowCleanup)", coordinatorSource, StringComparison.Ordinal);
   }
 
   private static string FindRepoRoot()

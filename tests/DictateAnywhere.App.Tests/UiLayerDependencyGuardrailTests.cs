@@ -761,10 +761,9 @@ public sealed class ReaderOwnershipGuardrailTests
 
     Assert.Contains("private Task activeDocumentImportTask = Task.CompletedTask;", source, StringComparison.Ordinal);
     Assert.Contains("private readonly HashSet<Task> activeDraftPreviewTasks", source, StringComparison.Ordinal);
-    Assert.Contains("activeDocumentImportOperation?.Cancel();", source, StringComparison.Ordinal);
+    Assert.Contains("activeDocumentImportOperation?.Cancel()", source, StringComparison.Ordinal);
     Assert.Contains("await activeDocumentImportTask", source, StringComparison.Ordinal);
-    Assert.Contains("await Task.WhenAll(activeDraftPreviewTasks.ToArray())", source, StringComparison.Ordinal);
-    Assert.Contains("await Task.WhenAll(activeSidebarIntentTasks.ToArray())", source, StringComparison.Ordinal);
+    Assert.Contains("activeDraftPreviewTasks.Concat(activeSidebarIntentTasks).Append(activeDocumentImportTask).ToArray()", source, StringComparison.Ordinal);
     Assert.Contains("if (!disposed) action();", source, StringComparison.Ordinal);
     Assert.Contains("DocumentView.RenderSurface(state.DocumentSurface", source, StringComparison.Ordinal);
     string viewSource = File.ReadAllText(Path.Combine(readerRoot, "ReaderDocumentView.xaml.cs"));
