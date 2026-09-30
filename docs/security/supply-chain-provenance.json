@@ -49,7 +49,7 @@
   ],
   "pythonPackageInventory": {
     "path": "docs/security/python-package-provenance.json",
-    "expectedPackages": 193
+    "expectedPackages": 192
   },
   "bundledBinaries": {
     "manifest": "installer/bundled-binary-manifest.json",
