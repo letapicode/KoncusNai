@@ -60,12 +60,15 @@ class CohereRuntimeTests(unittest.TestCase):
             metadata = {'backend':'transformers/cpu', 'dtype':'float32'}
             def __init__(self, path):
                 self_test.assertEqual('native-close', events[-1])
+                self_test.assertEqual('12', os.environ['OMP_NUM_THREADS'])
                 events.append('fallback-load')
             def transcribe(self, *args): return 'complete fallback text', 2.0
             def close(self): pass
         class FakeNative:
             metadata = {'backend':'transcribe.cpp/Vulkan0', 'dtype':'Q8_0'}
-            def __init__(self, *args): events.append('native-load')
+            def __init__(self, *args):
+                events.append('native-load')
+                os.environ['OMP_NUM_THREADS'] = '1'
             def supports(self, *args): return True
             def transcribe(self, *args): raise RuntimeError('incomplete')
             def close(self): events.append('native-close')
@@ -80,15 +83,27 @@ class CohereRuntimeTests(unittest.TestCase):
             self.assertEqual('native_request_failed:RuntimeError', response['payload']['fallback_reason'])
 
     @staticmethod
-    def run_worker(requests, runtime, native=False):
+    def run_worker(requests, runtime, native=False, mode='automatic'):
         output = io.StringIO()
         environment = {'DICTATEANYWHERE_COHERE_NATIVE_MANIFEST':'fake.json'} if native else {}
         with patch.dict(os.environ, environment, clear=True), patch.object(worker, 'TransformersRuntime', runtime), \
-             patch.object(sys, 'argv', ['worker', '--model-dir', 'installed']), \
+             patch.object(worker, 'inference_lease', contextlib.nullcontext), \
+             patch.object(worker, 'report_runtime_status'), \
+             patch('cohere_runtime_selection.resolve_selection', return_value=(None, None)), \
+             patch.object(sys, 'argv', ['worker', '--model-dir', 'installed', '--threads', '12', '--runtime-mode', mode]), \
              patch.object(sys, 'stdin', io.StringIO(''.join(json.dumps(r)+'\n' for r in requests))), \
              contextlib.redirect_stdout(output):
             assert worker.main() == 0
         return [json.loads(line) for line in output.getvalue().splitlines()]
+
+    def test_cpu_override_forces_original_cpu_when_native_is_unavailable(self):
+        forces = []
+        class FakeTransformers:
+            metadata = {'backend': 'transformers/cpu', 'dtype': 'float32'}
+            def __init__(self, path, force_cpu=False): forces.append(force_cpu)
+            def close(self): pass
+        self.run_worker([], FakeTransformers, mode='cpu')
+        self.assertEqual([True], forces)
 
 
 if __name__ == '__main__':

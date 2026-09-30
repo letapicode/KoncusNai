@@ -21,6 +21,8 @@ internal static class RuntimeSettingsRestartPolicy
            || !EqualsOrdinal(active.TranscriptionModelId, updated.TranscriptionModelId)
            || !EqualsOrdinal(active.TranscriptionLanguage, updated.TranscriptionLanguage)
            || active.EnableAutomaticPunctuation != updated.EnableAutomaticPunctuation
+           || active.DictationRuntimePreference != updated.DictationRuntimePreference
+           || active.DictationRuntimeDevice != updated.DictationRuntimeDevice
            || active.PreferredInsertionMethod != updated.PreferredInsertionMethod
            || active.RestoreClipboard != updated.RestoreClipboard
            || active.OverlayEnabled != updated.OverlayEnabled

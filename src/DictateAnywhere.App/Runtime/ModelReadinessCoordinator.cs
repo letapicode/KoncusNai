@@ -26,6 +26,8 @@ public sealed class ModelReadinessCoordinator : IModelReadinessSession
   private List<Task> warmupTasks = new();
   private ModelReadinessSnapshot snapshot = ModelReadinessSnapshot.Empty;
   private bool disposed;
+  private bool isPreparing;
+  private AppSettings? currentSettings;
 
   internal ModelReadinessCoordinator(
     IModelManager modelManager,
@@ -65,26 +67,7 @@ public sealed class ModelReadinessCoordinator : IModelReadinessSession
     await lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
     try
     {
-      ObjectDisposedException.ThrowIf(disposed, this);
-
-      await StopWarmupsAndDisposeRegistryAsync().ConfigureAwait(false);
-      modelRegistry = modelRegistryFactory(settings, diagnostics);
-
-      IReadOnlyList<ModelReadinessEntry> entries = await ResolveReadinessEntriesAsync(settings, cancellationToken)
-        .ConfigureAwait(false);
-      Publish(new ModelReadinessSnapshot(entries, DateTimeOffset.UtcNow));
-
-      CancellationTokenSource sessionWarmupCts = new();
-      warmupCts = sessionWarmupCts;
-      List<Task> startedTasks = new();
-      foreach (ModelReadinessEntry entry in entries.Where(entry => entry.State == ModelReadinessState.Pending))
-      {
-        startedTasks.Add(Task.Run(
-          () => WarmModelAsync(entry, sessionWarmupCts.Token),
-          CancellationToken.None));
-      }
-
-      warmupTasks = startedTasks;
+      await RefreshRegistryAsync(settings, cancellationToken).ConfigureAwait(false);
     }
     finally
     {
@@ -96,6 +79,8 @@ public sealed class ModelReadinessCoordinator : IModelReadinessSession
   {
     ArgumentNullException.ThrowIfNull(settings);
     ArgumentNullException.ThrowIfNull(runtimeDiagnostics);
+    if (Volatile.Read(ref isPreparing))
+      throw new InvalidOperationException("Dictation acceleration is being prepared. Wait for preparation or cancel it before recording.");
 
     TranscriptionModelRegistry? registry = Volatile.Read(ref modelRegistry);
     if (registry is null)
@@ -105,11 +90,69 @@ public sealed class ModelReadinessCoordinator : IModelReadinessSession
     }
 
     TranscriptionModelSelection selection = RuntimeServiceSelection.ResolveTranscription(settings);
-    return new TranscriptionService(
-      selection.ProviderId,
-      registry,
-      runtimeDiagnostics,
-      ownsModelRegistry: false);
+    return new SharedTranscriptionService(this, selection.ProviderId, runtimeDiagnostics);
+  }
+
+  /// <summary>Release the shared hotkey/Workbench model before conversion or sequential calibration.</summary>
+  internal async Task PrepareRuntimeAsync(Func<Task> prepare, CancellationToken cancellationToken)
+  {
+    using IDisposable captureReservation = ExclusiveAudioCaptureService.ReserveForRuntimePreparation();
+    await lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+    AppSettings? restore = currentSettings;
+    try
+    {
+      ObjectDisposedException.ThrowIf(disposed, this);
+      Volatile.Write(ref isPreparing, true);
+      await StopWarmupsAndDisposeRegistryAsync().ConfigureAwait(false);
+      await prepare().ConfigureAwait(false);
+    }
+    finally
+    {
+      try
+      {
+        if (restore is not null && !disposed)
+          await RefreshRegistryAsync(restore, CancellationToken.None).ConfigureAwait(false);
+      }
+      finally
+      {
+        Volatile.Write(ref isPreparing, false);
+        lifecycleLock.Release();
+      }
+    }
+  }
+
+  private async Task RefreshRegistryAsync(AppSettings settings, CancellationToken cancellationToken)
+  {
+    ObjectDisposedException.ThrowIf(disposed, this);
+    await StopWarmupsAndDisposeRegistryAsync().ConfigureAwait(false);
+    currentSettings = settings;
+    modelRegistry = modelRegistryFactory(settings, diagnostics);
+    IReadOnlyList<ModelReadinessEntry> entries = await ResolveReadinessEntriesAsync(settings, cancellationToken).ConfigureAwait(false);
+    Publish(new ModelReadinessSnapshot(entries, DateTimeOffset.UtcNow));
+    CancellationTokenSource sessionWarmupCts = new();
+    warmupCts = sessionWarmupCts;
+    warmupTasks = entries.Where(entry => entry.State == ModelReadinessState.Pending)
+      .Select(entry => Task.Run(() => WarmModelAsync(entry, sessionWarmupCts.Token), CancellationToken.None)).ToList();
+  }
+
+  // Both flows retain this facade when preparation replaces the underlying registry.
+  private sealed class SharedTranscriptionService(ModelReadinessCoordinator owner, string providerId, IDiagnostics runtimeDiagnostics)
+    : ITranscriptionService, IAsyncDisposable
+  {
+    public async Task<TranscriptionResult> TranscribeAsync(AudioCaptureResult audio, string modelId, CancellationToken cancellationToken = default)
+    {
+      await owner.lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+      try
+      {
+        ObjectDisposedException.ThrowIf(owner.disposed, owner);
+        TranscriptionModelRegistry registry = owner.modelRegistry ?? throw new InvalidOperationException("Dictation model is not ready.");
+        await using TranscriptionService service = new(providerId, registry, runtimeDiagnostics, ownsModelRegistry: false);
+        return await service.TranscribeAsync(audio, modelId, cancellationToken).ConfigureAwait(false);
+      }
+      finally { owner.lifecycleLock.Release(); }
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
   }
 
   public async ValueTask DisposeAsync()

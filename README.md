@@ -80,6 +80,22 @@ CrisperWhisper is optional and is **not licensed for ordinary production or comm
 
 ### First-use dictation speed and timing
 
+Cohere model preparation now detects usable CPU/Vulkan devices, provisions the
+pinned runtime and same-checkpoint Q8 conversion, and measures short/medium
+synthetic speech before choosing acceleration. First run and model downloads
+prepare it automatically; Settings → Speech offers **Prepare / remeasure**,
+**Automatic**, **CPU**, validated **GPU/device**, and **Original runtime** choices
+with the actual worker backend, precision and fallback reason. Preparation is
+cancellable and runs locally after explicit acquisition; it never downloads
+during transcription. The Python bootstrap uses the existing hashed dependency
+lock and verified wheels without requiring a compiler.
+
+Native execution remains restricted to English, automatic punctuation and
+requests up to 45 seconds. Other settings, invalidated caches and native errors
+retain the original provider. See the
+[automatic runtime implementation and measurements](docs/release/automatic-dictation-runtime-2026-09-29.md)
+for supported architectures, resource thresholds, recovery and hardware limits.
+
 **Expect possible first-use delay.** The first few dictations after opening Koncus Nai may take longer than later ones, even for a short phrase. Koncus Nai starts background readiness work for the selected model; loading a worker or model and warming system caches may contribute. The exact reason and number of slower attempts have not been measured for every setup; a faster third attempt is possible, not guaranteed. The tray menu shows the selected model's readiness state. Do not judge steady-state speed from the first attempt alone: try several similar dictations with the same model after it reports **Ready**. If delays continue, the timing fields below help identify the slow stage.
 
 The green CI run did not measure an installed model or explain why a user's first two dictations may feel slower than the third. For a comparable manual check, open the app normally, keep the same provider, model, language, target app, and recording mode, then dictate the same non-sensitive short phrase three times at a similar speaking pace. Note whether model readiness was still warming before the first attempt. Compare `Recording started.` and `Dictation stop-to-visible timing completed.` entries by `operationId` in the local logs under `%LOCALAPPDATA%\DictateAnywhere\logs`. The numeric `recordingOverlayMs`, `captureStartMs`, `transcribingOverlayMs`, `captureFinalizationMs`, `transcriptionWallMs`, `modelReportedMs`, `transformationMs`, `insertionMs`, and `stopToVisibleMs` fields separate the visible stages. Cohere and CrisperWhisper also log `workerColdStart`, worker startup, and inference or invocation timings; match those by time and model because their worker correlation IDs differ from the dictation operation ID. Do not commit raw logs, recordings, transcripts, models, or credentials.

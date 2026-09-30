@@ -507,7 +507,8 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
         client = workerClientFactory.Create(
           options.PythonExecutablePath,
           scriptPath,
-          $"--model-dir \"{modelPath}\"",
+          $"--model-dir \"{modelPath}\" --runtime-mode {NormalizeRuntimePreference(options.RuntimePreference)}" +
+          (string.IsNullOrEmpty(options.RuntimeDevice) ? string.Empty : " --runtime-device-base64 " + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(options.RuntimeDevice))),
           options.WorkerStartupTimeout);
         currentModelPath = modelPath;
         createdNewClient = true;
@@ -615,6 +616,9 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
       $"Cohere model '{modelId}' is not installed. Download it from Settings before using this provider.",
       InferenceFailureReason.ModelMissing);
   }
+
+  internal static string NormalizeRuntimePreference(string preference) =>
+    preference is "automatic" or "cpu" or "gpu" or "original" ? preference : "automatic";
 
   private string[] EnumerateModelRootPaths()
   {

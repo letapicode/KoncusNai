@@ -8,6 +8,18 @@ namespace DictateAnywhere.Settings.Tests;
 
 public sealed class JsonSettingsStoreTests
 {
+  [Xunit.Fact]
+  public async Task RuntimePreferenceAndDevice_RoundTripWithoutChangingModelIdentity()
+  {
+    using TemporaryDirectoryScope scope = new();
+    JsonSettingsStore store = new(Path.Combine(scope.DirectoryPath, "settings.json"));
+    AppSettings settings = AppSettings.Default with { DictationRuntimePreference = "gpu", DictationRuntimeDevice = "vulkan:PCI:simulated" };
+    await store.SaveAsync(settings);
+    AppSettings restored = await store.LoadAsync();
+    Xunit.Assert.Equal(settings.DictationRuntimePreference, restored.DictationRuntimePreference);
+    Xunit.Assert.Equal(settings.DictationRuntimeDevice, restored.DictationRuntimeDevice);
+    Xunit.Assert.Equal(settings.GetConfiguredTranscriptionSelection(), restored.GetConfiguredTranscriptionSelection());
+  }
   [Xunit.Theory]
   [Xunit.InlineData("[]")]
   [Xunit.InlineData("null")]
@@ -890,5 +902,4 @@ public sealed class JsonSettingsStoreTests
     }
   }
 }
-
 

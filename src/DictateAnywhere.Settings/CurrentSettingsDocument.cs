@@ -31,6 +31,8 @@ internal sealed class CurrentSettingsDocument
   public string? LegalAcceptanceVersion { get; init; }
   public DateTimeOffset? LegalAcceptanceAcceptedAtUtc { get; init; }
   public bool EnableAutomaticPunctuation { get; init; } = true;
+  public string DictationRuntimePreference { get; init; } = "automatic";
+  public string? DictationRuntimeDevice { get; init; }
 
   public static CurrentSettingsDocument FromSettings(AppSettings settings)
   {
@@ -58,6 +60,8 @@ internal sealed class CurrentSettingsDocument
       ChatPaperViewEnabled = settings.ChatPaperViewEnabled,
       ChatTypefaceId = ChatTypefaceSettings.Normalize(settings.ChatTypefaceId),
       EnableAutomaticPunctuation = settings.EnableAutomaticPunctuation,
+      DictationRuntimePreference = settings.DictationRuntimePreference,
+      DictationRuntimeDevice = settings.DictationRuntimeDevice,
       WorkbenchZoomPercent = Math.Clamp(settings.WorkbenchZoomPercent, 80, 150),
       AssistantFeaturesEnabled = settings.AssistantFeaturesEnabled,
       CrisperWhisperLicenseAcceptanceVersion = settings.CrisperWhisperLicenseAcceptanceVersion,
@@ -92,6 +96,8 @@ internal sealed class CurrentSettingsDocument
       ChatPaperViewEnabled = ChatPaperViewEnabled,
       ChatTypefaceId = ChatTypefaceSettings.Normalize(ChatTypefaceId),
       EnableAutomaticPunctuation = EnableAutomaticPunctuation,
+      DictationRuntimePreference = DictationRuntimePreference is "automatic" or "cpu" or "gpu" or "original" ? DictationRuntimePreference : "automatic",
+      DictationRuntimeDevice = DictationRuntimeDevice,
       WorkbenchZoomPercent = Math.Clamp(WorkbenchZoomPercent, 80, 150),
       AssistantFeaturesEnabled = AssistantFeaturesEnabled,
       CrisperWhisperLicenseAcceptanceVersion = CrisperWhisperLicenseAcceptanceVersion,

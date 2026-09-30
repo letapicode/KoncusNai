@@ -10,6 +10,7 @@ current contract.
 | --- | --- | --- | --- |
 | Global toggle dictation | First run, Settings, tray | Hotkey and selected local speech provider/model | `DictationRuntime` and `DictationPipelineCoordinator` |
 | Global transcription language | First run and Settings | Current scalar setting | transcription compatibility policy |
+| Measured Cohere CPU/Vulkan selection | First run, model preparation, Settings → Speech | Per-user pinned runtime, conversion and speech-free calibration cache; Automatic/CPU/GPU/device/Original overrides | `CohereRuntimePreparation`, `ModelReadinessCoordinator`, Cohere worker |
 | Spoken formatting commands | Settings | `enableDictationCommands` | text transformation service |
 | Workbench dictation, local chat, imports, and history | Main workspace and tray command | Local app state and always-on local plaintext JSONL history | Workbench operation/session owners and history coordinators |
 | Reading Studio narration, editing, export, and publishing preparation | Reading Studio | Local document/session state; network only for explicit acquisition or publish actions | Reader session and export owners |
@@ -51,6 +52,13 @@ Historical negative integer schema versions retain the existing best-effort
 legacy migration behavior.
 
 ## Failure boundaries and resource limits
+
+- Cohere native acceleration is Windows x64, English, punctuation enabled and
+  at most 45 seconds per provider request. It uses the configured checkpoint.
+  Unsupported settings, invalidated calibration, missing devices and failures
+  retain the original runtime, closing a native model before sticky fallback.
+  Preparation blocks competing microphone starts and releases the shared model
+  before conversion/calibration. Downloads occur only in explicit preparation.
 
 - Insertion requires a matching process lifetime and focused field identity.
   Browser targets without a usable UI Automation identity are refused. Blacklist

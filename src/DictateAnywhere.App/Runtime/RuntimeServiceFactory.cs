@@ -134,6 +134,8 @@ internal static class RuntimeServiceFactory
       EnableInferenceWarmup = !string.Equals(Environment.GetEnvironmentVariable("DICTATEANYWHERE_COHERE_INFERENCE_WARMUP"), "0", StringComparison.Ordinal),
       Language = compatibleLanguage,
       EnableAutomaticPunctuation = settings.EnableAutomaticPunctuation,
+      RuntimePreference = settings.DictationRuntimePreference,
+      RuntimeDevice = settings.DictationRuntimeDevice,
     };
     CrisperWhisperTranscriptionOptions crisperWhisperOptions = CrisperWhisperTranscriptionOptions.Default with
     {
@@ -157,6 +159,8 @@ internal static class RuntimeServiceFactory
       EnableInferenceWarmup = !string.Equals(Environment.GetEnvironmentVariable("DICTATEANYWHERE_COHERE_INFERENCE_WARMUP"), "0", StringComparison.Ordinal),
       Language = TranscriptionLanguageCompatibilityPolicy.ResolveCompatibleLanguage(settings),
       EnableAutomaticPunctuation = settings.EnableAutomaticPunctuation,
+      RuntimePreference = settings.DictationRuntimePreference,
+      RuntimeDevice = settings.DictationRuntimeDevice,
     };
 
     CohereTranscriptionService service = new(options, diagnostics);

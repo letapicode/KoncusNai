@@ -74,6 +74,9 @@
   <ItemGroup>
     <None Include="..\..\scripts\local-models\cohere_transcribe_worker.py;
                    ..\..\scripts\local-models\cohere_native_runtime.py;
+                   ..\..\scripts\local-models\cohere_runtime_selection.py;
+                   ..\..\scripts\local-models\cohere_quantize.py;
+                   ..\..\scripts\local-models\prepare_cohere_runtime.py;
                    ..\..\scripts\local-models\crisperwhisper_transcribe_worker.py;
                    ..\..\scripts\local-models\gemma_chat_worker.py;
                    ..\..\scripts\local-models\indic_hindi_ctc_align_worker.py;
@@ -98,6 +101,10 @@
           CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\scripts\setup-indic-parler-runtime.ps1"
           Link="setup-indic-parler-runtime.ps1"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\scripts\prepare-cohere-python-runtime.ps1"
+          Link="prepare-cohere-python-runtime.ps1"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\third_party\compat\**\*"

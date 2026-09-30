@@ -374,6 +374,18 @@ The persistent Python process owns the loaded selected model. Its memory is expe
 
 ## Provider model
 
+Cohere preparation wraps the existing acknowledged/verified model acquisition.
+It prepares the per-user Python environment if needed, provisions pinned
+transcribe.cpp Windows CPU/Vulkan binaries and bindings, converts that same
+checkpoint and calibrates candidates sequentially. `ModelReadinessCoordinator`
+releases the shared hotkey/Workbench registry while the capture gate reserves
+preparation, then restores both existing service facades. Workers only read and
+revalidate the measured cache; inference never provisions or downloads.
+Settings select automatic, CPU, validated GPU/device or the original runtime;
+the local worker receipt exposes actual backend/precision and sticky fallback.
+The [dated implementation report](../release/automatic-dictation-runtime-2026-09-29.md)
+records resource policy and physical versus simulated validation.
+
 A provider registration is the intended single source of truth for:
 
 - Stable provider ID and display metadata.

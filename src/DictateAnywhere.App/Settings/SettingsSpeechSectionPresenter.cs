@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using DictateAnywhere.App.Benchmarking;
@@ -113,7 +114,7 @@ internal sealed class SettingsSpeechSectionPresenter
 
   public void ApplyStatus(SettingsOperationStatus status, BenchmarkResult? lastBenchmarkResult, FrameworkElement themeContext)
   {
-    bool showProgress = status.IsBusy && status.Kind is SettingsOperationKind.DownloadModel or SettingsOperationKind.ActivateModel or SettingsOperationKind.RefreshModels;
+    bool showProgress = status.IsBusy && status.Kind is SettingsOperationKind.DownloadModel or SettingsOperationKind.PrepareRuntime or SettingsOperationKind.ActivateModel or SettingsOperationKind.RefreshModels;
     modelProgressBar.Visibility = showProgress ? Visibility.Visible : Visibility.Collapsed;
     modelProgressBar.IsIndeterminate = showProgress
       && (status.Kind != SettingsOperationKind.DownloadModel
@@ -121,6 +122,7 @@ internal sealed class SettingsSpeechSectionPresenter
     switch (status.Kind)
     {
       case SettingsOperationKind.DownloadModel:
+      case SettingsOperationKind.PrepareRuntime:
       case SettingsOperationKind.ActivateModel:
       case SettingsOperationKind.DeleteModel:
       case SettingsOperationKind.RefreshModels:
@@ -247,7 +249,7 @@ internal sealed class SettingsSpeechSectionPresenter
     await controller.RefreshModelsAsync(GetSelectedModelSelection()).ConfigureAwait(true);
   }
 
-  public async Task<bool> DownloadModelAsync()
+  public async Task<bool> DownloadModelAsync(CancellationToken cancellationToken = default)
   {
     if (controller.IsBusy)
     {
@@ -267,7 +269,7 @@ internal sealed class SettingsSpeechSectionPresenter
 
     modelProgressBar.Value = 0;
     Progress<double> progress = new(value => modelProgressBar.Value = value * 100d);
-    return await controller.DownloadModelAsync(selection, progress).ConfigureAwait(true);
+    return await controller.DownloadModelAsync(selection, progress, cancellationToken).ConfigureAwait(true);
   }
 
   public async Task ActivateModelAsync()

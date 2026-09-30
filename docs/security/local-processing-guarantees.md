@@ -37,7 +37,22 @@ Network activity is strictly restricted to user-initiated flows on an explicit a
    - Inter-process communication with Ollama daemon (`http://127.0.0.1:11434/`) and llama.cpp server (`http://127.0.0.1:8090/`).
    - Koncus Nai connects to the literal loopback endpoint. Ollama chat disables HTTP redirects and proxies, and requires review of an externally started listener before private chat text is sent. A locally running process may have its own networking behavior; see `docs/security/threat-model.md` for the process-identity race and approval limits.
 
+Explicit Cohere preparation also permits `www.python.org`, `pypi.org`,
+`files.pythonhosted.org`, `github.com`, `codeload.github.com` and
+`release-assets.githubusercontent.com`. Preparation also permits the pinned
+Microsoft Visual C++ redistributable from `download.visualstudio.microsoft.com`
+when the system CRT is missing. First-run/model preparation or Settings
+preparation initiates this acquisition. Python uses an exact installer hash and
+publisher signature when needed; dependencies use the existing hashed wheel
+lock with source builds disabled. Native DLLs, converter source and the
+conversion-only gguf wheel are SHA-256 pinned and checked against the matching
+ABI. Conversion uses the configured local checkpoint. Calibration synthesizes
+English speech locally without opening the microphone. Inference downloads no
+dependencies and performs no calibration; selection and actual-runtime receipts
+contain no transcripts or audio payloads.
+
 ## Logging & Diagnostic Bundle Guarantees
+
 - **Local Logging Only**: Diagnostic logs are written to `%LOCALAPPDATA%\DictateAnywhere\logs\` and are never transmitted automatically.
 - **Automated Redaction**: Prompts, transcripts, audio payloads, and authorization credentials (`Bearer`, API keys, passwords, secrets) are redacted by default.
 - **Support Export Bundles**:

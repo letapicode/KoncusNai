@@ -16,7 +16,7 @@ $allowedRemoteHosts = @(
   "api.nuget.org", "www.nuget.org", "pypi.org", "files.pythonhosted.org",
   "github.com", "codeload.github.com", "raw.githubusercontent.com", "release-assets.githubusercontent.com",
   "download-r2.pytorch.org", "download.pytorch.org", "huggingface.co",
-  "www.gyan.dev", "www.python.org", "ollama.com", "registry.ollama.ai"
+  "www.gyan.dev", "www.python.org", "download.visualstudio.microsoft.com", "ollama.com", "registry.ollama.ai"
 )
 
 function Read-JsonFile {

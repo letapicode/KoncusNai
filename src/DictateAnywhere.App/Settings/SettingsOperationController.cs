@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using DictateAnywhere.App.Benchmarking;
 using DictateAnywhere.App.Composition;
 using DictateAnywhere.App.Presentation;
+using DictateAnywhere.App.Runtime;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Core.Services;
 using DictateAnywhere.Diagnostics;
@@ -55,6 +56,8 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     this.audioDeviceService = audioDeviceService ?? throw new ArgumentNullException(nameof(audioDeviceService));
     this.benchmarkService = benchmarkService ?? throw new ArgumentNullException(nameof(benchmarkService));
     this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    if (modelManager is AutomaticDictationModelManager automatic)
+      automatic.PreparationProgress += OnPreparationProgress;
 
     if (autoSaveCoordinator is not null)
     {
@@ -381,6 +384,45 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     }
   }
 
+  internal async Task<bool> PrepareRuntimeAsync(TranscriptionModelSelection selection, CancellationToken cancellationToken)
+  {
+    if (IsBusy || !CohereRuntimePreparation.Supports(selection)) return false;
+    SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.PrepareRuntime, "Preparing local acceleration..."));
+    try
+    {
+      if (modelManager is not AutomaticDictationModelManager automatic)
+        throw new InvalidOperationException("Automatic preparation is unavailable in this installation.");
+      await automatic.PrepareAsync(selection, null, true, cancellationToken).ConfigureAwait(false);
+      SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.PrepareRuntime,
+        automatic.LastPreparationMessage ?? "Local acceleration prepared."));
+      return true;
+    }
+    catch (OperationCanceledException)
+    {
+      SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.PrepareRuntime,
+        "Preparation cancelled. Verified downloads can be reused when you retry."));
+      return false;
+    }
+    catch (InvalidOperationException ex)
+    {
+      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.PrepareRuntime, ex.Message));
+      return false;
+    }
+    catch (Exception ex)
+    {
+      diagnostics.Error("Dictation runtime preparation failed", ex);
+      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.PrepareRuntime,
+        "Preparation failed. Check Diagnostics, repair the installation if needed, and retry."));
+      return false;
+    }
+  }
+
+  private void OnPreparationProgress(object? sender, string message)
+  {
+    if (Status.Kind is SettingsOperationKind.DownloadModel or SettingsOperationKind.PrepareRuntime)
+      SetStatus(SettingsOperationStatus.Running(Status.Kind, message));
+  }
+
   /// <summary>
   /// Deletes a speech model and resolves fallback if it was the currently configured model.
   /// </summary>
@@ -546,6 +588,8 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     }
 
     disposed = true;
+    if (modelManager is AutomaticDictationModelManager automatic)
+      automatic.PreparationProgress -= OnPreparationProgress;
     autoSaveCoordinator.StatusChanged -= OnAutoSaveStatusChanged;
     if (ownsAutoSaveCoordinator)
     {

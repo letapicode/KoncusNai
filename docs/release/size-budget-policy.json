@@ -22,8 +22,8 @@
       "baselineBytes": 9190329,
       "minimumFiles": 1000,
       "minimumBytes": 8271296,
-      "maximumBytes": 10000000,
-      "rationale": "September 22 isolated-index source candidate after removal of 129 generated previews and the unlicensed Cohere fixture. A ten percent lower bound catches incomplete exports; the ten-megabyte cap rejects new bundled binary content."
+      "maximumBytes": 10150000,
+      "rationale": "September 22 source baseline after removal of generated previews and the unlicensed Cohere fixture. September 29 automatic runtime setup adds compiler-free provisioning, selection tests and speech-free measured evidence: reviewed source inventory approximately 10.08 MB. The 10.15 MB cap permits this source-only feature; bundled asset, native/model payload and all other budgets remain unchanged. A ten percent lower bound catches incomplete exports."
     },
     {
       "id": "production-source",
@@ -126,8 +126,8 @@
       "baselineBytes": 527323,
       "minimumFiles": 19,
       "minimumBytes": 500000,
-      "maximumBytes": 600000,
-      "rationale": "September 22 candidate contains no Cohere health-check WAV. Bounded source and lock metadata growth remains allowed while model and audio payloads are rejected."
+      "maximumBytes": 620000,
+      "rationale": "September 29 compiler-free conversion, provisioning, selection and focused tests measure approximately 602 KB of source/locks, without a Cohere health-check WAV. The 620 KB cap permits those reviewed helpers while model, binary and audio payloads remain rejected."
     }
   ],
   "bundledAssets": {
@@ -241,6 +241,11 @@
     "repeatability": "Payload files, bytes, and hashes were identical; MSI bytes were identical but hashes differed; Burn differed by 1,988 bytes. The variation is retained, not averaged."
   },
   "externalFootprints": [
+    { "id": "cohere-msvc-redist-win-x64", "owner": "prepare-cohere-python-runtime.ps1", "provenanceId": "cohere-msvc-redist-win-x64", "required": false, "status": "measured", "downloadBytes": 18731856, "payloadBytes": null, "cacheBytes": null, "method": "Pinned Microsoft redistributable downloaded and SHA256/Authenticode verified; installation is conditional on missing CRT and has not been tested on a clean machine." },
+    { "id": "cohere-python-win-x64", "owner": "prepare-cohere-python-runtime.ps1", "provenanceId": "cohere-python-win-x64", "required": false, "status": "measured", "downloadBytes": 26216840, "payloadBytes": null, "cacheBytes": null, "method": "Pinned Python 3.11.9 installer downloaded and SHA256/Authenticode verified on this host; installation on a Python-free host remains unverified." },
+    { "id": "cohere-transcribe-native-win-x64", "owner": "prepare_cohere_runtime.py", "provenanceId": "cohere-transcribe-native-win-x64", "required": false, "status": "measured", "downloadBytes": 17433342, "payloadBytes": null, "cacheBytes": null, "method": "Pinned Windows release archive measured locally; conversion adds a separate 2410655296-byte Q8 model and temporary BF16 output." },
+    { "id": "cohere-transcribe-converter-source", "owner": "prepare_cohere_runtime.py", "provenanceId": "cohere-transcribe-converter-source", "required": false, "status": "measured", "downloadBytes": 46022803, "payloadBytes": null, "cacheBytes": null, "method": "Pinned source ZIP measured locally; only converter, Python bindings and license are extracted." },
+    { "id": "cohere-gguf-converter-wheel", "owner": "prepare_cohere_runtime.py", "provenanceId": "cohere-gguf-converter-wheel", "required": false, "status": "measured", "downloadBytes": 114244, "payloadBytes": null, "cacheBytes": null, "method": "Pinned conversion-only wheel measured locally; installed application dependencies are reused." },
     { "id": "hf-cohere-transcribe", "owner": "HuggingFaceSnapshotModelManager", "provenanceId": "hf-cohere-transcribe", "required": false, "status": "measured", "downloadBytes": 4134323147, "payloadBytes": 4134323147, "cacheBytes": null, "method": "immutable snapshot file manifest; cache metadata overhead unknown" },
     { "id": "hf-crisper-turbo", "owner": "HuggingFaceSnapshotModelManager", "provenanceId": "hf-crisper-turbo", "required": false, "status": "measured", "downloadBytes": 1623557946, "payloadBytes": 1623557946, "cacheBytes": null, "method": "immutable snapshot file manifest; cache metadata overhead unknown" },
     { "id": "hf-crisper-large", "owner": "HuggingFaceSnapshotModelManager", "provenanceId": "hf-crisper-large", "required": false, "status": "measured", "downloadBytes": 3092493315, "payloadBytes": 3092493315, "cacheBytes": null, "method": "immutable snapshot file manifest; cache metadata overhead unknown" },

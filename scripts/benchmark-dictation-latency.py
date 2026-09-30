@@ -116,11 +116,16 @@ def main():
     finally:
         stop.set()
         parent = psutil.Process(proc.pid) if proc.poll() is None else None
+        children = []
         if parent:
-            for child in parent.children(recursive=True):
+            children = parent.children(recursive=True)
+            for child in reversed(children):
                 try: child.kill()
                 except psutil.Error: pass
             proc.kill()
         proc.wait(timeout=10)
+        _, alive = psutil.wait_procs(children, timeout=10)
+        if alive:
+            raise RuntimeError('Benchmark cleanup left an owned model worker running.')
 
 if __name__ == '__main__': main()
