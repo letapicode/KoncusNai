@@ -9,6 +9,16 @@ namespace DictateAnywhere.Settings.Tests;
 public sealed class JsonSettingsStoreTests
 {
   [Xunit.Fact]
+  public async Task Save_DoesNotAdoptAnUnknownFixedTemporaryFile()
+  {
+    using TemporaryDirectoryScope scope = new();
+    string path = Path.Combine(scope.DirectoryPath, "settings.json");
+    await File.WriteAllTextAsync(path + ".tmp", "unknown previous data");
+    await new JsonSettingsStore(path).SaveAsync(AppSettings.Default);
+    Xunit.Assert.Equal("unknown previous data", await File.ReadAllTextAsync(path + ".tmp"));
+  }
+
+  [Xunit.Fact]
   public async Task RuntimePreferenceAndDevice_RoundTripWithoutChangingModelIdentity()
   {
     using TemporaryDirectoryScope scope = new();
@@ -902,4 +912,3 @@ public sealed class JsonSettingsStoreTests
     }
   }
 }
-

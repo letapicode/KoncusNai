@@ -20,6 +20,46 @@ namespace DictateAnywhere.App.Tests;
 public sealed class SettingsPanelTests
 {
   [Fact]
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "The owned producer thread forwards any failure to the STA assertion and is joined in finally.")]
+  public void QueuedDraftNotification_RendersCurrentDraft_AndPanelCloseFlushesAcceptedEdits()
+  {
+    RunOnSta(() =>
+    {
+      TestSettingsStore store = new(AppSettings.Default);
+      SettingsOperationController controller = new(store, new TestFileTransferService(), new TestModelManager(),
+        new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+      SettingsPanel panel = new(controller, new TestHotkeyValidator(), new TestFileDialogService(),
+        LocalTranscriptionProviderRegistry.CreateDefault(), new TestDiagnostics());
+      Exception? workerFailure = null;
+      Thread worker = new(() =>
+      {
+        try { controller.UpdateDraft(draft => draft with { EnableSecureFieldDetection = false }, scheduleAutoSave: false); }
+        catch (Exception error) { workerFailure = error; }
+      });
+      try
+      {
+        worker.Start();
+        Assert.True(worker.Join(TimeSpan.FromSeconds(10)), "Owned draft producer did not finish.");
+        Assert.Null(workerFailure);
+        controller.UpdateDraft(draft => draft with { EnableSecureFieldDetection = true }, scheduleAutoSave: false);
+        System.Windows.Threading.DispatcherOperation fence = panel.Dispatcher.BeginInvoke(
+          System.Windows.Threading.DispatcherPriority.Background, new Action(() => { }));
+        TestResourceApplication.Drain(() => fence.Task);
+        var check = Assert.IsType<System.Windows.Controls.CheckBox>(panel.FindName("EnableSecureFieldDetectionCheckBox"));
+        Assert.True(check.IsChecked);
+        controller.UpdateDraft(draft => draft with { TranscriptionLanguage = "fr" });
+        TestResourceApplication.Drain(() => panel.DisposeAsync().AsTask());
+        Assert.Equal("fr", store.CurrentSettings.TranscriptionLanguage);
+      }
+      finally
+      {
+        if (worker.IsAlive) Assert.True(worker.Join(TimeSpan.FromSeconds(10)));
+        TestResourceApplication.Drain(() => panel.DisposeAsync().AsTask());
+      }
+    });
+  }
+
+  [Fact]
   public void PageNavigation_RoutedHomeEndScrollAtZoomWithoutOwningTextKeys()
   {
     RunOnSta(() =>

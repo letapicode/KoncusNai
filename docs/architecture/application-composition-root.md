@@ -66,12 +66,17 @@ Forced termination, an unresponsive dispatcher, and power loss cannot guarantee
 cleanup. See Microsoft's [SessionEnding contract](https://learn.microsoft.com/en-us/dotnet/api/system.windows.application.sessionending).
 
 Existing close/hide shell behavior and process-adoption policy are preserved.
-Shutdown does **not** add an autosave flush guarantee: the existing autosave
-owner can cancel a pending debounce. Global dictation now retains a per-run
+Settings disposal now accelerates and drains the latest valid accepted autosave,
+including explicit flushes. Invalid/unscheduled edits and explicit canceled
+pending intent are not implicitly saved; storage conflicts/failures and deadline
+expiry remain truthful incomplete cleanup. This is not forced-exit durability.
+See [settings ordering and ownership](settings-schema-compatibility.md).
+Global dictation retains a per-run
 token and accepted callback/startup leases through teardown; see the
 [batch 3 lifecycle decision](../release/dictation-cancellation-audit-batch-3-2026-09-30.md).
 Reporting failures are isolated by the [batch 4 diagnostic boundary](../release/diagnostic-sink-isolation-audit-batch-4-2026-09-30.md).
-Settings concurrency/flush policy remains a separate remediation batch.
+The [batch 5 decision](../release/settings-concurrency-audit-batch-5-2026-10-01.md)
+records persistence ordering, import boundaries, and validation limits.
 
 Tests use a resource-only WPF application rather than booting production App.
 Actual Application shutdown runs only in child test hosts whose startup skips

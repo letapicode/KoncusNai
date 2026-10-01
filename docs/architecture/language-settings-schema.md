@@ -8,7 +8,7 @@ The runtime resolves the configured tag against the selected provider's declared
 
 ## Upgrade behavior
 
-Schemas 1 through 7 default a missing language to `en`. Schemas 8 through 17 may contain `profiles[].transcriptionLanguageOverride`; that value is retired and is not copied into current settings. Schema 18 introduced the global-only field and schemas 19 and 20 retain it. See `product-capability-matrix.md` for the product decision.
+Schemas 1 through 7 default a missing language to `en`. Schemas 8 through 17 may contain `profiles[].transcriptionLanguageOverride`; that value is retired and is not copied into current settings. Schema 18 introduced the global-only field and schemas 19 through 21 retain it. See `product-capability-matrix.md` for the product decision.
 
 ## References
 

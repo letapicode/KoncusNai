@@ -15,7 +15,7 @@ supply-chain policies.
 | --- | --- | --- | --- | ---: |
 | `DictateAnywhere.Audio` | Reusable capture and PCM library | App, Audio tests, Spikes | Compiled baseline | 116 |
 | `DictateAnywhere.Benchmark` | Reusable benchmark policy and scoring library | App and Benchmark tests | Compiled baseline | 78 |
-| `DictateAnywhere.Core` | Provider-neutral contracts, domain types, and orchestration | All production implementation layers, executable hosts/tools, and Core tests | Compiled baseline | 715 |
+| `DictateAnywhere.Core` | Provider-neutral contracts, domain types, and orchestration | All production implementation layers, executable hosts/tools, and Core tests | Compiled baseline | 720 |
 | `DictateAnywhere.Diagnostics` | Structured diagnostics and redaction library | App and Diagnostics tests | Compiled baseline | 170 |
 | `DictateAnywhere.Hotkeys` | Windows hotkey implementation library | App, Hotkeys tests, Spikes | Compiled baseline | 38 |
 | `DictateAnywhere.Inference` | Provider implementations and worker boundaries | App, tests, ModelBenchmark, TtsCli, Spikes, VoicePreviewGenerator | Compiled baseline | 452 |
@@ -23,7 +23,7 @@ supply-chain policies.
 | `DictateAnywhere.Models` | Model catalog, cache, and snapshot ownership | App, tests, ModelBenchmark | Compiled baseline | 71 |
 | `DictateAnywhere.Overlay` | Overlay presentation library | App and Overlay tests | Compiled baseline | 66 |
 | `DictateAnywhere.Platform.Windows` | Windows interop foundation | App, Audio, Hotkeys, Insertion, tests | Compiled baseline | 35 |
-| `DictateAnywhere.Settings` | Settings persistence and migration library | App and Settings tests | Compiled baseline | 12 |
+| `DictateAnywhere.Settings` | Settings persistence and migration library | App and Settings tests | Compiled baseline | 14 |
 | `DictateAnywhere.App` | Sole desktop composition host | Windows shell, App tests, installer, VoicePreviewGenerator friendship | Host contract only | 0 |
 | `DictateAnywhere.UiAccessHelper` | One-shot operational production host | Dynamic `UiAccessHelperProcessBridge` caller, installer, process tests | Host contract only | 0 |
 | `DictateAnywhere.ModelBenchmark` | Controlled performance developer tool | `run-performance-regression.ps1` and WP-11/WP-12 evidence | Tool contract only | 0 |
@@ -31,8 +31,8 @@ supply-chain policies.
 | `DictateAnywhere.Spikes` | Milestone and interactive validation tool | Milestone, insertion, audio, and hotkey scripts | Tool contract only | 0 |
 | `DictateAnywhere.VoicePreviewGenerator` | Voice-preview asset-generation tool | Tool README/workflow, App friendship, preview manifest contract | Tool contract only | 0 |
 
-The 11 reusable libraries currently contain 1,981 deterministic signatures,
-including 217 type signatures. Executable hosts and tools are deliberately not
+The 11 reusable libraries currently contain 1,988 deterministic signatures,
+including 218 type signatures. Executable hosts and tools are deliberately not
 presented as reusable APIs. Their assembly identities, project/package/compiled
 references, real consumers, and `InternalsVisibleTo` friendships are still
 baselined. Protocol and persisted-data behavior continue to be protected by
@@ -41,6 +41,16 @@ second protocol or serialization owner.
 
 ## Captured contract
 
+### October 2026 settings transactions
+
+Batch 5 adds `ISettingsStore.SaveChangesAsync` with a compatibility default,
+`SettingsSnapshot` capture/merge/conflict policy, and the production store's
+strict read/update methods. Core adds five signatures; Settings adds two.
+The Settings-tests friendship supports instance I/O fault seams, and the compiled
+`System.Collections` reference supports the shared path-lease dictionary.
+Existing signatures, package/project dependencies, and layer permissions remain.
+The [batch 5 decision](../release/settings-concurrency-audit-batch-5-2026-10-01.md)
+defines transactional conflicts, explicit replacement, and injected-store limits.
 ### September 2026 edge-case hardening
 
 The reviewed contract changes serve the desktop host and its one-shot helper:

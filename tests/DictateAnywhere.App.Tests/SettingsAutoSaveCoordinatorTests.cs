@@ -10,6 +10,69 @@ namespace DictateAnywhere.App.Tests;
 public sealed class SettingsAutoSaveCoordinatorTests
 {
   [Xunit.Fact]
+  public async Task Disposal_RetainsExplicitFlushUntilWriterReturns()
+  {
+    TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    SettingsAutoSaveCoordinator coordinator = new(async (_, _) =>
+    {
+      started.SetResult();
+      await release.Task.ConfigureAwait(false);
+    }, TimeSpan.Zero);
+    Task<bool> flush = coordinator.FlushAsync(AppSettings.Default);
+    Task? disposal = null;
+    try
+    {
+      await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+      disposal = coordinator.DisposeAsync().AsTask();
+      Xunit.Assert.False(disposal.IsCompleted);
+    }
+    finally
+    {
+      release.TrySetResult();
+      try { await flush.WaitAsync(TimeSpan.FromSeconds(30)); }
+      finally { await (disposal ?? coordinator.DisposeAsync().AsTask()).WaitAsync(TimeSpan.FromSeconds(30)); }
+    }
+  }
+
+  [Xunit.Fact]
+  public async Task SupersededFlush_DoesNotWriteAfterNewerSnapshot()
+  {
+    TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    List<int> writes = new();
+    SettingsAutoSaveCoordinator coordinator = new(async (settings, _) =>
+    {
+      if (settings.ChatOutputFontSize == 16)
+      {
+        started.SetResult();
+        await release.Task.ConfigureAwait(false);
+      }
+      writes.Add(settings.ChatOutputFontSize);
+    }, TimeSpan.Zero);
+    coordinator.Schedule(AppSettings.Default with { ChatOutputFontSize = 16 });
+    Task<bool>? oldFlush = null;
+    Task<bool>? newFlush = null;
+    try
+    {
+      await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+      oldFlush = coordinator.FlushAsync(AppSettings.Default with { ChatOutputFontSize = 17 });
+      newFlush = coordinator.FlushAsync(AppSettings.Default with { ChatOutputFontSize = 18 });
+      release.SetResult();
+      await Task.WhenAll(oldFlush, newFlush).WaitAsync(TimeSpan.FromSeconds(30));
+      Xunit.Assert.Equal(18, writes[^1]);
+      Xunit.Assert.DoesNotContain(17, writes);
+    }
+    finally
+    {
+      release.TrySetResult();
+      if (oldFlush is not null) await oldFlush.WaitAsync(TimeSpan.FromSeconds(30));
+      if (newFlush is not null) await newFlush.WaitAsync(TimeSpan.FromSeconds(30));
+      await coordinator.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+    }
+  }
+
+  [Xunit.Fact]
   public async Task Schedule_CollapsesRapidChangesToTheLatestSnapshot()
   {
     TaskCompletionSource<AppSettings> saved = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -49,10 +112,11 @@ public sealed class SettingsAutoSaveCoordinatorTests
   }
 
   [Xunit.Fact]
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000", Justification = "Both shared disposal awaits are observed and expected to fault with the original persistence failure.")]
   public async Task FlushAsync_ReportsExpectedPersistenceFailures()
   {
     SettingsAutoSaveStatus? status = null;
-    await using SettingsAutoSaveCoordinator coordinator = new(
+    SettingsAutoSaveCoordinator coordinator = new(
       (_, _) => throw new InvalidOperationException("disk unavailable"),
       TimeSpan.Zero);
     coordinator.StatusChanged += (_, value) => status = value;
@@ -63,6 +127,8 @@ public sealed class SettingsAutoSaveCoordinatorTests
     Xunit.Assert.NotNull(status);
     Xunit.Assert.Equal(SettingsAutoSaveState.Failed, status.State);
     Xunit.Assert.Equal("disk unavailable", status.ErrorMessage);
+    await Xunit.Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.DisposeAsync().AsTask());
+    await Xunit.Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.DisposeAsync().AsTask());
   }
 
   [Xunit.Fact]
