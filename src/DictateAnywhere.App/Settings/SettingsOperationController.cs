@@ -9,6 +9,7 @@ using DictateAnywhere.App.Benchmarking;
 using DictateAnywhere.App.Composition;
 using DictateAnywhere.App.Presentation;
 using DictateAnywhere.App.Runtime;
+using DictateAnywhere.App.Lifecycle;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Core.Services;
 using DictateAnywhere.Diagnostics;
@@ -38,7 +39,17 @@ internal sealed class SettingsOperationController : IAsyncDisposable
 
   private long modelRefreshSequence;
   private long audioRefreshSequence;
-  private AppSettings? lastScheduledSettings;
+  private readonly object stateSync = new();
+  private static readonly AsyncLocal<OperationLease?> Executing = new();
+  private readonly CancellationTokenSource lifetime = new();
+  private readonly HashSet<OperationLease> activeOperations = new();
+  private long draftRevision;
+  private long pendingReplacementRevision;
+  private AppSettings? lastAcceptedSnapshot;
+  private AppSettings? lastOwnedCommit;
+  private AppSettings? pendingIntentBaseline;
+  private long lastAcceptedRevision;
+  private Task? disposalTask;
   private bool disposed;
 
   public SettingsOperationController(
@@ -66,7 +77,7 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     }
     else
     {
-      this.autoSaveCoordinator = new SettingsAutoSaveCoordinator(this.settingsStore.SaveAsync);
+      this.autoSaveCoordinator = new SettingsAutoSaveCoordinator(SaveOwnedSettingsAsync);
       ownsAutoSaveCoordinator = true;
     }
 
@@ -107,15 +118,26 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   /// </summary>
   public async Task InitializeAsync(CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
+    ObjectDisposedException.ThrowIf(disposed, this);
+    long initialRevision = draftRevision;
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.Load, "Loading settings..."));
 
     try
     {
       AppSettings loadedSettings = await settingsStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
+      if (disposed || initialRevision != draftRevision) return;
       AppSettings normalized = CurrentSettingsPolicy.Normalize(loadedSettings);
-      PersistedSettings = normalized;
-      CurrentDraft = SettingsDraft.FromSettings(normalized);
-      DraftChanged?.Invoke(this, CurrentDraft);
+      SettingsDraft loadedDraft = SettingsDraft.FromSettings(normalized);
+      lock (stateSync)
+      {
+        if (disposed || initialRevision != draftRevision) return;
+        PersistedSettings = normalized;
+        CurrentDraft = loadedDraft;
+      }
+      Notify(DraftChanged, CurrentDraft);
 
       SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.Load, "Settings loaded."));
 
@@ -130,8 +152,12 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     }
     catch (Exception ex) when (ex is UnsupportedSettingsSchemaException or UnrecognizedSettingsSchemaException)
     {
-      CurrentDraft = SettingsDraft.CreateReadOnly(ex.Message);
-      DraftChanged?.Invoke(this, CurrentDraft);
+      lock (stateSync)
+      {
+        if (disposed || initialRevision != draftRevision) return;
+        CurrentDraft = SettingsDraft.CreateReadOnly(ex.Message);
+      }
+      Notify(DraftChanged, CurrentDraft);
       SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.Load, "Settings loaded in read-only mode (unsupported schema detected)."));
     }
     catch (Exception ex)
@@ -147,20 +173,32 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   public void UpdateDraft(Func<SettingsDraft, SettingsDraft> update, bool scheduleAutoSave = true)
   {
     ArgumentNullException.ThrowIfNull(update);
-
-    if (CurrentDraft.IsReadOnly)
+    SettingsDraft original;
+    long originalRevision;
+    lock (stateSync)
     {
-      throw new InvalidOperationException($"Cannot update read-only settings draft: {CurrentDraft.ReadOnlyReason ?? "Settings are read-only."}");
+      ObjectDisposedException.ThrowIf(disposed, this);
+      original = CurrentDraft;
+      originalRevision = draftRevision;
     }
+    if (original.IsReadOnly) throw new InvalidOperationException("Cannot update read-only settings.");
+    SettingsDraft updated = update(original) ?? throw new InvalidOperationException("Draft update returned null.");
+    updated = updated with { InsertionBlockedProcessNames = SettingsSnapshot.Capture(updated.ToSettings()).InsertionBlockedProcessNames };
+    lock (stateSync)
+    {
+      ObjectDisposedException.ThrowIf(disposed, this);
+      if (originalRevision != draftRevision)
+        throw new InvalidOperationException("The settings draft changed during this update; resubmit the edit against the current draft.");
+      CurrentDraft = updated;
+      draftRevision++;
+    }
+    Notify(DraftChanged, updated);
 
-    SettingsDraft updated = update(CurrentDraft);
-    CurrentDraft = updated;
-    DraftChanged?.Invoke(this, updated);
-
-    if (scheduleAutoSave && updated.IsDirty(PersistedSettings))
+    if (scheduleAutoSave && (updated.IsDirty(PersistedSettings) || lastAcceptedSnapshot is not null))
     {
       ScheduleAutoSave();
     }
+    else if (scheduleAutoSave) autoSaveCoordinator.CancelPending();
   }
 
   /// <summary>
@@ -168,22 +206,16 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   /// </summary>
   public bool ScheduleAutoSave()
   {
-    if (CurrentDraft.IsReadOnly)
+    var request = CaptureSave(out string? rejection, out long rejectedRevision);
+    if (request is null)
     {
-      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.Save, "Settings are read-only and cannot be saved."));
+      autoSaveCoordinator.CancelPending(rejectedRevision);
+      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.Save, rejection!));
       return false;
     }
-
-    SettingsValidationResult validation = CurrentDraft.Validate();
-    if (!validation.IsValid)
-    {
-      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.Save, "Cannot save invalid settings. Review the highlighted values."));
-      return false;
-    }
-
-    AppSettings snapshot = CurrentDraft.ToSettings();
-    lastScheduledSettings = snapshot;
-    autoSaveCoordinator.Schedule(snapshot);
+    (AppSettings snapshot, AppSettings? baseline, long ownerRevision) = request.Value;
+    if (!Status.IsBusy) SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.Save, "Saving settings..."));
+    autoSaveCoordinator.Schedule(snapshot, baseline, ownerRevision);
     return true;
   }
 
@@ -192,36 +224,32 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   /// </summary>
   public async Task<bool> FlushSaveAsync(CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
+    ObjectDisposedException.ThrowIf(disposed, this);
+    cancellationToken.ThrowIfCancellationRequested();
     using OperationDiagnosticScope opScope = OperationDiagnosticScope.Begin(
       diagnostics,
       operationName: "SettingsSave");
 
-    if (CurrentDraft.IsReadOnly)
-    {
-      opScope.Fail(null, "Settings are read-only and cannot be saved.", DiagnosticRemediationCodes.OperationFailed);
-      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.Save, "Settings are read-only and cannot be saved."));
-      return false;
-    }
-
     opScope.Stage("validation");
-    SettingsValidationResult validation = CurrentDraft.Validate();
-    if (!validation.IsValid)
+    var request = CaptureSave(out string? rejection, out long rejectedRevision);
+    if (request is null)
     {
-      opScope.Fail(null, "Cannot save invalid settings.", DiagnosticRemediationCodes.OperationFailed);
-      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.Save, "Cannot save invalid settings. Review the highlighted values."));
+      autoSaveCoordinator.CancelPending(rejectedRevision);
+      opScope.Fail(null, rejection!, DiagnosticRemediationCodes.OperationFailed);
+      SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.Save, rejection!));
       return false;
     }
 
     opScope.Stage("storage");
-    AppSettings snapshot = CurrentDraft.ToSettings();
-    lastScheduledSettings = snapshot;
-    bool saved = await autoSaveCoordinator.FlushAsync(snapshot).ConfigureAwait(false);
+    (AppSettings snapshot, AppSettings? baseline, long ownerRevision) = request.Value;
+    SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.Save, "Saving settings..."));
+    cancellationToken.ThrowIfCancellationRequested();
+    bool saved = await autoSaveCoordinator.FlushAsync(snapshot, baseline, cancellationToken, ownerRevision).ConfigureAwait(false);
+    cancellationToken.ThrowIfCancellationRequested();
     if (saved)
     {
-      PersistedSettings = snapshot;
-      CurrentDraft = CurrentDraft.ClearPreviews();
-      SettingsSaved?.Invoke(this, PersistedSettings);
-      SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.Save, "Settings saved."));
       opScope.Complete();
     }
     else
@@ -245,6 +273,8 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   /// </summary>
   public async Task RefreshModelsAsync(TranscriptionModelSelection? targetSelection = null, CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
     long sequence = Interlocked.Increment(ref modelRefreshSequence);
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.RefreshModels, "Refreshing speech models..."));
     using OperationDiagnosticScope opScope = OperationDiagnosticScope.Begin(
@@ -255,6 +285,7 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     {
       opScope.Stage("model_query");
       IReadOnlyList<ModelInfo> models = await modelManager.GetModelsAsync(cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       if (sequence != Interlocked.Read(ref modelRefreshSequence))
       {
         opScope.Cancel("Superseded by newer model refresh.");
@@ -281,6 +312,8 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   /// </summary>
   public async Task RefreshAudioDevicesAsync(CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
     long sequence = Interlocked.Increment(ref audioRefreshSequence);
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.RefreshAudioDevices, "Refreshing audio devices..."));
     using OperationDiagnosticScope opScope = OperationDiagnosticScope.Begin(
@@ -291,6 +324,7 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     {
       opScope.Stage("device_enumeration");
       IReadOnlyList<AudioInputDeviceOption> devices = await audioDeviceService.GetInputDevicesAsync(cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       if (sequence != Interlocked.Read(ref audioRefreshSequence))
       {
         opScope.Cancel("Superseded by newer audio refresh.");
@@ -326,6 +360,8 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     IProgress<double>? progress = null,
     CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
     ArgumentNullException.ThrowIfNull(selection);
 
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.DownloadModel,
@@ -333,7 +369,9 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     try
     {
       await modelManager.DownloadModelAsync(selection, progress, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       await RefreshModelsAsync(selection, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.DownloadModel,
         $"Speech model installed: {selection.ProviderId}/{selection.ModelId}."));
       return true;
@@ -356,12 +394,15 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   /// </summary>
   public async Task<bool> ActivateModelAsync(TranscriptionModelSelection selection, CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
     ArgumentNullException.ThrowIfNull(selection);
 
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.ActivateModel, $"Activating {selection.ProviderId}/{selection.ModelId}..."));
     try
     {
       await modelManager.SetActiveModelAsync(selection, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       UpdateDraft(d => d with
       {
         TranscriptionProviderId = selection.ProviderId,
@@ -369,6 +410,7 @@ internal sealed class SettingsOperationController : IAsyncDisposable
       });
 
       await RefreshModelsAsync(selection, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.ActivateModel, $"Activated {selection.ProviderId}/{selection.ModelId}."));
       return true;
     }
@@ -386,6 +428,8 @@ internal sealed class SettingsOperationController : IAsyncDisposable
 
   internal async Task<bool> PrepareRuntimeAsync(TranscriptionModelSelection selection, CancellationToken cancellationToken)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
     if (IsBusy || !CohereRuntimePreparation.Supports(selection)) return false;
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.PrepareRuntime, "Preparing local acceleration..."));
     try
@@ -393,6 +437,7 @@ internal sealed class SettingsOperationController : IAsyncDisposable
       if (modelManager is not AutomaticDictationModelManager automatic)
         throw new InvalidOperationException("Automatic preparation is unavailable in this installation.");
       await automatic.PrepareAsync(selection, null, true, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.PrepareRuntime,
         automatic.LastPreparationMessage ?? "Local acceleration prepared."));
       return true;
@@ -428,17 +473,21 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   /// </summary>
   public async Task<bool> DeleteModelAsync(TranscriptionModelSelection selection, CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
     ArgumentNullException.ThrowIfNull(selection);
 
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.DeleteModel, $"Deleting {selection.ProviderId}/{selection.ModelId}..."));
     try
     {
       await modelManager.DeleteModelAsync(selection, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
 
       if (string.Equals(CurrentDraft.TranscriptionProviderId, selection.ProviderId, StringComparison.OrdinalIgnoreCase)
           && string.Equals(CurrentDraft.TranscriptionModelId, selection.ModelId, StringComparison.OrdinalIgnoreCase))
       {
         TranscriptionModelSelection fallback = await ResolveFallbackModelAfterDeleteAsync(selection, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
         UpdateDraft(d => d with
         {
           TranscriptionProviderId = fallback.ProviderId,
@@ -447,6 +496,7 @@ internal sealed class SettingsOperationController : IAsyncDisposable
       }
 
       await RefreshModelsAsync(CurrentDraft.ToSettings().GetConfiguredTranscriptionSelection(), cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.DeleteModel, $"Deleted {selection.ProviderId}/{selection.ModelId}."));
       return true;
     }
@@ -467,13 +517,17 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   /// </summary>
   public async Task<BenchmarkResult?> RunBenchmarkAsync(string? languageScope = null, CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.RunBenchmark, "Benchmarking speech models..."));
     try
     {
       BenchmarkResult result = await benchmarkService.RunAsync(languageScope, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       LastBenchmarkResult = result;
 
       await RefreshModelsAsync(new TranscriptionModelSelection(result.RecommendedProviderId, result.RecommendedModelId), cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.RunBenchmark, $"Benchmark finished at {result.ExecutedAtUtc.LocalDateTime:HH:mm:ss}."));
       return result;
     }
@@ -490,17 +544,22 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   }
 
   /// <summary>
-  /// Atomically imports settings from a file. If validation or transfer fails,
-  /// the active draft and unsaved changes are strictly preserved.
+  /// Validates and adopts an imported draft without overwriting concurrent edits.
+  /// Persistence is tracked separately; later option refresh cannot undo adoption.
   /// </summary>
   public async Task<bool> ImportAsync(string filePath, CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
     ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+    long originalRevision = draftRevision;
+    bool adopted = false;
 
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.Import, "Importing settings..."));
     try
     {
       AppSettings importedSettings = await fileTransferService.ImportAsync(filePath, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       SettingsDraft candidateDraft = SettingsDraft.FromSettings(importedSettings) with
       {
         HasCompletedFirstRun = true,
@@ -516,27 +575,35 @@ internal sealed class SettingsOperationController : IAsyncDisposable
         return false;
       }
 
-      // Atomically replace the draft
-      CurrentDraft = candidateDraft;
-      DraftChanged?.Invoke(this, CurrentDraft);
+      lock (stateSync)
+      {
+        if (disposed || originalRevision != draftRevision) return false;
+        CurrentDraft = candidateDraft;
+        pendingReplacementRevision = ++draftRevision;
+        adopted = true;
+      }
+      Notify(DraftChanged, CurrentDraft);
       ScheduleAutoSave();
 
       await RefreshModelsAsync(CurrentDraft.ToSettings().GetConfiguredTranscriptionSelection(), cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       await RefreshAudioDevicesAsync(cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
 
-      SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.Import, "Settings imported successfully."));
+      SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.Import, "Settings imported into the draft; persistence is tracked separately."));
       return true;
     }
     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
     {
-      return false;
+      return adopted;
     }
     catch (Exception ex)
     {
       diagnostics.Error("Settings import failed", ex);
       SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.Import, "Import failed. See Diagnostics."));
-      // Note: CurrentDraft is strictly untouched to preserve user edits.
-      return false;
+      // Once accepted, an import cannot be rolled back by a later option refresh
+      // failure: its save may already have committed. Before admission, edits survive.
+      return adopted;
     }
   }
 
@@ -545,6 +612,8 @@ internal sealed class SettingsOperationController : IAsyncDisposable
   /// </summary>
   public async Task<bool> ExportAsync(string filePath, CancellationToken cancellationToken = default)
   {
+    using OperationLease accepted = EnterOperation(cancellationToken);
+    cancellationToken = accepted.Token;
     ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
     SetStatus(SettingsOperationStatus.Running(SettingsOperationKind.Export, "Exporting settings..."));
@@ -565,6 +634,7 @@ internal sealed class SettingsOperationController : IAsyncDisposable
 
       AppSettings snapshot = CurrentDraft.ToSettings();
       await fileTransferService.ExportAsync(filePath, snapshot, cancellationToken).ConfigureAwait(false);
+      cancellationToken.ThrowIfCancellationRequested();
       SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.Export, $"Exported settings to {filePath}."));
       return true;
     }
@@ -580,31 +650,51 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     }
   }
 
-  public async ValueTask DisposeAsync()
+  public ValueTask DisposeAsync()
   {
-    if (disposed)
+    lock (stateSync)
     {
-      return;
+      disposalTask ??= DisposeCoreAsync();
+      return (Executing.Value is OperationLease executing && executing.Owner == this && !executing.Completion.Task.IsCompleted)
+        || autoSaveCoordinator.IsExecuting
+        ? ValueTask.FromException(new InvalidOperationException("Request settings shutdown without awaiting it inside an accepted operation."))
+        : new ValueTask(disposalTask);
     }
+  }
 
+  private async Task DisposeCoreAsync()
+  {
     disposed = true;
-    if (modelManager is AutomaticDictationModelManager automatic)
-      automatic.PreparationProgress -= OnPreparationProgress;
-    autoSaveCoordinator.StatusChanged -= OnAutoSaveStatusChanged;
-    if (ownsAutoSaveCoordinator)
+    await Task.Yield();
+    Task[] pending;
+    lock (stateSync) pending = activeOperations.Select(operation => operation.Completion.Task).ToArray();
+    try
     {
-      await autoSaveCoordinator.DisposeAsync().ConfigureAwait(false);
+      await LifecycleCleanup.RunAsync(
+        LifecycleCleanup.Sync("Cancel settings operations", lifetime.Cancel),
+        new CleanupStep("Accepted settings operations", () => Task.WhenAll(pending)),
+        new CleanupStep("Settings autosave", () => ownsAutoSaveCoordinator
+          ? autoSaveCoordinator.RequestShutdown() : Task.CompletedTask)).ConfigureAwait(false);
+    }
+    finally
+    {
+      if (modelManager is AutomaticDictationModelManager automatic)
+        automatic.PreparationProgress -= OnPreparationProgress;
+      autoSaveCoordinator.StatusChanged -= OnAutoSaveStatusChanged;
+      lifetime.Dispose();
     }
   }
 
   private void SetStatus(SettingsOperationStatus status)
   {
+    if (disposed) return;
     Status = status;
-    StatusChanged?.Invoke(this, status);
+    Notify(StatusChanged, status);
   }
 
   private void OnAutoSaveStatusChanged(object? sender, SettingsAutoSaveStatus status)
   {
+    if (disposed) return;
     switch (status.State)
     {
       case SettingsAutoSaveState.Saving:
@@ -615,9 +705,35 @@ internal sealed class SettingsOperationController : IAsyncDisposable
         break;
 
       case SettingsAutoSaveState.Saved:
-        PersistedSettings = lastScheduledSettings ?? PersistedSettings;
-        CurrentDraft = CurrentDraft.ClearPreviews();
-        SettingsSaved?.Invoke(this, PersistedSettings);
+        if (status.Snapshot is null || status.Submitted is null) return;
+        lock (stateSync)
+        {
+          if (disposed || CurrentDraft.IsReadOnly) return;
+          AppSettings remainingEdits = SettingsSnapshot.Merge(status.Submitted, CurrentDraft.ToSettings(), status.Snapshot);
+          SettingsDraft previous = CurrentDraft;
+          CurrentDraft = SettingsDraft.FromSettings(remainingEdits) with
+          {
+            PreviewThemePreference = previous.PreviewThemePreference,
+            PreviewChatOutputFontSize = previous.PreviewChatOutputFontSize,
+            PreviewChatTypefaceId = previous.PreviewChatTypefaceId,
+          };
+          if (status.OwnerRevision == draftRevision) CurrentDraft = CurrentDraft.ClearPreviews();
+          PersistedSettings = status.Snapshot;
+          if (status.OwnerRevision == lastAcceptedRevision)
+          {
+            lastAcceptedSnapshot = null;
+            pendingIntentBaseline = null;
+          }
+          else if (lastAcceptedSnapshot is not null && pendingIntentBaseline is not null)
+          {
+            pendingIntentBaseline = SettingsSnapshot.Merge(lastAcceptedSnapshot, pendingIntentBaseline, status.Snapshot);
+            lastAcceptedSnapshot = SettingsSnapshot.Merge(status.Submitted, lastAcceptedSnapshot, status.Snapshot);
+          }
+          if (status.Replacement && status.OwnerRevision >= pendingReplacementRevision) pendingReplacementRevision = 0;
+        }
+        if (disposed) return;
+        Notify(DraftChanged, CurrentDraft);
+        Notify(SettingsSaved, status.Snapshot);
         if (Status.Kind is SettingsOperationKind.Idle or SettingsOperationKind.Save)
         {
           SetStatus(SettingsOperationStatus.Succeeded(SettingsOperationKind.Save, "Settings saved."));
@@ -628,6 +744,93 @@ internal sealed class SettingsOperationController : IAsyncDisposable
         diagnostics.Error("Settings auto-save failed", new IOException(status.ErrorMessage));
         SetStatus(SettingsOperationStatus.Failed(SettingsOperationKind.Save, "Save failed. See Diagnostics."));
         break;
+    }
+  }
+
+  private (AppSettings Snapshot, AppSettings? Baseline, long Revision)? CaptureSave(out string? rejection, out long rejectedRevision)
+  {
+    lock (stateSync)
+    {
+      ObjectDisposedException.ThrowIf(disposed, this);
+      rejectedRevision = draftRevision;
+      // Validation and snapshot capture refer to the same owned revision. A
+      // concurrent edit cannot replace a validated draft before capture.
+      rejection = CurrentDraft.IsReadOnly ? "Settings are read-only and cannot be saved."
+        : !CurrentDraft.Validate().IsValid ? "Cannot save invalid settings. Review the highlighted values." : null;
+      if (rejection is not null) return null;
+      AppSettings snapshot = SettingsSnapshot.Capture(CurrentDraft.ToSettings());
+      // Include reversions of already accepted edits as well as dirty fields. A
+      // writer ignoring cancellation may commit the earlier value before this one.
+      AppSettings baseline = lastAcceptedSnapshot is null ? PersistedSettings
+        : SettingsSnapshot.Merge(snapshot, lastAcceptedSnapshot, pendingIntentBaseline ?? PersistedSettings);
+      lastAcceptedSnapshot = snapshot;
+      pendingIntentBaseline = baseline;
+      lastAcceptedRevision = draftRevision;
+      return (snapshot, pendingReplacementRevision != 0 ? null : baseline, draftRevision);
+    }
+  }
+
+  private async Task<AppSettings> SaveOwnedSettingsAsync(AppSettings? baseline, AppSettings edited, CancellationToken token)
+  {
+    AppSettings actualBaseline;
+    lock (stateSync)
+    {
+      // The preceding owned writer has settled. Rebase cumulative local intent
+      // onto its actual outcome, including a commit made despite cancellation.
+      actualBaseline = lastOwnedCommit ?? PersistedSettings;
+      if (baseline is not null) edited = SettingsSnapshot.Merge(baseline, edited, actualBaseline);
+    }
+    AppSettings committed = SettingsSnapshot.Capture(await settingsStore.SaveChangesAsync(
+      baseline is null ? null : actualBaseline, edited, token).ConfigureAwait(false));
+    // Persistence ownership survives suppressed late UI notifications during quit.
+    lock (stateSync) lastOwnedCommit = committed;
+    return committed;
+  }
+
+  private void Notify<T>(EventHandler<T>? subscribers, T value)
+  {
+    if (subscribers is null || disposed) return;
+    foreach (EventHandler<T> subscriber in subscribers.GetInvocationList())
+    {
+      if (disposed) return;
+      try { subscriber(this, value); }
+      catch (Exception error) { diagnostics.Error("Settings notification failed", error); }
+    }
+  }
+
+  private OperationLease EnterOperation(CancellationToken token)
+  {
+    lock (stateSync)
+    {
+      ObjectDisposedException.ThrowIf(disposed, this);
+      token.ThrowIfCancellationRequested();
+      OperationLease operation = new(this, token, Executing.Value);
+      activeOperations.Add(operation);
+      Executing.Value = operation;
+      return operation;
+    }
+  }
+
+  private sealed class OperationLease : IDisposable
+  {
+    private readonly SettingsOperationController owner;
+    private readonly OperationLease? previous;
+    private readonly CancellationTokenSource source;
+    internal readonly TaskCompletionSource Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal CancellationToken Token => source.Token;
+    internal SettingsOperationController Owner => owner;
+    internal OperationLease(SettingsOperationController owner, CancellationToken token, OperationLease? previous)
+    {
+      this.owner = owner;
+      this.previous = previous;
+      source = CancellationTokenSource.CreateLinkedTokenSource(token, owner.lifetime.Token);
+    }
+    public void Dispose()
+    {
+      Executing.Value = previous;
+      source.Dispose();
+      lock (owner.stateSync) owner.activeOperations.Remove(this);
+      Completion.TrySetResult();
     }
   }
 

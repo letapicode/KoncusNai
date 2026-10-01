@@ -100,17 +100,18 @@ internal sealed class ApplicationComposition
   public LocalChatProviderRegistry ChatProviderRegistry { get; }
   public LocalFileDiagnostics Diagnostics { get; }
 
-  public static ApplicationComposition CreateProduction() => CreateProductionCore(null);
+  public static ApplicationComposition CreateProduction() => CreateProductionCore(null, null);
 
-  // Explicit sink ownership lets production-window tests use only their own temporary log files.
-  internal static ApplicationComposition CreateProduction(LocalFileDiagnostics diagnostics) =>
-    CreateProductionCore(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
+  // Production-window tests must supply both owned settings and temporary diagnostics.
+  internal static ApplicationComposition CreateProduction(LocalFileDiagnostics diagnostics, ISettingsStore settingsStore) =>
+    CreateProductionCore(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)),
+      settingsStore ?? throw new ArgumentNullException(nameof(settingsStore)));
 
-  private static ApplicationComposition CreateProductionCore(LocalFileDiagnostics? diagnostics)
+  private static ApplicationComposition CreateProductionCore(LocalFileDiagnostics? diagnostics, ISettingsStore? settingsStore)
   {
     IModelManager transcriptionModels = CreateTranscriptionModelManager();
     return new ApplicationComposition(
-      new JsonSettingsStore(),
+      settingsStore ?? new JsonSettingsStore(),
       new WindowsHotkeyRegistrationValidator(),
       transcriptionModels,
       new CpuCalibrationBenchmarkService(),

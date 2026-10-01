@@ -680,6 +680,7 @@
         "M|DictateAnywhere.Core.Contracts.IProviderModelManager|public|abstract SetActiveModelAsync(System.String modelId,System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task",
         "M|DictateAnywhere.Core.Contracts.ISettingsStore|public|abstract LoadAsync(System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task\u003CDictateAnywhere.Core.Contracts.AppSettings\u003E",
         "M|DictateAnywhere.Core.Contracts.ISettingsStore|public|abstract SaveAsync(DictateAnywhere.Core.Contracts.AppSettings settings,System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task",
+        "M|DictateAnywhere.Core.Contracts.ISettingsStore|public|virtual SaveChangesAsync(DictateAnywhere.Core.Contracts.AppSettings? baseline,DictateAnywhere.Core.Contracts.AppSettings edited,System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task\u003CDictateAnywhere.Core.Contracts.AppSettings\u003E",
         "M|DictateAnywhere.Core.Contracts.ISpeechAlignmentService|public|abstract AlignAsync(DictateAnywhere.Core.Contracts.SpeechAlignmentRequest request,System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task\u003CDictateAnywhere.Core.Contracts.SpeechAlignmentResult\u003E",
         "M|DictateAnywhere.Core.Contracts.IStructuredDiagnostics|public|abstract Error(System.String message,System.Exception? exception,System.Collections.Generic.IReadOnlyDictionary\u003CSystem.String,System.Object?\u003E properties)-\u003ESystem.Void",
         "M|DictateAnywhere.Core.Contracts.IStructuredDiagnostics|public|abstract Info(System.String message,System.Collections.Generic.IReadOnlyDictionary\u003CSystem.String,System.Object?\u003E properties)-\u003ESystem.Void",
@@ -846,6 +847,9 @@
         "M|DictateAnywhere.Core.Services.FaultTolerantOverlayService|public|virtual sealed HideAsync(System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task",
         "M|DictateAnywhere.Core.Services.FaultTolerantOverlayService|public|virtual sealed ShowStateAsync(DictateAnywhere.Core.Domain.DictationSessionState state,System.String? message=null,System.Nullable\u003CSystem.TimeSpan\u003E elapsed=null,DictateAnywhere.Core.Contracts.OverlayDisplayOptions? display=null,System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task",
         "M|DictateAnywhere.Core.Services.RuleBasedTextTransformationService|public|virtual sealed TransformAsync(DictateAnywhere.Core.Contracts.TextTransformationRequest request,System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task\u003CDictateAnywhere.Core.Contracts.TextTransformationResult\u003E",
+        "M|DictateAnywhere.Core.Services.SettingsSnapshot|public|static Capture(DictateAnywhere.Core.Contracts.AppSettings settings)-\u003EDictateAnywhere.Core.Contracts.AppSettings",
+        "M|DictateAnywhere.Core.Services.SettingsSnapshot|public|static HasConflict(DictateAnywhere.Core.Contracts.AppSettings baseline,DictateAnywhere.Core.Contracts.AppSettings edited,DictateAnywhere.Core.Contracts.AppSettings current)-\u003ESystem.Boolean",
+        "M|DictateAnywhere.Core.Services.SettingsSnapshot|public|static Merge(DictateAnywhere.Core.Contracts.AppSettings baseline,DictateAnywhere.Core.Contracts.AppSettings edited,DictateAnywhere.Core.Contracts.AppSettings current)-\u003EDictateAnywhere.Core.Contracts.AppSettings",
         "M|DictateAnywhere.Core.Services.SpeechTextChunker|public|static Split(System.String? text,System.Int32 maximumCharacters=700)-\u003ESystem.Collections.Generic.IReadOnlyList\u003CSystem.String\u003E",
         "P|DictateAnywhere.Core.Contracts.AppSettings|AltSpaceDefaultHotkey[]:DictateAnywhere.Core.Contracts.HotkeyBinding|get:public static|",
         "P|DictateAnywhere.Core.Contracts.AppSettings|AssistantFeaturesEnabled[]:System.Boolean|get:public|init:public",
@@ -1086,6 +1090,7 @@
         "T|public|class|static DictateAnywhere.Core.Contracts.TranscriptionProviderIds|base=System.Object|interfaces=|generic=",
         "T|public|class|static DictateAnywhere.Core.Services.CurrentSettingsPolicy|base=System.Object|interfaces=|generic=",
         "T|public|class|static DictateAnywhere.Core.Services.DiagnosticBoundary|base=System.Object|interfaces=|generic=",
+        "T|public|class|static DictateAnywhere.Core.Services.SettingsSnapshot|base=System.Object|interfaces=|generic=",
         "T|public|class|static DictateAnywhere.Core.Services.SpeechTextChunker|base=System.Object|interfaces=|generic=",
         "T|public|enum|DictateAnywhere.Core.Contracts.AppThemePreference|base=System.Enum|interfaces=System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable|generic=",
         "T|public|enum|DictateAnywhere.Core.Contracts.HotkeyModifiers|base=System.Enum|interfaces=System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable|generic=",
@@ -2475,13 +2480,16 @@
         "DictateAnywhere.App",
         "DictateAnywhere.Settings.Tests"
       ],
-      "friends": [],
+      "friends": [
+        "DictateAnywhere.Settings.Tests"
+      ],
       "declaredProjectReferences": [
         "DictateAnywhere.Core"
       ],
       "directPackages": [],
       "compiledReferences": [
         "DictateAnywhere.Core",
+        "System.Collections",
         "System.Runtime",
         "System.Text.Json",
         "System.Threading"
@@ -2491,8 +2499,10 @@
         "C|DictateAnywhere.Settings.JsonSettingsStore|public|.ctor(System.String settingsFilePath)",
         "C|DictateAnywhere.Settings.UnrecognizedSettingsSchemaException|public|.ctor()",
         "C|DictateAnywhere.Settings.UnsupportedSettingsSchemaException|public|.ctor(System.String settingsFilePath,System.Int32 foundVersion,System.Int32 currentVersion)",
+        "M|DictateAnywhere.Settings.JsonSettingsStore|public|LoadReadOnlyAsync(System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task\u003CDictateAnywhere.Core.Contracts.AppSettings\u003E",
         "M|DictateAnywhere.Settings.JsonSettingsStore|public|virtual sealed LoadAsync(System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task\u003CDictateAnywhere.Core.Contracts.AppSettings\u003E",
         "M|DictateAnywhere.Settings.JsonSettingsStore|public|virtual sealed SaveAsync(DictateAnywhere.Core.Contracts.AppSettings settings,System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task",
+        "M|DictateAnywhere.Settings.JsonSettingsStore|public|virtual sealed SaveChangesAsync(DictateAnywhere.Core.Contracts.AppSettings? baseline,DictateAnywhere.Core.Contracts.AppSettings edited,System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task\u003CDictateAnywhere.Core.Contracts.AppSettings\u003E",
         "P|DictateAnywhere.Settings.UnsupportedSettingsSchemaException|CurrentVersion[]:System.Int32|get:public|",
         "P|DictateAnywhere.Settings.UnsupportedSettingsSchemaException|FoundVersion[]:System.Int32|get:public|",
         "P|DictateAnywhere.Settings.UnsupportedSettingsSchemaException|SettingsFilePath[]:System.String|get:public|",

@@ -26,6 +26,7 @@ public partial class FirstRunWizardWindow : Window
   private readonly IDiagnostics diagnostics;
 
   private AppSettings currentSettings = AppSettings.Default;
+  private AppSettings loadedSettings = AppSettings.Default;
   private bool isBusy;
   private readonly CancellationTokenSource lifetime = new();
   private readonly CancellationToken lifetimeToken;
@@ -112,6 +113,7 @@ public partial class FirstRunWizardWindow : Window
     try
     {
       currentSettings = await settingsStore.LoadAsync(lifetimeToken).ConfigureAwait(true);
+      loadedSettings = currentSettings;
       lifetimeToken.ThrowIfCancellationRequested();
       FullAssistantRadioButton.IsChecked = currentSettings.AssistantFeaturesEnabled;
       DictationOnlyRadioButton.IsChecked = !currentSettings.AssistantFeaturesEnabled;
@@ -228,7 +230,7 @@ public partial class FirstRunWizardWindow : Window
         AssistantFeaturesEnabled = FullAssistantRadioButton.IsChecked == true,
       };
 
-      await settingsStore.SaveAsync(currentSettings, lifetimeToken).ConfigureAwait(true);
+      currentSettings = await settingsStore.SaveChangesAsync(loadedSettings, currentSettings, lifetimeToken).ConfigureAwait(true);
       lifetimeToken.ThrowIfCancellationRequested();
       CompletedSettings = currentSettings;
       DialogResult = true;

@@ -215,7 +215,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
       return;
     }
 
-    ApplyDraftToUi(draft);
+    ApplyDraftToUi(controller.CurrentDraft);
   }
 
   private void ApplyDraftToUi(SettingsDraft draft)
@@ -270,6 +270,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
       _ = Dispatcher.BeginInvoke(() => OnStatusChanged(sender, status));
       return;
     }
+    status = controller.Status;
 
     if (status.Phase == SettingsOperationPhase.Failed)
     {
@@ -279,7 +280,8 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
     }
     else if (status.Kind == SettingsOperationKind.Save)
     {
-      PersistStatusTextBlock.Text = status.IsBusy ? "Saving changes…" : "Changes saved.";
+      PersistStatusTextBlock.Text = status.IsBusy ? "Saving changes…"
+        : controller.IsDirty ? "Earlier changes saved; newer edits remain unsaved." : "Changes saved.";
       PersistStatusTextBlock.Visibility = Visibility.Visible;
       PersistStatusTextBlock.Foreground = ThemeResourceResolver.ResolveStatusBrush(this, UiStatusKind.Neutral);
     }

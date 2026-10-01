@@ -143,8 +143,9 @@ public partial class App : Application
           return;
         }
 
-        settings = AppLegalAcceptancePolicy.AcceptCurrentVersion(settings, DateTimeOffset.UtcNow);
-        await settingsStore.SaveAsync(settings, shutdownCancellation.Token).ConfigureAwait(true);
+        AppSettings accepted = AppLegalAcceptancePolicy.AcceptCurrentVersion(settings, DateTimeOffset.UtcNow);
+        settings = await settingsStore.SaveChangesAsync(settings, accepted, shutdownCancellation.Token).ConfigureAwait(true);
+        shutdownCancellation.Token.ThrowIfCancellationRequested();
       }
 
       if (FirstRunWizardGuard.ShouldShowWizard(settings))
@@ -348,6 +349,7 @@ public partial class App : Application
       }
 
       AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
+      shutdownCancellation.Token.ThrowIfCancellationRequested();
       AppThemeManager.ApplyThemeResources(settings.ThemePreference);
       if (windowCoordinator is not null)
       {
@@ -475,7 +477,8 @@ public partial class App : Application
     {
       ThemePreference = preference,
     };
-    await settingsStore.SaveAsync(updated).ConfigureAwait(true);
+    _ = await settingsStore.SaveChangesAsync(settings, updated, shutdownCancellation.Token).ConfigureAwait(true);
+    shutdownCancellation.Token.ThrowIfCancellationRequested();
     AppThemeManager.ApplyThemeResources(preference);
   }
 
@@ -491,7 +494,7 @@ public partial class App : Application
     {
       ChatOutputFontSize = ChatTextSizePolicy.Normalize(fontSize),
     };
-    await settingsStore.SaveAsync(updated).ConfigureAwait(true);
+    _ = await settingsStore.SaveChangesAsync(settings, updated, shutdownCancellation.Token).ConfigureAwait(true);
   }
 
   private async Task ApplyWorkbenchChatPaperViewAsync(bool enabled)
@@ -500,7 +503,7 @@ public partial class App : Application
       throw new InvalidOperationException("Settings store is not initialized.");
 
     AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
-    await settingsStore.SaveAsync(settings with { ChatPaperViewEnabled = enabled }).ConfigureAwait(true);
+    _ = await settingsStore.SaveChangesAsync(settings, settings with { ChatPaperViewEnabled = enabled }, shutdownCancellation.Token).ConfigureAwait(true);
   }
 
   private async Task ApplyWorkbenchZoomAsync(int percent)
@@ -515,7 +518,7 @@ public partial class App : Application
     {
       WorkbenchZoomPercent = Math.Clamp(percent, 80, 150),
     };
-    await settingsStore.SaveAsync(updated).ConfigureAwait(true);
+    _ = await settingsStore.SaveChangesAsync(settings, updated, shutdownCancellation.Token).ConfigureAwait(true);
   }
 
   private async Task OpenSettingsAsync()
@@ -639,6 +642,7 @@ public partial class App : Application
 
     AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
     if (isShuttingDown) return;
+    AppSettings baseline = settings;
     if (!CrisperWhisperLicenseConfirmation.EnsureAccepted(
           Current?.MainWindow,
           normalizedSelection,
@@ -653,12 +657,14 @@ public partial class App : Application
       settings = CrisperWhisperLicensePolicy.AcceptCurrentVersion(settings);
     }
 
-    await modelManager.SetActiveModelAsync(normalizedSelection).ConfigureAwait(true);
+    await modelManager.SetActiveModelAsync(normalizedSelection, shutdownCancellation.Token).ConfigureAwait(true);
+    shutdownCancellation.Token.ThrowIfCancellationRequested();
 
     AppSettings updated = settings.WithConfiguredTranscription(
       normalizedSelection.ProviderId,
       normalizedSelection.ModelId);
-    await settingsStore.SaveAsync(updated).ConfigureAwait(true);
+    updated = await settingsStore.SaveChangesAsync(baseline, updated, shutdownCancellation.Token).ConfigureAwait(true);
+    shutdownCancellation.Token.ThrowIfCancellationRequested();
 
     bool runtimeStarted = false;
     if (applicationHost is not null)

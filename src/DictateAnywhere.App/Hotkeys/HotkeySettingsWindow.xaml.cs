@@ -11,6 +11,8 @@ public partial class HotkeySettingsWindow : Window
   private readonly ISettingsStore settingsStore;
   private readonly IHotkeyRegistrationValidator validator;
   private AppSettings currentSettings = AppSettings.Default;
+  private long editRevision;
+  private bool closed;
 
   public HotkeySettingsWindow(ISettingsStore settingsStore, IHotkeyRegistrationValidator validator)
   {
@@ -20,29 +22,36 @@ public partial class HotkeySettingsWindow : Window
     InitializeComponent();
     HotkeyCaptureControl.RegistrationValidator = this.validator;
     HotkeyCaptureControl.HotkeyChanged += OnHotkeyChanged;
+    Closed += (_, _) => { closed = true; HotkeyCaptureControl.HotkeyChanged -= OnHotkeyChanged; };
   }
 
   private async void OnLoaded(object sender, RoutedEventArgs e)
   {
+    long revision = editRevision;
     try
     {
-      currentSettings = await settingsStore.LoadAsync().ConfigureAwait(true);
+      AppSettings loaded = await settingsStore.LoadAsync().ConfigureAwait(true);
+      if (closed || revision != editRevision) return;
+      currentSettings = loaded;
       HotkeyCaptureControl.SetBinding(currentSettings.Hotkey);
       PersistStatusTextBlock.Text = "Loaded saved hotkey.";
       PersistStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 93, 33));
     }
     catch (IOException ex)
     {
+      if (closed || revision != editRevision) return;
       PersistStatusTextBlock.Text = $"Failed to load settings: {ex.Message}";
       PersistStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(138, 47, 0));
     }
     catch (UnauthorizedAccessException ex)
     {
+      if (closed || revision != editRevision) return;
       PersistStatusTextBlock.Text = $"Failed to load settings: {ex.Message}";
       PersistStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(138, 47, 0));
     }
     catch (InvalidOperationException ex)
     {
+      if (closed || revision != editRevision) return;
       PersistStatusTextBlock.Text = $"Failed to load settings: {ex.Message}";
       PersistStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(138, 47, 0));
     }
@@ -50,29 +59,37 @@ public partial class HotkeySettingsWindow : Window
 
   private async void OnHotkeyChanged(object? sender, HotkeyBinding binding)
   {
+    if (closed) return;
+    long revision = ++editRevision;
     try
     {
-      currentSettings = currentSettings with
+      AppSettings baseline = currentSettings;
+      AppSettings edited = currentSettings with
       {
         Hotkey = binding,
       };
 
-      await settingsStore.SaveAsync(currentSettings).ConfigureAwait(true);
+      AppSettings committed = await settingsStore.SaveChangesAsync(baseline, edited).ConfigureAwait(true);
+      if (closed || revision != editRevision) return;
+      currentSettings = committed;
       PersistStatusTextBlock.Text = $"Saved: {HotkeyFormatter.ToDisplayString(binding)}";
       PersistStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 93, 33));
     }
     catch (IOException ex)
     {
+      if (closed || revision != editRevision) return;
       PersistStatusTextBlock.Text = $"Failed to save settings: {ex.Message}";
       PersistStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(138, 47, 0));
     }
     catch (UnauthorizedAccessException ex)
     {
+      if (closed || revision != editRevision) return;
       PersistStatusTextBlock.Text = $"Failed to save settings: {ex.Message}";
       PersistStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(138, 47, 0));
     }
     catch (InvalidOperationException ex)
     {
+      if (closed || revision != editRevision) return;
       PersistStatusTextBlock.Text = $"Failed to save settings: {ex.Message}";
       PersistStatusTextBlock.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(138, 47, 0));
     }

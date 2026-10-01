@@ -18,6 +18,282 @@ namespace DictateAnywhere.App.Tests;
 public sealed class SettingsOperationControllerTests
 {
   [Fact]
+  public async Task SavedCallback_ShutdownRequestRejectsSelfAwait_ButOwnedTeardownCompletes()
+  {
+    TestSettingsStore store = new(AppSettings.Default);
+    SettingsOperationController controller = new(store, new TestFileTransferService(),
+      new TestModelManager(), new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+    TaskCompletionSource callback = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    Task? callbackDisposal = null;
+    Task<bool>? flush = null;
+    try
+    {
+      await controller.InitializeAsync();
+      controller.SettingsSaved += (_, _) =>
+      { callbackDisposal = controller.DisposeAsync().AsTask(); callback.TrySetResult(); };
+      controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 22 }, scheduleAutoSave: false);
+      flush = controller.FlushSaveAsync();
+      await callback.Task.WaitAsync(TimeSpan.FromSeconds(30));
+      await Assert.ThrowsAsync<InvalidOperationException>(() => callbackDisposal!);
+      try { await flush.WaitAsync(TimeSpan.FromSeconds(30)); } catch (OperationCanceledException) { }
+      await controller.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+      Assert.Equal(22, store.CurrentSettings.ChatOutputFontSize);
+    }
+    finally
+    {
+      if (flush is not null) { try { await flush.WaitAsync(TimeSpan.FromSeconds(30)); } catch (OperationCanceledException) { } }
+      await controller.DisposeAsync();
+    }
+  }
+
+  [Fact]
+  public async Task AlreadyCanceledInitialization_DoesNotAdmitLoadOrStatusCallbacks()
+  {
+    TestSettingsStore store = new(AppSettings.Default);
+    await using SettingsOperationController controller = new(store, new TestFileTransferService(),
+      new TestModelManager(), new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+    bool notified = false;
+    controller.StatusChanged += (_, _) => notified = true;
+    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => controller.InitializeAsync(new CancellationToken(true)));
+    Assert.Equal(0, store.LoadCalls);
+    Assert.False(notified);
+  }
+
+  [Theory]
+  [InlineData(false)]
+  [InlineData(true)]
+  public async Task OwnedWriter_RebasesARevertOnTheActualPriorCommit_EvenDuringQuit(bool quit)
+  {
+    TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    ControlledSettingsStore store = new(started, release);
+    SettingsOperationController controller = new(store, new TestFileTransferService(),
+      new TestModelManager(), new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+    Task<bool>? newer = null;
+    Task? disposal = null;
+    Task<bool>? older = null;
+    try
+    {
+      await controller.InitializeAsync();
+      controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 22, TranscriptionLanguage = "fr" }, scheduleAutoSave: false);
+      older = controller.FlushSaveAsync();
+      await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+      controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 15 });
+      if (quit)
+      {
+        disposal = controller.DisposeAsync().AsTask();
+        // Establish cancellation before releasing the uncooperative writer.
+        // Without this barrier, a successful commit may legitimately win.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => older.WaitAsync(TimeSpan.FromSeconds(30)));
+      }
+      else newer = controller.FlushSaveAsync();
+      release.TrySetResult();
+      if (!quit) { Assert.True(await older); Assert.True(await newer!.WaitAsync(TimeSpan.FromSeconds(30))); }
+      await (disposal ?? controller.DisposeAsync().AsTask()).WaitAsync(TimeSpan.FromSeconds(30));
+      Assert.Equal(15, store.Current.ChatOutputFontSize);
+      Assert.Equal("fr", store.Current.TranscriptionLanguage);
+      Assert.Equal(2, store.Writes);
+    }
+    finally
+    {
+      release.TrySetResult();
+      if (older is not null) { try { await older.WaitAsync(TimeSpan.FromSeconds(30)); } catch (OperationCanceledException) { } }
+      if (newer is not null) await newer.WaitAsync(TimeSpan.FromSeconds(30));
+      await controller.DisposeAsync();
+    }
+  }
+
+  [Fact]
+  public async Task ReentrantInvalidDraft_RejectsAnEarlierCapturedSaveBeforeAdmission()
+  {
+    TestSettingsStore store = new(AppSettings.Default);
+    await using SettingsOperationController controller = new(store, new TestFileTransferService(),
+      new TestModelManager(), new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+    await controller.InitializeAsync();
+    controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 18 }, scheduleAutoSave: false);
+    bool changed = false;
+    controller.StatusChanged += (_, status) =>
+    {
+      if (changed || status.Kind != SettingsOperationKind.Save || !status.IsBusy) return;
+      changed = true;
+      controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 99 });
+    };
+    Assert.False(await controller.FlushSaveAsync().WaitAsync(TimeSpan.FromSeconds(30)));
+    Assert.True(changed);
+    Assert.Equal(99, controller.CurrentDraft.ChatOutputFontSize);
+    Assert.Equal(15, store.CurrentSettings.ChatOutputFontSize);
+    controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 22 });
+    Assert.True(await controller.FlushSaveAsync().WaitAsync(TimeSpan.FromSeconds(30)));
+    Assert.Equal(22, store.CurrentSettings.ChatOutputFontSize);
+  }
+
+  [Theory]
+  [InlineData(false)]
+  [InlineData(true)]
+  public async Task DelayedImport_CannotReplaceNewerEdits_OrAdoptAfterCancellation(bool cancel)
+  {
+    TaskCompletionSource<AppSettings> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TestSettingsStore store = new(AppSettings.Default);
+    TestFileTransferService transfer = new() { ImportTask = release.Task };
+    await using SettingsOperationController controller = new(store, transfer,
+      new TestModelManager(), new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+    await controller.InitializeAsync();
+    using CancellationTokenSource cancellation = new();
+    Task<bool> import = controller.ImportAsync("fake-import.json", cancellation.Token);
+    try
+    {
+      controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 22 }, scheduleAutoSave: false);
+      if (cancel) cancellation.Cancel();
+      release.TrySetResult(AppSettings.Default with { ChatOutputFontSize = 18 });
+      Assert.False(await import.WaitAsync(TimeSpan.FromSeconds(30)));
+      Assert.Equal(22, controller.CurrentDraft.ChatOutputFontSize);
+      Assert.Equal(15, store.CurrentSettings.ChatOutputFontSize);
+    }
+    finally { release.TrySetResult(AppSettings.Default); await import.WaitAsync(TimeSpan.FromSeconds(30)); }
+  }
+
+  [Fact]
+  public async Task RevertDuringAnUncooperativeCommit_IsPersistedWithoutLosingPriorEdits()
+  {
+    TestSettingsStore store = new(AppSettings.Default);
+    TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    bool first = true;
+    await using SettingsAutoSaveCoordinator coordinator = new(async (baseline, settings, _) =>
+    {
+      if (first)
+      {
+        first = false;
+        started.TrySetResult();
+        await release.Task.ConfigureAwait(false);
+      }
+      AppSettings committed = baseline is null ? settings
+        : DictateAnywhere.Core.Services.SettingsSnapshot.Merge(baseline, settings, store.CurrentSettings);
+      await store.SaveAsync(committed);
+      return committed;
+    }, TimeSpan.Zero);
+    await using SettingsOperationController controller = new(store, new TestFileTransferService(),
+      new TestModelManager(), new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics(), coordinator);
+    await controller.InitializeAsync();
+    controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 22, TranscriptionLanguage = "fr" });
+    Task<bool>? final = null;
+    try
+    {
+      await started.Task.WaitAsync(TimeSpan.FromSeconds(30));
+      controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 15 });
+      final = controller.FlushSaveAsync();
+      release.TrySetResult();
+      Assert.True(await final.WaitAsync(TimeSpan.FromSeconds(30)));
+      Assert.Equal(15, store.CurrentSettings.ChatOutputFontSize);
+      Assert.Equal("fr", store.CurrentSettings.TranscriptionLanguage);
+      Assert.False(controller.IsDirty);
+    }
+    finally
+    {
+      release.TrySetResult();
+      if (final is not null) await final.WaitAsync(TimeSpan.FromSeconds(30));
+      await coordinator.DisposeAsync();
+    }
+  }
+
+  [Fact]
+  public async Task Disposal_DrainsAcceptedLoad_AndRejectsLateStateChanges()
+  {
+    TaskCompletionSource<AppSettings> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TestSettingsStore store = new(AppSettings.Default) { LoadTask = release.Task };
+    SettingsOperationController controller = new(store, new TestFileTransferService(),
+      new TestModelManager(), new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+    Task load = controller.InitializeAsync();
+    Task disposal = controller.DisposeAsync().AsTask();
+    try
+    {
+      Assert.False(disposal.IsCompleted);
+      Assert.Same(disposal, controller.DisposeAsync().AsTask());
+      Assert.Throws<ObjectDisposedException>(() => controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 22 }));
+      release.TrySetResult(AppSettings.Default with { ChatOutputFontSize = 23 });
+      await Task.WhenAll(load, disposal).WaitAsync(TimeSpan.FromSeconds(30));
+      Assert.Equal(15, controller.CurrentDraft.ChatOutputFontSize);
+    }
+    finally
+    {
+      release.TrySetResult(AppSettings.Default);
+      await Task.WhenAll(load, disposal).WaitAsync(TimeSpan.FromSeconds(30));
+    }
+  }
+
+  [Fact]
+  public async Task StaleLoad_AndReentrantMutator_DoNotOverwriteNewerDraft()
+  {
+    TaskCompletionSource<AppSettings> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    TestSettingsStore store = new(AppSettings.Default) { LoadTask = release.Task };
+    await using SettingsOperationController controller = new(store, new TestFileTransferService(),
+      new TestModelManager(), new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+    Task load = controller.InitializeAsync();
+    try
+    {
+      controller.UpdateDraft(draft => draft with { ChatOutputFontSize = 22 }, scheduleAutoSave: false);
+      release.TrySetResult(AppSettings.Default);
+      await load.WaitAsync(TimeSpan.FromSeconds(30));
+      Assert.Equal(22, controller.CurrentDraft.ChatOutputFontSize);
+      Assert.Throws<InvalidOperationException>(() => controller.UpdateDraft(draft =>
+      {
+        controller.UpdateDraft(current => current with { TranscriptionLanguage = "fr" }, scheduleAutoSave: false);
+        return draft with { ChatOutputFontSize = 18 };
+      }, scheduleAutoSave: false));
+      Assert.Equal("fr", controller.CurrentDraft.TranscriptionLanguage);
+      Assert.Equal(22, controller.CurrentDraft.ChatOutputFontSize);
+    }
+    finally { release.TrySetResult(AppSettings.Default); await load.WaitAsync(TimeSpan.FromSeconds(30)); }
+  }
+
+  [Fact]
+  public async Task IndependentDraftOwners_PreserveUnrelatedChanges_AndImportExplicitlyReplaces()
+  {
+    TestSettingsStore store = new(AppSettings.Default);
+    TestFileTransferService transfer = new() { ImportResult = AppSettings.Default with { ChatOutputFontSize = 19 } };
+    await using SettingsOperationController first = new(store, transfer, new TestModelManager(),
+      new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+    await using SettingsOperationController second = new(store, transfer, new TestModelManager(),
+      new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics());
+    await first.InitializeAsync();
+    await second.InitializeAsync();
+    first.UpdateDraft(draft => draft with { TranscriptionLanguage = "fr" }, scheduleAutoSave: false);
+    second.UpdateDraft(draft => draft with { ChatOutputFontSize = 22 }, scheduleAutoSave: false);
+    Assert.True(await first.FlushSaveAsync());
+    Assert.True(await second.FlushSaveAsync());
+    Assert.Equal("fr", store.CurrentSettings.TranscriptionLanguage);
+    Assert.Equal("fr", second.CurrentDraft.TranscriptionLanguage);
+    Assert.True(await second.ImportAsync("owned fake source"));
+    Assert.True(await second.FlushSaveAsync());
+    Assert.Equal("en", store.CurrentSettings.TranscriptionLanguage);
+    Assert.Equal(19, store.CurrentSettings.ChatOutputFontSize);
+  }
+
+  [Fact]
+  public async Task SavedCallback_CannotCertifyANewerUnwrittenDraft()
+  {
+    TestSettingsStore store = new(AppSettings.Default);
+    await using SettingsAutoSaveCoordinator coordinator = new(store.SaveAsync, TimeSpan.FromMinutes(1));
+    SettingsOperationController? owner = null;
+    coordinator.StatusChanged += (_, status) =>
+    {
+      if (status.State == SettingsAutoSaveState.Saved)
+        owner!.UpdateDraft(d => d with { ChatOutputFontSize = 22 });
+    };
+    await using SettingsOperationController controller = new(store, new TestFileTransferService(),
+      new TestModelManager(), new TestAudioDeviceService(), new TestBenchmarkService(), new TestDiagnostics(), coordinator);
+    owner = controller;
+    await controller.InitializeAsync();
+    controller.UpdateDraft(d => d with { ChatOutputFontSize = 18 }, scheduleAutoSave: false);
+    List<AppSettings> notifications = new();
+    controller.SettingsSaved += (_, settings) => notifications.Add(settings);
+    await controller.FlushSaveAsync();
+    Assert.All(notifications, settings => Assert.Equal(18, settings.ChatOutputFontSize));
+    Assert.Equal(22, controller.CurrentDraft.ChatOutputFontSize);
+    Assert.True(controller.IsDirty);
+  }
+
+  [Fact]
   public async Task InitializeAsync_LoadsPersistedSettings_InitializesDraftAndState()
   {
     AppSettings customSettings = AppSettings.Default with
@@ -165,8 +441,7 @@ public sealed class SettingsOperationControllerTests
     controller.UpdateDraft(d => d with { TranscriptionLanguage = "it" });
     controller.CancelPendingSave();
 
-    // Wait short time to ensure cancelled save does not write
-    await Task.Delay(50);
+    await coordinator.DisposeAsync();
 
     Assert.NotEqual("it", store.CurrentSettings.TranscriptionLanguage);
   }
@@ -491,15 +766,18 @@ public sealed class SettingsOperationControllerTests
     }
 
     public AppSettings CurrentSettings { get; private set; }
+    public Task<AppSettings>? LoadTask { get; set; }
+    public int LoadCalls { get; private set; }
 
     public Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
+      LoadCalls++;
       if (loadException is not null)
       {
         throw loadException;
       }
 
-      return Task.FromResult(CurrentSettings);
+      return LoadTask ?? Task.FromResult(CurrentSettings);
     }
 
     public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -509,8 +787,26 @@ public sealed class SettingsOperationControllerTests
     }
   }
 
+  private sealed class ControlledSettingsStore(TaskCompletionSource started, TaskCompletionSource release) : ISettingsStore
+  {
+    internal AppSettings Current = AppSettings.Default;
+    internal int Writes;
+    public Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Current);
+    public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    { Current = settings; return Task.CompletedTask; }
+    public async Task<AppSettings> SaveChangesAsync(AppSettings? baseline, AppSettings edited, CancellationToken cancellationToken = default)
+    {
+      if (Writes++ == 0) { started.TrySetResult(); await release.Task.ConfigureAwait(false); }
+      if (baseline is not null && DictateAnywhere.Core.Services.SettingsSnapshot.HasConflict(baseline, edited, Current))
+        throw new InvalidOperationException("controlled settings conflict");
+      Current = baseline is null ? edited : DictateAnywhere.Core.Services.SettingsSnapshot.Merge(baseline, edited, Current);
+      return Current;
+    }
+  }
+
   private sealed class TestFileTransferService : ISettingsFileTransferService
   {
+    public Task<AppSettings>? ImportTask { get; set; }
     public AppSettings? ImportResult { get; set; }
     public Exception? ImportException { get; set; }
     public AppSettings? LastExportedSettings { get; private set; }
@@ -522,7 +818,7 @@ public sealed class SettingsOperationControllerTests
         throw ImportException;
       }
 
-      return Task.FromResult(ImportResult ?? AppSettings.Default);
+      return ImportTask ?? Task.FromResult(ImportResult ?? AppSettings.Default);
     }
 
     public Task ExportAsync(string path, AppSettings settings, CancellationToken cancellationToken = default)

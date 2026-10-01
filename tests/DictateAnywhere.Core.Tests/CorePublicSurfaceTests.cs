@@ -90,6 +90,7 @@ public sealed class CorePublicSurfaceTests
     "DictateAnywhere.Core.Domain.DictationSessionState",
     "DictateAnywhere.Core.Services.CurrentSettingsPolicy",
     "DictateAnywhere.Core.Services.DiagnosticBoundary",
+    "DictateAnywhere.Core.Services.SettingsSnapshot",
     "DictateAnywhere.Core.Services.DictationPipelineCoordinator",
     "DictateAnywhere.Core.Services.FaultTolerantOverlayService",
     "DictateAnywhere.Core.Services.RuleBasedTextTransformationService",
@@ -120,7 +121,7 @@ public sealed class CorePublicSurfaceTests
       $"Unexpected ({unexpected.Count}): {string.Join(", ", unexpected)}{Environment.NewLine}" +
       $"Missing ({missing.Count}): {string.Join(", ", missing)}");
 
-    Assert.Equal(83, actualExported.Length);
+    Assert.Equal(84, actualExported.Length);
   }
 
   [Theory]

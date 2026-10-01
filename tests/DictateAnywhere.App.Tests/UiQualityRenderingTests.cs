@@ -43,8 +43,10 @@ public sealed class UiQualityRenderingTests
       using DictateAnywhere.App.Diagnostics.LocalFileDiagnostics isolatedDiagnostics = new(
         DictateAnywhere.Diagnostics.StructuredDiagnosticsOptions.Default with { LogsDirectoryPath = logRoot },
         new DictateAnywhere.Diagnostics.DiagnosticsBundleExporter(), Path.Combine(logRoot, "unused-settings.json"));
-      DictateAnywhere.App.Composition.ApplicationComposition composition = DictateAnywhere.App.Composition.ApplicationComposition.CreateProduction(isolatedDiagnostics);
+      DictateAnywhere.Settings.JsonSettingsStore isolatedSettings = new(Path.Combine(logRoot, "settings.json"));
+      DictateAnywhere.App.Composition.ApplicationComposition composition = DictateAnywhere.App.Composition.ApplicationComposition.CreateProduction(isolatedDiagnostics, isolatedSettings);
       Assert.Same(isolatedDiagnostics, composition.Diagnostics);
+      Assert.Same(isolatedSettings, composition.SettingsStore);
       TextboxWorkbenchWindow window = composition.CreateWorkbenchWindow();
       try
       {

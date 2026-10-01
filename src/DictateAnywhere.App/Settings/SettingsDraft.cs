@@ -78,7 +78,7 @@ public sealed record SettingsDraft
   {
     ArgumentNullException.ThrowIfNull(settings);
 
-    AppSettings normalized = CurrentSettingsPolicy.Normalize(settings);
+    AppSettings normalized = SettingsSnapshot.Capture(CurrentSettingsPolicy.Normalize(settings));
     return new SettingsDraft
     {
       Hotkey = normalized.Hotkey,
