@@ -36,6 +36,9 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
   private bool accepting = true;
   private bool started;
   private Task? disposal;
+  private Task? disposalDriver;
+  private int completions;
+  private readonly TaskCompletionSource completionDrain = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
   public ChunkedTranscriptionSession(IChunkedAudioCaptureService audioCaptureService,
     ITranscriptionService transcriptionService, string modelId, IDiagnostics diagnostics, CancellationToken cancellationToken)
@@ -64,7 +67,7 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
     if (chunk is null || chunk.Audio.Pcm16Mono.Length == 0) return;
     lock (sync)
     {
-      if (!accepting) return; // A callback captured before unsubscribe is harmless.
+      if (!accepting || cancellation.IsCancellationRequested) return; // Captured callbacks cannot revive a canceled session.
       int bytes = chunk.Audio.Pcm16Mono.Length;
       if (bytes > MaximumPendingAudioBytes - pendingBytes || !queue.Writer.TryWrite(chunk))
       {
@@ -83,35 +86,75 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
 
   public async Task<IReadOnlyList<TranscriptionChunkResult>> CompleteAsync(CancellationToken completionCancellationToken)
   {
-    CloseAdmission();
-    using CancellationTokenRegistration registration = completionCancellationToken.Register(cancellation.Cancel);
-    await worker.ConfigureAwait(false);
-    completionCancellationToken.ThrowIfCancellationRequested();
-    if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
-    return results.OrderBy(result => result.SequenceNumber).ToArray();
+    lock (sync)
+    {
+      ObjectDisposedException.ThrowIf(disposal is not null, this);
+      completions++;
+    }
+    try
+    {
+      CloseAdmission();
+      using CancellationTokenRegistration registration = completionCancellationToken.Register(cancellation.Cancel);
+      await worker.ConfigureAwait(false);
+      lock (sync)
+      {
+        // Completion commits under the same lock as disposal publication,
+        // including the interval before DisposeCore's queued continuation runs.
+        completionCancellationToken.ThrowIfCancellationRequested();
+        _ = GetWorkerToken();
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+        return results.OrderBy(result => result.SequenceNumber).ToArray();
+      }
+    }
+    finally
+    {
+      lock (sync)
+      {
+        completions--;
+        if (disposal is not null && completions == 0) completionDrain.TrySetResult();
+      }
+    }
   }
 
   public ValueTask DisposeAsync()
   {
-    lock (sync) return new ValueTask(disposal ??= DisposeCoreAsync());
+    TaskCompletionSource source;
+    lock (sync)
+    {
+      if (disposal is not null) return new ValueTask(disposal);
+      accepting = false;
+      source = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      disposal = source.Task;
+    }
+    disposalDriver = DisposeCoreAsync(source);
+    return new ValueTask(source.Task);
   }
 
-  private async Task DisposeCoreAsync()
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Shared disposal reports faults after its worker and accepted completers release all resources.")]
+  private async Task DisposeCoreAsync(TaskCompletionSource source)
   {
-    await Task.Yield();
-    CloseAdmission();
+    List<Exception> failures = [];
+    try { CloseAdmission(); }
+    catch (Exception exception) { failures.Add(exception); }
     try { cancellation.Cancel(); }
-    catch (AggregateException)
+    catch (Exception exception)
     {
-      diagnostics.Warning("A transcription cancellation callback failed; waiting for the provider to release the session.");
+      failures.Add(exception);
     }
-    finally
+    // Neither cancellation nor event-detachment faults can release the source
+    // beneath a provider or a completion registration. Cancel runs outside sync.
+    try { await worker.ConfigureAwait(false); }
+    catch (Exception exception) { failures.Add(exception); }
+    lock (sync) { if (completions == 0) completionDrain.TrySetResult(); }
+    await completionDrain.Task.ConfigureAwait(false);
+    cancellation.Dispose();
+    results.Clear();
+    if (failures.Count == 0) source.TrySetResult();
+    else
     {
-      // A provider ignoring cancellation retains ownership until its call ends;
-      // the next session must never reuse its resources in the meantime.
-      await worker.ConfigureAwait(false);
-      cancellation.Dispose();
-      results.Clear();
+      source.TrySetException(new AggregateException(failures));
+      _ = source.Task.Exception;
     }
   }
 
@@ -127,6 +170,16 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
 
   private void OnChunkAvailable(object? sender, AudioCaptureChunkAvailableEventArgs e) => QueueChunk(e.Chunk);
 
+  private CancellationToken GetWorkerToken()
+  {
+    lock (sync)
+    {
+      if (disposal is not null) throw new OperationCanceledException(cancellation.Token);
+      cancellation.Token.ThrowIfCancellationRequested();
+      return cancellation.Token;
+    }
+  }
+
   [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types",
     Justification = "The single worker retains its failure for CompleteAsync and is always awaited during disposal.")]
   private async Task ConsumeAsync()
@@ -138,7 +191,8 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
       {
         try
         {
-          TranscriptionResult result = await transcription.TranscribeAsync(chunk.Audio, modelId, cancellation.Token).ConfigureAwait(false);
+          TranscriptionResult result = await transcription.TranscribeAsync(chunk.Audio, modelId, GetWorkerToken()).ConfigureAwait(false);
+          _ = GetWorkerToken();
           characters = checked(characters + result.Text.Length);
           if (characters > MaximumTranscriptCharacters || results.Count >= 10_000)
             throw new InvalidOperationException("Dictation transcript limit reached. Use a shorter recording.");

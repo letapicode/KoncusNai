@@ -20,9 +20,12 @@ internal sealed class CachingDictationHistoryRecorder : IDictationHistoryRecorde
 
   public async Task RecordAsync(DictationHistoryRecord record, CancellationToken cancellationToken = default)
   {
+    cancellationToken.ThrowIfCancellationRequested();
     DictationHistoryRecord normalized = record.Normalize();
     LastDictationSessionCache.Store(normalized);
+    cancellationToken.ThrowIfCancellationRequested();
     await inner.RecordAsync(normalized, cancellationToken).ConfigureAwait(false);
+    cancellationToken.ThrowIfCancellationRequested();
     changeNotifier?.PublishRecordAdded(normalized);
   }
 }

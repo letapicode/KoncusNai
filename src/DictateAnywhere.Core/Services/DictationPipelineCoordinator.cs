@@ -25,11 +25,12 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
   private readonly DictationSessionStateMachine stateMachine = new();
   private readonly SemaphoreSlim signalLock = new(1, 1);
   private readonly object runtimeSync = new();
-  private CancellationTokenSource? runtimeCts;
+  private RunLifetime? lifetime;
+  private TaskCompletionSource? disposal;
+  private Task? disposalDriver;
   private ChunkedTranscriptionSession? chunkedTranscriptionSession;
 
   private int pipelineBusy;
-  private int started;
   private string? activeOperationId;
   private AppSettings settings = AppSettings.Default;
   private AppSettings? activeSessionSettings;
@@ -60,136 +61,207 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
 
   public DictationSessionState CurrentState => stateMachine.CurrentState;
 
-  public async Task StartAsync(CancellationToken cancellationToken = default)
+  public Task StartAsync(CancellationToken cancellationToken = default)
   {
-    ObjectDisposedException.ThrowIf(disposed, this);
-
-    if (Interlocked.Exchange(ref started, 1) == 1)
-    {
-      return;
-    }
-
+    RunLifetime owner;
     lock (runtimeSync)
     {
-      runtimeCts = new CancellationTokenSource();
+      ObjectDisposedException.ThrowIf(disposed, this);
+      cancellationToken.ThrowIfCancellationRequested();
+      if (lifetime?.Stop is not null)
+      {
+        if (!lifetime.Stop.Task.IsCompletedSuccessfully)
+          return StartAfterStopAsync(lifetime.Stop.Task, cancellationToken);
+        lifetime = null;
+      }
+      if (lifetime is not null) return lifetime.Start.Task.WaitAsync(cancellationToken);
+      owner = new RunLifetime();
+      lifetime = owner;
     }
-
-    settings = await settingsStore.LoadAsync(cancellationToken).ConfigureAwait(false);
-
-    HotkeyRegistrationResult registrationResult = await hotkeyService
-      .RegisterAsync(settings.Hotkey, cancellationToken)
-      .ConfigureAwait(false);
-
-    if (!registrationResult.Success)
-    {
-      Interlocked.Exchange(ref started, 0);
-      CancelAndDisposeRuntimeTokenSource();
-      string message = registrationResult.ErrorMessage ?? "Unable to register configured hotkey.";
-      diagnostics.Error(message);
-      await overlayService
-        .ShowStateAsync(
-          DictationSessionState.Error,
-          DictationStatusMessages.HotkeyUnavailable,
-          display: OverlayDisplayOptions.StatusPanelDefault,
-          cancellationToken: cancellationToken)
-        .ConfigureAwait(false);
-      throw new InvalidOperationException(message);
-    }
-
-    hotkeyService.HotkeyPressed += OnHotkeyPressed;
-    hotkeyService.HotkeyReleased += OnHotkeyReleased;
-
-    diagnostics.Info($"Dictation coordinator started in {settings.RecordingMode} mode.");
+    owner.StartDriver = StartCoreAsync(owner, cancellationToken);
+    return owner.Start.Task.WaitAsync(cancellationToken);
   }
 
-  public async Task StopAsync(CancellationToken cancellationToken = default)
+  private async Task StartAfterStopAsync(Task stop, CancellationToken cancellationToken)
   {
-    ObjectDisposedException.ThrowIf(disposed, this);
-    await StopCoreAsync(cancellationToken).ConfigureAwait(false);
+    await stop.WaitAsync(cancellationToken).ConfigureAwait(false);
+    await StartAsync(cancellationToken).ConfigureAwait(false);
   }
 
-  public async ValueTask DisposeAsync()
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Startup completion owns its fault; failed startup requests teardown without awaiting itself.")]
+  private async Task StartCoreAsync(RunLifetime owner, CancellationToken cancellationToken)
   {
-    if (disposed)
-    {
-      return;
-    }
-
-    disposed = true;
-
-    await StopCoreAsync(CancellationToken.None).ConfigureAwait(false);
-    signalLock.Dispose();
-  }
-
-  [SuppressMessage(
-    "Design",
-    "CA1031:Do not catch general exception types",
-    Justification = "Shutdown path must tolerate and isolate downstream service failures.")]
-  private async Task StopCoreAsync(CancellationToken cancellationToken)
-  {
-    if (Interlocked.Exchange(ref started, 0) == 0)
-    {
-      return;
-    }
-
-    hotkeyService.HotkeyPressed -= OnHotkeyPressed;
-    hotkeyService.HotkeyReleased -= OnHotkeyReleased;
-
-    CancelAndDisposeRuntimeTokenSource();
-
-    await signalLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+    Exception? failure = null;
     try
     {
-      if (audioCaptureService.IsCapturing)
+      using CancellationTokenSource startup = CancellationTokenSource.CreateLinkedTokenSource(owner.Token, cancellationToken);
+      settings = await settingsStore.LoadAsync(startup.Token).ConfigureAwait(false);
+      startup.Token.ThrowIfCancellationRequested();
+      _ = GetRuntimeToken(owner);
+      HotkeyRegistrationResult registrationResult = await hotkeyService
+        .RegisterAsync(settings.Hotkey, startup.Token).ConfigureAwait(false);
+      startup.Token.ThrowIfCancellationRequested();
+      if (!registrationResult.Success)
       {
-        try
-        {
-          if (audioCaptureService is IChunkedAudioCaptureService chunkedAudioCaptureService)
-          {
-            _ = await chunkedAudioCaptureService.StopAndFlushChunkAsync(cancellationToken).ConfigureAwait(false);
-          }
-          else
-          {
-            _ = await audioCaptureService.StopAsync(cancellationToken).ConfigureAwait(false);
-          }
-        }
-        catch (OperationCanceledException)
-        {
-          throw;
-        }
-        catch (Exception ex)
-        {
-          diagnostics.Warning($"Ignoring capture stop failure during shutdown: {ex.Message}");
-        }
+        string message = registrationResult.ErrorMessage ?? "Unable to register configured hotkey.";
+        diagnostics.Error(message);
+        await overlayService.ShowStateAsync(DictationSessionState.Error,
+          DictationStatusMessages.HotkeyUnavailable, display: OverlayDisplayOptions.StatusPanelDefault,
+          cancellationToken: startup.Token).ConfigureAwait(false);
+        throw new InvalidOperationException(message);
       }
+      lock (runtimeSync)
+      {
+        _ = GetRuntimeToken(owner);
+        owner.Pressed = (sender, args) => OnHotkeyPressed(owner, sender, args);
+        owner.Released = (sender, args) => OnHotkeyReleased(owner, sender, args);
+        hotkeyService.HotkeyPressed += owner.Pressed;
+        hotkeyService.HotkeyReleased += owner.Released;
+        owner.Ready = true;
+      }
+      diagnostics.Info($"Dictation coordinator started in {settings.RecordingMode} mode.");
+    }
+    catch (Exception exception)
+    {
+      failure = exception;
+      // Publish teardown while startup still owns its lease; never self-await.
+      _ = RequestStop(owner);
+    }
+    finally { ReleaseOperation(owner); }
+    if (failure is null) owner.Start.TrySetResult();
+    else if (failure is OperationCanceledException) owner.Start.TrySetCanceled();
+    else
+    {
+      owner.Start.TrySetException(failure);
+      _ = owner.Start.Task.Exception; // A canceled caller wait must not leave an unobserved owned fault.
+    }
+  }
 
-      try
-      {
-        await hotkeyService.UnregisterAsync(cancellationToken).ConfigureAwait(false);
-      }
-      catch (Exception ex) when (ex is not OperationCanceledException)
-      {
-        diagnostics.Warning($"Ignoring hotkey unregister failure during shutdown: {ex.Message}");
-      }
+  public Task StopAsync(CancellationToken cancellationToken = default)
+  {
+    RunLifetime? owner;
+    lock (runtimeSync)
+    {
+      ObjectDisposedException.ThrowIf(disposed, this);
+      owner = lifetime;
+    }
+    Task stop = owner is null ? Task.CompletedTask : RequestStop(owner);
+    return cancellationToken.CanBeCanceled ? stop.WaitAsync(cancellationToken) : stop;
+  }
 
-      try
-      {
-        await overlayService.HideAsync(cancellationToken).ConfigureAwait(false);
-      }
-      catch (Exception ex) when (ex is not OperationCanceledException)
-      {
-        diagnostics.Warning($"Ignoring overlay hide failure during shutdown: {ex.Message}");
-      }
+  public ValueTask DisposeAsync()
+  {
+    TaskCompletionSource source;
+    RunLifetime? owner;
+    lock (runtimeSync)
+    {
+      if (disposal is not null) return new ValueTask(disposal.Task);
+      disposed = true;
+      source = disposal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      owner = lifetime;
+    }
+    disposalDriver = DisposeCoreAsync(source, owner);
+    return new ValueTask(source.Task);
+  }
 
+  private Task RequestStop(RunLifetime owner)
+  {
+    lock (runtimeSync)
+    {
+      if (owner.Stop is not null) return owner.Stop.Task;
+      owner.Accepting = false;
+      owner.Stop = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      if (owner.Operations == 0) owner.Drained.TrySetResult();
+    }
+    owner.StopDriver = StopCoreAsync(owner);
+    return owner.Stop.Task;
+  }
+
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Every independent teardown stage is attempted; the shared stop reports aggregate failure after draining.")]
+  private async Task StopCoreAsync(RunLifetime owner)
+  {
+    List<Exception> failures = [];
+    async Task Attempt(Func<Task> cleanup)
+    {
+      try { await cleanup().ConfigureAwait(false); }
+      catch (Exception exception) { failures.Add(exception); }
+    }
+    // No user cancellation callback runs under runtimeSync. Caller wait tokens
+    // never cancel this owned teardown operation.
+    await Attempt(() =>
+    {
+      hotkeyService.HotkeyPressed -= owner.Pressed;
+      hotkeyService.HotkeyReleased -= owner.Released;
+      return Task.CompletedTask;
+    }).ConfigureAwait(false);
+    await Attempt(() =>
+    {
+      owner.Cancellation.Cancel();
+      return Task.CompletedTask;
+    }).ConfigureAwait(false);
+    await owner.Drained.Task.ConfigureAwait(false);
+    await Attempt(async () =>
+    {
+      if (!audioCaptureService.IsCapturing) return;
+      if (audioCaptureService is IChunkedAudioCaptureService chunked)
+        _ = await chunked.StopAndFlushChunkAsync(CancellationToken.None).ConfigureAwait(false);
+      else _ = await audioCaptureService.StopAsync(CancellationToken.None).ConfigureAwait(false);
+    }).ConfigureAwait(false);
+    await Attempt(() => hotkeyService.UnregisterAsync(CancellationToken.None)).ConfigureAwait(false);
+    await Attempt(() => overlayService.HideAsync(CancellationToken.None)).ConfigureAwait(false);
+    await Attempt(DisposeChunkedTranscriptionSessionAsync).ConfigureAwait(false);
+    await Attempt(() =>
+    {
       stateMachine.Reset();
-      await DisposeChunkedTranscriptionSessionAsync().ConfigureAwait(false);
       insertionTargetSession?.ClearCapturedTarget();
-      diagnostics.Info("Dictation coordinator stopped.");
-    }
-    finally
-    {
+      activeSessionSettings = null;
+      activeOperationId = null;
       Volatile.Write(ref pipelineBusy, 0);
-      signalLock.Release();
+      diagnostics.Info("Dictation coordinator stopped.");
+      return Task.CompletedTask;
+    }).ConfigureAwait(false);
+    owner.Cancellation.Dispose();
+    if (failures.Count == 0) owner.Stop!.TrySetResult();
+    else
+    {
+      owner.Stop!.TrySetException(new AggregateException(failures));
+      _ = owner.Stop.Task.Exception;
+    }
+  }
+
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Dispose retains the shared stop failure while releasing the semaphore only after its users drain.")]
+  private async Task DisposeCoreAsync(TaskCompletionSource source, RunLifetime? owner)
+  {
+    Exception? failure = null;
+    try
+    {
+      if (owner is not null) await RequestStop(owner).ConfigureAwait(false);
+    }
+    catch (Exception exception) { failure = exception; }
+    signalLock.Dispose();
+    if (failure is null) source.TrySetResult();
+    else { source.TrySetException(failure); _ = source.Task.Exception; }
+  }
+
+  private bool AcquireOperation(RunLifetime owner)
+  {
+    lock (runtimeSync)
+    {
+      if (disposed || !ReferenceEquals(lifetime, owner) || !owner.Accepting || !owner.Ready) return false;
+      owner.Operations++;
+      return true;
+    }
+  }
+
+  private void ReleaseOperation(RunLifetime owner)
+  {
+    lock (runtimeSync)
+    {
+      owner.Operations--;
+      if (!owner.Accepting && owner.Operations == 0) owner.Drained.TrySetResult();
     }
   }
 
@@ -197,45 +269,44 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     "Design",
     "CA1031:Do not catch general exception types",
     Justification = "Hotkey callbacks are genuine event boundaries; all accepted pipeline work is awaited and final failures are reported.")]
-  private async void OnHotkeyPressed(object? sender, HotkeyEventArgs e)
+  private async void OnHotkeyPressed(RunLifetime owner, object? sender, HotkeyEventArgs e)
   {
+    if (!AcquireOperation(owner)) return;
     try
     {
-      await HandleHotkeySignalAsync(HotkeySignal.Pressed, e.ObservedAtUtc).ConfigureAwait(false);
+      await HandleHotkeySignalAsync(owner, HotkeySignal.Pressed, e.ObservedAtUtc).ConfigureAwait(false);
     }
     catch (Exception ex)
     {
-      diagnostics.Error("Unexpected failure while handling the dictation hotkey press.", ex);
+      ReportCallbackFailure("Unexpected failure while handling the dictation hotkey press.", ex);
     }
+    finally { ReleaseOperation(owner); }
   }
 
   [SuppressMessage(
     "Design",
     "CA1031:Do not catch general exception types",
     Justification = "Hotkey callbacks are genuine event boundaries; all accepted pipeline work is awaited and final failures are reported.")]
-  private async void OnHotkeyReleased(object? sender, HotkeyEventArgs e)
+  private async void OnHotkeyReleased(RunLifetime owner, object? sender, HotkeyEventArgs e)
   {
+    if (!AcquireOperation(owner)) return;
     try
     {
-      await HandleHotkeySignalAsync(HotkeySignal.Released, e.ObservedAtUtc).ConfigureAwait(false);
+      await HandleHotkeySignalAsync(owner, HotkeySignal.Released, e.ObservedAtUtc).ConfigureAwait(false);
     }
     catch (Exception ex)
     {
-      diagnostics.Error("Unexpected failure while handling the dictation hotkey release.", ex);
+      ReportCallbackFailure("Unexpected failure while handling the dictation hotkey release.", ex);
     }
+    finally { ReleaseOperation(owner); }
   }
 
   [SuppressMessage(
     "Design",
     "CA1031:Do not catch general exception types",
     Justification = "Coordinator boundary catches unexpected pipeline exceptions and transitions to a safe state.")]
-  private async Task HandleHotkeySignalAsync(HotkeySignal signal, DateTimeOffset observedAtUtc)
+  private async Task HandleHotkeySignalAsync(RunLifetime owner, HotkeySignal signal, DateTimeOffset observedAtUtc)
   {
-    if (Interlocked.CompareExchange(ref started, 1, 1) == 0 || disposed)
-    {
-      return;
-    }
-
     if (Volatile.Read(ref pipelineBusy) == 1)
     {
       diagnostics.Info($"Dropped reentrant {signal} signal at {observedAtUtc:O} while pipeline is busy.");
@@ -244,7 +315,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
 
     try
     {
-      await signalLock.WaitAsync(GetRuntimeToken()).ConfigureAwait(false);
+      await signalLock.WaitAsync(GetRuntimeToken(owner)).ConfigureAwait(false);
     }
     catch (OperationCanceledException)
     {
@@ -253,15 +324,21 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
 
     try
     {
-      await ProcessHotkeySignalAsync(signal).ConfigureAwait(false);
+      _ = GetRuntimeToken(owner);
+      await ProcessHotkeySignalAsync(owner, signal).ConfigureAwait(false);
+    }
+    catch (OperationCanceledException) when (!owner.Accepting || owner.Token.IsCancellationRequested) { }
+    catch (Exception ex) when (!owner.Accepting || owner.Token.IsCancellationRequested)
+    {
+      ReportCallbackFailure("Stopped dictation work failed while draining.", ex);
     }
     catch (OperationCanceledException)
     {
-      await HandlePipelineErrorAsync("Dictation operation was canceled.", null).ConfigureAwait(false);
+      await HandlePipelineErrorAsync(owner, "Dictation operation was canceled.", null).ConfigureAwait(false);
     }
     catch (Exception ex)
     {
-      await HandlePipelineErrorAsync("Dictation failed. Check logs for details.", ex).ConfigureAwait(false);
+      await HandlePipelineErrorAsync(owner, "Dictation failed. Check logs for details.", ex).ConfigureAwait(false);
     }
     finally
     {
@@ -269,27 +346,35 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     }
   }
 
-  private Task ProcessHotkeySignalAsync(HotkeySignal signal)
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Only terminal event/drain reporting is isolated here; sink failure must not escape async void or revive stopped work.")]
+  private void ReportCallbackFailure(string message, Exception failure)
+  {
+    try { diagnostics.Error(message, failure); }
+    catch (Exception) { /* General diagnostic sink policy is a separate remediation batch. */ }
+  }
+
+  private Task ProcessHotkeySignalAsync(RunLifetime owner, HotkeySignal signal)
   {
     return settings.RecordingMode switch
     {
-      RecordingMode.HoldToTalk => ProcessHoldToTalkSignalAsync(signal),
-      RecordingMode.ToggleToTalk => ProcessToggleToTalkSignalAsync(signal),
+      RecordingMode.HoldToTalk => ProcessHoldToTalkSignalAsync(owner, signal),
+      RecordingMode.ToggleToTalk => ProcessToggleToTalkSignalAsync(owner, signal),
       _ => Task.CompletedTask,
     };
   }
 
-  private Task ProcessHoldToTalkSignalAsync(HotkeySignal signal)
+  private Task ProcessHoldToTalkSignalAsync(RunLifetime owner, HotkeySignal signal)
   {
     return signal switch
     {
-      HotkeySignal.Pressed => StartRecordingIfIdleAsync(),
-      HotkeySignal.Released => StopTranscribeAndInsertIfRecordingAsync(),
+      HotkeySignal.Pressed => StartRecordingIfIdleAsync(owner),
+      HotkeySignal.Released => StopTranscribeAndInsertIfRecordingAsync(owner),
       _ => Task.CompletedTask,
     };
   }
 
-  private Task ProcessToggleToTalkSignalAsync(HotkeySignal signal)
+  private Task ProcessToggleToTalkSignalAsync(RunLifetime owner, HotkeySignal signal)
   {
     if (signal != HotkeySignal.Pressed)
     {
@@ -298,13 +383,13 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
 
     return stateMachine.CurrentState switch
     {
-      DictationSessionState.Idle => StartRecordingIfIdleAsync(),
-      DictationSessionState.Recording => StopTranscribeAndInsertIfRecordingAsync(),
+      DictationSessionState.Idle => StartRecordingIfIdleAsync(owner),
+      DictationSessionState.Recording => StopTranscribeAndInsertIfRecordingAsync(owner),
       _ => Task.CompletedTask,
     };
   }
 
-  private async Task StartRecordingIfIdleAsync()
+  private async Task StartRecordingIfIdleAsync(RunLifetime owner)
   {
     if (stateMachine.CurrentState != DictationSessionState.Idle)
     {
@@ -330,7 +415,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
         transcriptionService,
         effectiveSettings.GetConfiguredTranscriptionModelId(),
         diagnostics,
-        GetRuntimeToken());
+        GetRuntimeToken(owner));
       chunkedTranscriptionSession.Start();
       diagnostics.Info("Chunked transcription session started.");
     }
@@ -341,14 +426,15 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
         DictationSessionState.Recording,
         elapsed: TimeSpan.Zero,
         display: OverlayDisplayOptions.AnchoredRecording,
-        cancellationToken: GetRuntimeToken())
+        cancellationToken: GetRuntimeToken(owner))
       .ConfigureAwait(false);
     recordingOverlayStopwatch.Stop();
 
     Stopwatch captureStartStopwatch = Stopwatch.StartNew();
     await (audioCaptureService is IChunkedAudioCaptureService chunkedCapture
-      ? chunkedCapture.StartChunkedAsync(GetRuntimeToken())
-      : audioCaptureService.StartAsync(GetRuntimeToken())).ConfigureAwait(false);
+      ? chunkedCapture.StartChunkedAsync(GetRuntimeToken(owner))
+      : audioCaptureService.StartAsync(GetRuntimeToken(owner))).ConfigureAwait(false);
+    _ = GetRuntimeToken(owner);
     captureStartStopwatch.Stop();
     activeOperationId = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
     Dictionary<string, object?> startProperties = new(StringComparer.Ordinal)
@@ -372,7 +458,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     }
   }
 
-  private async Task StopTranscribeAndInsertIfRecordingAsync()
+  private async Task StopTranscribeAndInsertIfRecordingAsync(RunLifetime owner)
   {
     if (stateMachine.CurrentState != DictationSessionState.Recording)
     {
@@ -393,14 +479,15 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
         .ShowStateAsync(
           DictationSessionState.Transcribing,
           display: OverlayDisplayOptions.AnchoredTranscribing,
-          cancellationToken: GetRuntimeToken())
+          cancellationToken: GetRuntimeToken(owner))
         .ConfigureAwait(false);
       transcribingOverlayStopwatch.Stop();
 
       AppSettings effectiveSettings = activeSessionSettings ?? settings;
       TranscriptionModelSelection transcriptionSelection = effectiveSettings.GetConfiguredTranscriptionSelection();
-      StopTranscriptionOutcome stopOutcome = await StopAndTranscribeAsync(effectiveSettings, transcriptionSelection)
+      StopTranscriptionOutcome stopOutcome = await StopAndTranscribeAsync(owner, effectiveSettings, transcriptionSelection)
         .ConfigureAwait(false);
+      _ = GetRuntimeToken(owner);
       TranscriptionResult transcription = stopOutcome.Transcription;
       diagnostics.Info(
         string.Format(
@@ -424,7 +511,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
             DictationSessionState.Completed,
             DictationStatusMessages.NoAudibleSpeechDetected,
             display: OverlayDisplayOptions.AnchoredNotice,
-            cancellationToken: GetRuntimeToken())
+            cancellationToken: GetRuntimeToken(owner))
           .ConfigureAwait(false);
 
         await ResetToIdleAsync(hideOverlay: false).ConfigureAwait(false);
@@ -437,8 +524,9 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
       TextTransformationResult transformation = await textTransformationService
         .TransformAsync(
           new TextTransformationRequest(transcription.Text, transformationOptions),
-          GetRuntimeToken())
+          GetRuntimeToken(owner))
         .ConfigureAwait(false);
+      _ = GetRuntimeToken(owner);
       transformationStopwatch.Stop();
       string transformedText = transformation.Text;
 
@@ -471,8 +559,9 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
           transformedText,
           effectiveSettings.PreferredInsertionMethod,
           effectiveSettings.RestoreClipboard,
-          GetRuntimeToken())
+          GetRuntimeToken(owner))
         .ConfigureAwait(false);
+      _ = GetRuntimeToken(owner);
       insertionStopwatch.Stop();
 
       if (insertion.Outcome == InsertionOutcome.Blocked && !insertion.CanRecoverTranscript)
@@ -513,13 +602,14 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
         pipelineStopwatch.Elapsed,
         insertion);
       bool historyRecorded = await RecordHistoryAsync(
-          transcriptionSelection,
+          owner, transcriptionSelection,
           transcription,
           transformation,
           transformationStopwatch.Elapsed,
           pipelineStopwatch.Elapsed,
           recoveryRequired ? "global-hotkey-recovery" : "global-hotkey")
         .ConfigureAwait(false);
+      _ = GetRuntimeToken(owner);
 
       await overlayService
         .ShowStateAsync(
@@ -530,7 +620,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
           display: recoveryRequired
             ? OverlayDisplayOptions.AnchoredStatus
             : OverlayDisplayOptions.AnchoredCompletion,
-          cancellationToken: GetRuntimeToken())
+          cancellationToken: GetRuntimeToken(owner))
         .ConfigureAwait(false);
 
       await ResetToIdleAsync(hideOverlay: false).ConfigureAwait(false);
@@ -547,6 +637,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     "CA1031:Do not catch general exception types",
     Justification = "History persistence must not make an otherwise successful dictation fail.")]
   private async Task<bool> RecordHistoryAsync(
+    RunLifetime owner,
     TranscriptionModelSelection transcriptionSelection,
     TranscriptionResult transcription,
     TextTransformationResult transformation,
@@ -569,7 +660,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
             TextTransformationDuration: transformationDuration,
             TotalPipelineDuration: totalPipelineDuration,
             Source: source).Normalize(),
-          GetRuntimeToken())
+          GetRuntimeToken(owner))
         .ConfigureAwait(false);
       return true;
     }
@@ -596,6 +687,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
   }
 
   private async Task<StopTranscriptionOutcome> StopAndTranscribeAsync(
+    RunLifetime owner,
     AppSettings effectiveSettings,
     TranscriptionModelSelection transcriptionSelection)
   {
@@ -606,13 +698,13 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     {
       Stopwatch captureFinalizationStopwatch = Stopwatch.StartNew();
       AudioCaptureChunk? finalChunk = await chunkedAudioCaptureService
-        .StopAndFlushChunkAsync(GetRuntimeToken())
+        .StopAndFlushChunkAsync(GetRuntimeToken(owner))
         .ConfigureAwait(false);
       captureFinalizationStopwatch.Stop();
       chunkedTranscriptionSession.QueueChunk(finalChunk);
       Stopwatch chunkCompletionStopwatch = Stopwatch.StartNew();
       IReadOnlyList<TranscriptionChunkResult> chunks = await chunkedTranscriptionSession
-        .CompleteAsync(GetRuntimeToken())
+        .CompleteAsync(GetRuntimeToken(owner))
         .ConfigureAwait(false);
       TranscriptionResult combined = TranscriptChunkCombiner.Combine(chunks, modelId);
       chunkCompletionStopwatch.Stop();
@@ -633,7 +725,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     }
 
     Stopwatch captureStopwatch = Stopwatch.StartNew();
-    AudioCaptureResult audio = await audioCaptureService.StopAsync(GetRuntimeToken()).ConfigureAwait(false);
+    AudioCaptureResult audio = await audioCaptureService.StopAsync(GetRuntimeToken(owner)).ConfigureAwait(false);
     captureStopwatch.Stop();
     if (audio.Pcm16Mono.Length == 0)
     {
@@ -647,7 +739,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
 
     Stopwatch transcriptionWallStopwatch = Stopwatch.StartNew();
     TranscriptionResult transcription = await transcriptionService
-      .TranscribeAsync(audio, modelId, GetRuntimeToken())
+      .TranscribeAsync(audio, modelId, GetRuntimeToken(owner))
       .ConfigureAwait(false);
     transcriptionWallStopwatch.Stop();
     return new StopTranscriptionOutcome(
@@ -727,7 +819,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     "Design",
     "CA1031:Do not catch general exception types",
     Justification = "Error recovery must swallow secondary failures while attempting safe reset.")]
-  private async Task HandlePipelineErrorAsync(string message, Exception? exception)
+  private async Task HandlePipelineErrorAsync(RunLifetime owner, string message, Exception? exception)
   {
     Dictionary<string, object?> errorProps = new(StringComparer.Ordinal)
     {
@@ -760,9 +852,10 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
           DictationSessionState.Error,
           message,
           display: OverlayDisplayOptions.AnchoredStatus,
-          cancellationToken: CancellationToken.None)
+          cancellationToken: GetRuntimeToken(owner))
         .ConfigureAwait(false);
     }
+    catch (OperationCanceledException) when (!owner.Accepting || owner.Token.IsCancellationRequested) { }
     catch (Exception overlayException)
     {
       diagnostics.Warning($"Failed to show error overlay: {overlayException.Message}");
@@ -823,31 +916,33 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     activeOperationId = null;
   }
 
-  private CancellationToken GetRuntimeToken()
+  private CancellationToken GetRuntimeToken(RunLifetime owner)
   {
     lock (runtimeSync)
     {
-      return runtimeCts?.Token ?? CancellationToken.None;
+      // This check is a stage-admission point. A stage admitted before stop may
+      // finish in flight; subsequent stages must not revive the canceled run.
+      if (!owner.Accepting || !ReferenceEquals(lifetime, owner)) throw new OperationCanceledException(owner.Token);
+      owner.Token.ThrowIfCancellationRequested();
+      return owner.Token;
     }
   }
 
-  private void CancelAndDisposeRuntimeTokenSource()
+  private sealed class RunLifetime
   {
-    CancellationTokenSource? ctsToDispose = null;
-    lock (runtimeSync)
-    {
-      if (runtimeCts is not null)
-      {
-        ctsToDispose = runtimeCts;
-        runtimeCts = null;
-      }
-    }
-
-    if (ctsToDispose is not null)
-    {
-      ctsToDispose.Cancel();
-      ctsToDispose.Dispose();
-    }
+    internal CancellationTokenSource Cancellation { get; } = new();
+    internal CancellationToken Token { get; }
+    internal TaskCompletionSource Start { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal TaskCompletionSource Drained { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal TaskCompletionSource? Stop { get; set; }
+    internal Task? StartDriver { get; set; }
+    internal Task? StopDriver { get; set; }
+    internal EventHandler<HotkeyEventArgs>? Pressed { get; set; }
+    internal EventHandler<HotkeyEventArgs>? Released { get; set; }
+    internal bool Accepting { get; set; } = true;
+    internal bool Ready { get; set; }
+    internal int Operations { get; set; } = 1; // Startup is an accepted resource user.
+    internal RunLifetime() => Token = Cancellation.Token;
   }
 
   private async Task DisposeChunkedTranscriptionSessionAsync()

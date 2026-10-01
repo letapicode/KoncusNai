@@ -67,8 +67,10 @@ cleanup. See Microsoft's [SessionEnding contract](https://learn.microsoft.com/en
 
 Existing close/hide shell behavior and process-adoption policy are preserved.
 Shutdown does **not** add an autosave flush guarantee: the existing autosave
-owner can cancel a pending debounce. Stable dictation cancellation tokens,
-general diagnostic sink hardening, and settings concurrency/flush policy remain
+owner can cancel a pending debounce. Global dictation now retains a per-run
+token and accepted callback/startup leases through teardown; see the
+[batch 3 lifecycle decision](../release/dictation-cancellation-audit-batch-3-2026-09-30.md).
+General diagnostic sink hardening and settings concurrency/flush policy remain
 separate remediation batches.
 
 Tests use a resource-only WPF application rather than booting production App.

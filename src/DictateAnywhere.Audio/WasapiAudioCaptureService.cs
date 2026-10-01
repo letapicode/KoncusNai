@@ -28,6 +28,10 @@ public sealed class WasapiAudioCaptureService : IChunkedAudioCaptureService, IAs
   private int nextChunkSequenceNumber;
   private int trailingSilentChunkBytes;
   private AudioCaptureMetrics lastMetrics = new(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero, 0);
+  private TaskCompletionSource? disposal;
+  private Task? disposalDriver;
+  private int users;
+  private readonly TaskCompletionSource drained = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
   public WasapiAudioCaptureService(IAudioInputSource inputSource, AudioCaptureOptions options)
   {
@@ -73,6 +77,7 @@ public sealed class WasapiAudioCaptureService : IChunkedAudioCaptureService, IAs
   {
     lock (sync)
     {
+      ObjectDisposedException.ThrowIf(disposal is not null, this);
       if (captureClock is not null)
       {
         throw new AudioCaptureException("Audio capture already in progress.");
@@ -89,6 +94,7 @@ public sealed class WasapiAudioCaptureService : IChunkedAudioCaptureService, IAs
       captureClock = Stopwatch.StartNew();
       nextChunkSequenceNumber = 0;
       trailingSilentChunkBytes = 0;
+      users++;
     }
 
     Stopwatch startStopwatch = Stopwatch.StartNew();
@@ -116,14 +122,45 @@ public sealed class WasapiAudioCaptureService : IChunkedAudioCaptureService, IAs
       CapturedAtUtc: DateTimeOffset.UtcNow);
   }
 
-  public async ValueTask DisposeAsync()
+  public ValueTask DisposeAsync()
   {
-    inputSource.DataAvailable -= OnDataAvailable;
-    inputSource.DeviceError -= OnDeviceError;
+    TaskCompletionSource source;
+    lock (sync)
+    {
+      if (disposal is not null) return new ValueTask(disposal.Task);
+      source = disposal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      if (users == 0) drained.TrySetResult();
+    }
+    disposalDriver = DisposeCoreAsync(source);
+    return new ValueTask(source.Task);
+  }
 
-    sessionBuffer.Dispose();
-    chunkBuffer.Dispose();
-    await inputSource.DisposeAsync().ConfigureAwait(false);
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "The shared disposal drains accepted operations/input callbacks before buffers and reports cleanup failures.")]
+  private async Task DisposeCoreAsync(TaskCompletionSource source)
+  {
+    List<Exception> failures = [];
+    try { inputSource.DataAvailable -= OnDataAvailable; }
+    catch (Exception exception) { failures.Add(exception); }
+    try { inputSource.DeviceError -= OnDeviceError; }
+    catch (Exception exception) { failures.Add(exception); }
+    await drained.Task.ConfigureAwait(false);
+    try { await inputSource.DisposeAsync().ConfigureAwait(false); }
+    catch (Exception exception) { failures.Add(exception); }
+    lock (sync)
+    {
+      captureClock?.Stop();
+      captureClock = null;
+      capturing = false;
+      sessionBuffer.Dispose();
+      chunkBuffer.Dispose();
+    }
+    if (failures.Count == 0) source.TrySetResult();
+    else
+    {
+      source.TrySetException(failures.Count == 1 ? failures[0] : new AggregateException(failures));
+      _ = source.Task.Exception;
+    }
   }
 
   private async Task StartCoreAsync(Stopwatch startStopwatch, CancellationToken cancellationToken)
@@ -135,6 +172,8 @@ public sealed class WasapiAudioCaptureService : IChunkedAudioCaptureService, IAs
 
       lock (sync)
       {
+        ObjectDisposedException.ThrowIf(disposal is not null, this);
+        if (captureError is not null) throw new AudioCaptureException("Audio input failed during capture startup.", captureError);
         capturing = true;
         lastMetrics = lastMetrics with
         {
@@ -154,6 +193,7 @@ public sealed class WasapiAudioCaptureService : IChunkedAudioCaptureService, IAs
 
       throw;
     }
+    finally { ReleaseUser(); }
   }
 
   private void OnDataAvailable(object? sender, AudioRawDataEventArgs e)
@@ -187,7 +227,7 @@ public sealed class WasapiAudioCaptureService : IChunkedAudioCaptureService, IAs
     AudioCaptureChunk? chunk = null;
     lock (sync)
     {
-      if (captureClock is null || captureError is not null) return;
+      if (disposal is not null || captureClock is null || captureError is not null) return;
       ringBuffer.Write(converted);
       capturedBytes += converted.Length;
       if (!streamingOnly) sessionBuffer.Write(converted, 0, converted.Length);
@@ -207,6 +247,7 @@ public sealed class WasapiAudioCaptureService : IChunkedAudioCaptureService, IAs
   {
     lock (sync)
     {
+      if (disposal is not null) return;
       captureError = e.Exception;
       capturing = false;
     }
@@ -224,6 +265,26 @@ public sealed class WasapiAudioCaptureService : IChunkedAudioCaptureService, IAs
   }
 
   private async Task<StopCaptureSnapshot> StopCaptureCoreAsync(CancellationToken cancellationToken)
+  {
+    lock (sync)
+    {
+      ObjectDisposedException.ThrowIf(disposal is not null, this);
+      users++;
+    }
+    try { return await StopOwnedCaptureCoreAsync(cancellationToken).ConfigureAwait(false); }
+    finally { ReleaseUser(); }
+  }
+
+  private void ReleaseUser()
+  {
+    lock (sync)
+    {
+      users--;
+      if (disposal is not null && users == 0) drained.TrySetResult();
+    }
+  }
+
+  private async Task<StopCaptureSnapshot> StopOwnedCaptureCoreAsync(CancellationToken cancellationToken)
   {
     Stopwatch stopStopwatch = Stopwatch.StartNew();
     await inputSource.StopAsync(cancellationToken).ConfigureAwait(false);

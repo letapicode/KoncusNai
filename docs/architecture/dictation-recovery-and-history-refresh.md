@@ -17,6 +17,7 @@ History is always-on and local. A recovery path must not claim that persistence 
 - The insertion service creates the clipboard recovery copy. The pipeline records the transformed transcript once with the `global-hotkey-recovery` source.
 - The completion message is selected after the history write and reflects the recovery copies that really exist.
 - `CachingDictationHistoryRecorder` publishes through one application-owned notifier after its inner persistent recorder succeeds. The WPF composition root coalesces notifications received during an active refresh and updates only open history views on the dispatcher.
+- Cancellation is checked before caching, before persistence, and before publishing its notification. A write/cache effect already admitted cannot be rolled back by cancellation. A stopped global dictation cannot admit a later recovery/history or completion stage, even if its provider returned late success. See the [cancellation ownership decision](../release/dictation-cancellation-audit-batch-3-2026-09-30.md).
 - The overlay reuses the monitor anchor captured for the recording session and renders later states through the same bottom-center indicator window. Normal completion uses a terse animated sequence (letter-spinning **Transcribing**, then a green check); target-recovery and error outcomes keep explanatory text so the animation never obscures a required action.
 
 ## Approaches rejected

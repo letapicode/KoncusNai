@@ -106,7 +106,9 @@
         "DictateAnywhere.Audio.Tests",
         "DictateAnywhere.Spikes"
       ],
-      "friends": [],
+      "friends": [
+        "DictateAnywhere.Audio.Tests"
+      ],
       "declaredProjectReferences": [
         "DictateAnywhere.Core",
         "DictateAnywhere.Platform.Windows"

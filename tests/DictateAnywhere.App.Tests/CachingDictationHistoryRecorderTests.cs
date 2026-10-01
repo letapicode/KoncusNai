@@ -20,6 +20,46 @@ public sealed class CachingDictationHistoryRecorderTests : IDisposable
   }
 
   [Xunit.Fact]
+  public async Task AlreadyCanceledRecordCannotReplaceCacheOrWriteHistory()
+  {
+    DictationHistoryRecord previous = CreateRecord("previous").Normalize();
+    LastDictationSessionCache.Store(previous);
+    RecordingHistoryStore store = new();
+    using CancellationTokenSource canceled = new();
+    canceled.Cancel();
+    CachingDictationHistoryRecorder recorder = new(store);
+    await Xunit.Assert.ThrowsAnyAsync<OperationCanceledException>(() => recorder.RecordAsync(CreateRecord("canceled"), canceled.Token));
+    Xunit.Assert.Null(store.Recorded);
+    Xunit.Assert.True(LastDictationSessionCache.TryGet(TimeSpan.Zero, out DictationHistoryRecord? retained));
+    Xunit.Assert.Equal(previous, retained);
+  }
+
+  [Xunit.Fact]
+  public void PersistenceThatIgnoresCancellationCannotPublishLateSuccess() => LifecycleTestContext.Run(async context =>
+  {
+    TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    context.ReleaseOnTimeout(() => release.TrySetResult());
+    RecordingHistoryStore store = new() { Gate = release.Task };
+    DictationHistoryChangeNotifier notifier = new();
+    int published = 0;
+    notifier.RecordAdded += (_, _) => published++;
+    using CancellationTokenSource cancellation = new();
+    CachingDictationHistoryRecorder recorder = new(store, notifier);
+    Task write = recorder.RecordAsync(CreateRecord("already admitted"), cancellation.Token);
+    try
+    {
+      Xunit.Assert.NotNull(store.Recorded);
+      cancellation.Cancel();
+      Xunit.Assert.False(write.IsCompleted);
+    }
+    finally { release.TrySetResult(); }
+    await Xunit.Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
+    Xunit.Assert.Equal(0, published);
+    // The already-admitted cache/write effect is retained; cancellation is not rollback.
+    Xunit.Assert.True(LastDictationSessionCache.TryGet(TimeSpan.Zero, out _));
+  });
+
+  [Xunit.Fact]
   public async Task RecordAsync_PublishesOnlyAfterPersistenceSucceeds()
   {
     RecordingHistoryStore store = new();
@@ -66,11 +106,12 @@ public sealed class CachingDictationHistoryRecorderTests : IDisposable
   private sealed class RecordingHistoryStore : IDictationHistoryRecorder
   {
     public DictationHistoryRecord? Recorded { get; private set; }
+    internal Task Gate { get; init; } = Task.CompletedTask;
 
     public Task RecordAsync(DictationHistoryRecord record, CancellationToken cancellationToken = default)
     {
       Recorded = record;
-      return Task.CompletedTask;
+      return Gate;
     }
   }
 

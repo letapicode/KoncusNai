@@ -29,13 +29,22 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
     DictationHistoryChangeNotifier?,
     RuntimeServices> runtimeServicesFactory;
   private readonly SemaphoreSlim lifecycleLock = new(1, 1);
+  private readonly object disposalSync = new();
+  private readonly CancellationTokenSource disposalCancellation = new();
+  private TaskCompletionSource? disposal;
+  private Task? disposalDriver;
+  private Task? teardown;
+  private Task? teardownDriver;
+  private TaskCompletionSource? stopRequest;
+  private Task? stopDriver;
+  private CancellationTokenSource? pendingStartupCancellation;
 
   private RuntimeServices? services;
   private DictationPipelineCoordinator? coordinator;
   private UndoHotkeyCoordinator? undoHotkeyCoordinator;
   private RuntimeStartupNotice? startupNotice;
-  private bool isRunning;
-  private bool disposed;
+  private volatile bool isRunning;
+  private volatile bool disposed;
 
   internal DictationRuntime(
     ISettingsStore settingsStore,
@@ -70,11 +79,14 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
   public async Task StartAsync(CancellationToken cancellationToken = default)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
+    using CancellationTokenSource startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, disposalCancellation.Token);
+    cancellationToken = startup.Token;
 
-    await lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+    await AcquireLifecycleAsync(cancellationToken).ConfigureAwait(false);
     try
     {
       ObjectDisposedException.ThrowIf(disposed, this);
+      if (teardown is not null) await teardown.WaitAsync(cancellationToken).ConfigureAwait(false);
 
       if (coordinator is not null)
       {
@@ -93,13 +105,15 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
   public async Task RestartAsync(CancellationToken cancellationToken = default)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
+    using CancellationTokenSource startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, disposalCancellation.Token);
+    cancellationToken = startup.Token;
 
-    await lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+    await AcquireLifecycleAsync(cancellationToken).ConfigureAwait(false);
     try
     {
       ObjectDisposedException.ThrowIf(disposed, this);
 
-      await StopAndDisposeCoordinatorAsync(cancellationToken).ConfigureAwait(false);
+      await StopAndDisposeCoordinatorAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
       await CreateAndStartCoordinatorAsync(cancellationToken).ConfigureAwait(false);
     }
     finally
@@ -111,8 +125,10 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
   public async Task<bool> TryRestartWhenIdleAsync(CancellationToken cancellationToken = default)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
+    using CancellationTokenSource startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, disposalCancellation.Token);
+    cancellationToken = startup.Token;
 
-    await lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+    await AcquireLifecycleAsync(cancellationToken).ConfigureAwait(false);
     try
     {
       ObjectDisposedException.ThrowIf(disposed, this);
@@ -122,7 +138,7 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
         return false;
       }
 
-      await StopAndDisposeCoordinatorAsync(cancellationToken).ConfigureAwait(false);
+      await StopAndDisposeCoordinatorAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
       await CreateAndStartCoordinatorAsync(cancellationToken).ConfigureAwait(false);
       return true;
     }
@@ -132,51 +148,124 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
     }
   }
 
-  public async Task StopAsync(CancellationToken cancellationToken = default)
+  public Task StopAsync(CancellationToken cancellationToken = default)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
+    Task stop = RequestStop();
+    return cancellationToken.CanBeCanceled ? stop.WaitAsync(cancellationToken) : stop;
+  }
 
-    await lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-    try
+  private Task RequestStop()
+  {
+    TaskCompletionSource source;
+    CancellationTokenSource? startupToCancel;
+    DictationPipelineCoordinator? activeCoordinator;
+    lock (disposalSync)
     {
-      ObjectDisposedException.ThrowIf(disposed, this);
-
-      await StopAndDisposeCoordinatorAsync(cancellationToken).ConfigureAwait(false);
+      if (stopRequest is not null) return stopRequest.Task;
+      source = stopRequest = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      isRunning = false;
+      startupToCancel = pendingStartupCancellation;
+      activeCoordinator = coordinator;
     }
-    finally
+    stopDriver = StopCoreAsync(source, startupToCancel, activeCoordinator);
+    return source.Task;
+  }
+
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Stop closes startup admission before waiting for the lifecycle lock and owns cleanup independently of caller waits.")]
+  private async Task StopCoreAsync(TaskCompletionSource source, CancellationTokenSource? startupToCancel,
+    DictationPipelineCoordinator? activeCoordinator)
+  {
+    List<Exception> failures = [];
+    // Close a ready graph before lock acquisition too. Startup's cancellation
+    // registration owns the corresponding request for a not-yet-published graph.
+    Task<Exception?> activeStop = StopOwner(() =>
     {
+      try { return activeCoordinator?.StopAsync() ?? Task.CompletedTask; }
+      catch (ObjectDisposedException) { return Task.CompletedTask; } // An already-disposed snapshot belongs to serialized teardown.
+    });
+    try { startupToCancel?.Cancel(); }
+    catch (Exception exception) { failures.Add(exception); }
+    await lifecycleLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+    try { await StopAndDisposeCoordinatorAsync().ConfigureAwait(false); }
+    catch (Exception exception) { failures.Add(exception); }
+    finally { lifecycleLock.Release(); }
+    Exception? activeFailure = await activeStop.ConfigureAwait(false);
+    if (activeFailure is not null) failures.Add(activeFailure);
+    if (failures.Count == 0) source.TrySetResult();
+    else { source.TrySetException(new AggregateException(failures)); _ = source.Task.Exception; }
+  }
+
+  private async Task AcquireLifecycleAsync(CancellationToken token)
+  {
+    while (true)
+    {
+      Task? stopping;
+      lock (disposalSync) stopping = stopRequest?.Task;
+      if (stopping is not null) await stopping.WaitAsync(token).ConfigureAwait(false);
+      await lifecycleLock.WaitAsync(token).ConfigureAwait(false);
+      // Never await a stop holding the semaphore that stop itself needs.
+      lock (disposalSync) { if (stopRequest?.Task.IsCompleted != false) return; }
       lifecycleLock.Release();
     }
   }
 
-  public async ValueTask DisposeAsync()
+  public ValueTask DisposeAsync()
   {
-    if (disposed)
+    TaskCompletionSource source;
+    lock (disposalSync)
     {
-      return;
+      if (disposal is not null) return new ValueTask(disposal.Task);
+      disposed = true;
+      source = disposal = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
+    disposalDriver = DisposeCoreAsync(source);
+    return new ValueTask(source.Task);
+  }
 
-    await lifecycleLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Cancellation reporting failures cannot prevent owned runtime teardown.")]
+  private async Task DisposeCoreAsync(TaskCompletionSource source)
+  {
+    List<Exception> failures = [];
+    try { disposalCancellation.Cancel(); }
+    catch (Exception exception) { failures.Add(exception); }
     try
     {
-      if (disposed)
-      {
-        return;
-      }
-
-      disposed = true;
-      await StopAndDisposeCoordinatorAsync(CancellationToken.None).ConfigureAwait(false);
+      await RequestStop().ConfigureAwait(false);
     }
-    finally
-    {
-      lifecycleLock.Release();
-      lifecycleLock.Dispose();
-    }
+    catch (Exception exception) { failures.Add(exception); }
+    // Queued public callers may still unwind. These managed admission objects
+    // are reclaimed with the owner, never disposed beneath those callers.
+    if (failures.Count == 0) source.TrySetResult();
+    else { source.TrySetException(new AggregateException(failures)); _ = source.Task.Exception; }
   }
 
   private async Task CreateAndStartCoordinatorAsync(CancellationToken cancellationToken)
   {
+    CancellationTokenSource admission;
+    lock (disposalSync)
+    {
+      ObjectDisposedException.ThrowIf(disposed, this);
+      if (stopRequest?.Task.IsCompleted == false) throw new OperationCanceledException(cancellationToken);
+      stopRequest = null;
+      admission = pendingStartupCancellation = new();
+    }
+    // The raw admission source is reclaimed with its owner: a stop can hold a
+    // snapshot while startup finishes. Its linked registrations are disposed.
+    using CancellationTokenSource startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, admission.Token);
+    try { await CreateAndStartOwnedCoordinatorAsync(startup.Token).ConfigureAwait(false); }
+    finally { lock (disposalSync) pendingStartupCancellation = null; }
+  }
+
+  [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+    Justification = "Successful graphs transfer to runtime fields under the admission lock; LifecycleCleanup releases every partial owner on failure.")]
+  private async Task CreateAndStartOwnedCoordinatorAsync(CancellationToken cancellationToken)
+  {
     AppSettings settings = await settingsStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+    cancellationToken.ThrowIfCancellationRequested();
+    ObjectDisposedException.ThrowIf(disposed, this);
     diagnostics.Info(RuntimeStartupAdvisory.DescribeSettings(settings));
     Func<AppSettings, IDiagnostics, ITranscriptionService>? transcriptionServiceFactory =
       modelReadinessCoordinator is null
@@ -198,11 +287,21 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
       diagnostics,
       runtimeServices.HistoryRecorder);
 
+    UndoHotkeyCoordinator? runtimeUndoCoordinator = null;
+    using CancellationTokenRegistration stopStartupCoordinator = cancellationToken.Register(() =>
+    {
+      try
+      {
+        // Core retains/observes its shared stop promise. Request only: awaiting
+        // this inside the cancellation callback would self-await startup.
+        Task retainedStop = runtimeCoordinator.StopAsync();
+      }
+      catch (ObjectDisposedException) { /* Partial startup already released this coordinator. */ }
+    });
     try
     {
       await runtimeCoordinator.StartAsync(cancellationToken).ConfigureAwait(false);
 
-      UndoHotkeyCoordinator? runtimeUndoCoordinator = null;
       if (runtimeServices.UndoInsertionService is not null)
       {
         if (settings.UndoHotkey == settings.Hotkey)
@@ -230,44 +329,79 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
         }
       }
 
-      undoHotkeyCoordinator = runtimeUndoCoordinator;
+      lock (disposalSync)
+      {
+        cancellationToken.ThrowIfCancellationRequested();
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (stopRequest is not null) throw new OperationCanceledException(cancellationToken);
+        undoHotkeyCoordinator = runtimeUndoCoordinator;
+        services = runtimeServices;
+        coordinator = runtimeCoordinator;
+        teardown = null;
+        startupNotice = BuildStartupNotice(settings, runtimeServices);
+        isRunning = true;
+      }
     }
     catch
     {
       undoHotkeyCoordinator = null;
-      await runtimeCoordinator.DisposeAsync().ConfigureAwait(false);
-      await runtimeServices.DisposeAsync().ConfigureAwait(false);
+      await LifecycleCleanup.RunAsync(
+        new CleanupStep("Partial undo coordinator", () => runtimeUndoCoordinator?.DisposeAsync().AsTask() ?? Task.CompletedTask),
+        new CleanupStep("Partial coordinator", () => runtimeCoordinator.DisposeAsync().AsTask()),
+        new CleanupStep("Partial runtime services", () => runtimeServices.DisposeAsync().AsTask())).ConfigureAwait(false);
       isRunning = false;
       throw;
     }
 
-    services = runtimeServices;
-    coordinator = runtimeCoordinator;
-    startupNotice = BuildStartupNotice(settings, runtimeServices);
-    isRunning = true;
   }
 
-  private async Task StopAndDisposeCoordinatorAsync(CancellationToken cancellationToken)
+  private Task StopAndDisposeCoordinatorAsync()
   {
+    if (teardown is not null) return teardown;
     DictationPipelineCoordinator? coordinatorToStop = coordinator;
     RuntimeServices? servicesToDispose = services;
     UndoHotkeyCoordinator? undoCoordinatorToStop = undoHotkeyCoordinator;
 
+    startupNotice = null;
+    isRunning = false;
+    TaskCompletionSource source = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    teardown = source.Task;
+    teardownDriver = TeardownCoreAsync(source, coordinatorToStop, servicesToDispose, undoCoordinatorToStop);
+    return teardown;
+  }
+
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Stop failures are reported after every retained owner drains and independent disposal is attempted.")]
+  private async Task TeardownCoreAsync(TaskCompletionSource source, DictationPipelineCoordinator? coordinatorToStop,
+    RuntimeServices? servicesToDispose, UndoHotkeyCoordinator? undoCoordinatorToStop)
+  {
+    // Stop both event admissions before awaiting either drain. An undo operation
+    // must not leave global dictation hotkeys accepting new capture during quit.
+    Task<Exception?> dictationStop = StopOwner(() => coordinatorToStop?.StopAsync() ?? Task.CompletedTask);
+    Task<Exception?> undoStop = StopOwner(() => undoCoordinatorToStop?.StopAsync() ?? Task.CompletedTask);
+    Exception?[] stopFailures = await Task.WhenAll(dictationStop, undoStop).ConfigureAwait(false);
+    List<Exception> failures = stopFailures.OfType<Exception>().ToList();
+    try
+    {
+      await LifecycleCleanup.RunAsync(
+        new CleanupStep("Undo coordinator", () => undoCoordinatorToStop?.DisposeAsync().AsTask() ?? Task.CompletedTask),
+        new CleanupStep("Dictation coordinator", () => coordinatorToStop?.DisposeAsync().AsTask() ?? Task.CompletedTask),
+        new CleanupStep("Runtime services", () => servicesToDispose?.DisposeAsync().AsTask() ?? Task.CompletedTask)).ConfigureAwait(false);
+    }
+    catch (Exception exception) { failures.Add(exception); }
     coordinator = null;
     services = null;
     undoHotkeyCoordinator = null;
-    startupNotice = null;
-    isRunning = false;
+    if (failures.Count == 0) source.TrySetResult();
+    else { source.TrySetException(new AggregateException(failures)); _ = source.Task.Exception; }
+  }
 
-    // Stop both event admissions before awaiting either drain. An undo operation
-    // must not leave global dictation hotkeys accepting new capture during quit.
-    Task undoStop = undoCoordinatorToStop?.StopAsync(cancellationToken) ?? Task.CompletedTask;
-    Task dictationStop = coordinatorToStop?.StopAsync(cancellationToken) ?? Task.CompletedTask;
-    await Task.WhenAll(undoStop, dictationStop).ConfigureAwait(false);
-    await LifecycleCleanup.RunAsync(
-      new CleanupStep("Undo coordinator", () => undoCoordinatorToStop?.DisposeAsync().AsTask() ?? Task.CompletedTask),
-      new CleanupStep("Dictation coordinator", () => coordinatorToStop?.DisposeAsync().AsTask() ?? Task.CompletedTask),
-      new CleanupStep("Runtime services", () => servicesToDispose?.DisposeAsync().AsTask() ?? Task.CompletedTask)).ConfigureAwait(false);
+  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+    Justification = "Retained stop attempts report faults after all independent owners drain.")]
+  private static async Task<Exception?> StopOwner(Func<Task> stop)
+  {
+    try { await stop().ConfigureAwait(false); return null; }
+    catch (Exception exception) { return exception; }
   }
 
   internal sealed class RuntimeServices : IAsyncDisposable
