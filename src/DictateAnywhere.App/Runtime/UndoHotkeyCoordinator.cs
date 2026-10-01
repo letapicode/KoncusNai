@@ -69,8 +69,8 @@ internal sealed class UndoHotkeyCoordinator : IAsyncDisposable
       operationToAwait = activeUndoOperation;
     }
 
-    await hotkeyService.UnregisterAsync(cancellationToken).ConfigureAwait(false);
-    await operationToAwait.WaitAsync(cancellationToken).ConfigureAwait(false);
+    try { await hotkeyService.UnregisterAsync(cancellationToken).ConfigureAwait(false); }
+    finally { await operationToAwait.ConfigureAwait(false); }
   }
 
   public async ValueTask DisposeAsync()
@@ -97,8 +97,7 @@ internal sealed class UndoHotkeyCoordinator : IAsyncDisposable
     {
       // Ignore hotkey teardown failures during app shutdown.
     }
-
-    await operationToAwait.ConfigureAwait(false);
+    finally { await operationToAwait.ConfigureAwait(false); }
   }
 
   private void OnUndoHotkeyPressed(object? sender, HotkeyEventArgs e)

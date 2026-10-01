@@ -22,8 +22,8 @@
       "baselineBytes": 9190329,
       "minimumFiles": 1000,
       "minimumBytes": 8271296,
-      "maximumBytes": 10175000,
-      "rationale": "September 22 source baseline after removal of generated previews and the unlicensed Cohere fixture. September 29 automatic runtime setup adds compiler-free provisioning, selection tests and speech-free measured evidence. September 30 awaitable shutdown adds lifecycle ownership, isolated dispatcher/barrier tests and its review report: candidate Git inventory approximately 10.165 MB. The 10.175 MB source cap adds 25 KB for this measured remediation; bundled asset, native/model payload and all other budgets remain unchanged. A ten percent lower bound catches incomplete exports."
+      "maximumBytes": 10255000,
+      "rationale": "September 22 source baseline after removal of generated previews and the unlicensed Cohere fixture. September 29 automatic runtime setup adds compiler-free provisioning, selection tests and speech-free measured evidence. September 30 awaitable shutdown adds lifecycle ownership, isolated dispatcher/barrier tests and its review report. Main measures 10,174,991 bytes against the 10,175,000 cap. Batch 3 cancellation/capture ownership, controlled regressions and documentation measure 10,253,286 candidate blob bytes including final validation evidence (78,295 bytes growth). An 80 KB source-only increase covers that measured growth and bounded review evidence. Bundled assets, release/native/model payloads and every other cap remain unchanged. A ten percent lower bound catches incomplete exports."
     },
     {
       "id": "production-source",

@@ -138,3 +138,9 @@ Automatic dictation preparation adds only init properties to `AppSettings`
 constructors and deconstruction signatures remain unchanged. Settings documents
 without these fields default to automatic selection and no device override;
 provider and configured checkpoint identity remain independent of backend choice.
+
+Batch 3 grants `DictateAnywhere.Audio.Tests` access to Audio internals for the
+controlled native capture lifetime tests. Candidate comparison changes only
+that friendship; public signatures, consumers, packages, and references stay
+unchanged. The lifetime decision and validation are recorded in the
+[batch 3 report](../release/dictation-cancellation-audit-batch-3-2026-09-30.md).

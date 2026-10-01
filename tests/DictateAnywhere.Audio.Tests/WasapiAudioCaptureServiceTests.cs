@@ -10,6 +10,86 @@ namespace DictateAnywhere.Audio.Tests;
 public sealed class WasapiAudioCaptureServiceTests
 {
   [Xunit.Fact]
+  public Task DisposalWaitsForAcceptedStartupBeforeDisposingItsInput() => Task.Run(async () =>
+  {
+    TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    FakeAudioInputSource source = new() { StartGate = release.Task };
+    WasapiAudioCaptureService service = new(source, AudioCaptureOptions.Default);
+    Task start = service.StartAsync();
+    Task? dispose = null;
+    try
+    {
+      Xunit.Assert.True(source.Started);
+      dispose = service.DisposeAsync().AsTask();
+      Xunit.Assert.False(dispose.IsCompleted);
+      Xunit.Assert.Equal(0, source.Disposals);
+    }
+    finally
+    {
+      release.TrySetResult();
+      await Xunit.Assert.ThrowsAsync<ObjectDisposedException>(() => start).ConfigureAwait(false);
+      await (dispose ?? service.DisposeAsync().AsTask()).WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+    }
+    Xunit.Assert.Equal(1, source.Disposals);
+    Xunit.Assert.False(service.IsCapturing);
+  });
+
+  [Xunit.Fact]
+  public Task InputCleanupFailureStillClosesBuffersAndRejectsSavedCallbacks() => Task.Run(async () =>
+  {
+    FakeAudioInputSource source = new() { DisposeGate = Task.FromException(new IOException("controlled input cleanup failure")) };
+    WasapiAudioCaptureService service = new(source, AudioCaptureOptions.Default);
+    await service.StartAsync().ConfigureAwait(false);
+    Action saved = source.SnapshotData();
+    Task dispose = service.DisposeAsync().AsTask();
+    await Xunit.Assert.ThrowsAsync<IOException>(() => dispose).ConfigureAwait(false);
+    Xunit.Assert.Same(dispose, service.DisposeAsync().AsTask());
+    Xunit.Assert.False(service.IsCapturing);
+    saved();
+  });
+
+  [Xunit.Fact]
+  public Task DisposeRetainsBuffersUntilInputDrainAndRejectsSavedDataCallbacks() => Task.Run(async () =>
+  {
+    TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    FakeAudioInputSource source = new() { DisposeGate = release.Task };
+    WasapiAudioCaptureService service = new(source, AudioCaptureOptions.Default);
+    Task? dispose = null;
+    try
+    {
+      await service.StartAsync().ConfigureAwait(false);
+      Action saved = source.SnapshotData();
+      dispose = service.DisposeAsync().AsTask();
+      Xunit.Assert.False(dispose.IsCompleted);
+      saved();
+      Xunit.Assert.Same(dispose, service.DisposeAsync().AsTask());
+      await Xunit.Assert.ThrowsAsync<ObjectDisposedException>(() => service.StartAsync()).ConfigureAwait(false);
+      release.TrySetResult();
+      await dispose.WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+      saved();
+    }
+    finally
+    {
+      release.TrySetResult();
+      await (dispose ?? service.DisposeAsync().AsTask()).WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+    }
+  });
+
+  [Xunit.Fact]
+  public Task DeviceErrorDuringStartCannotBeOverwrittenByLateStartupSuccess() => Task.Run(async () =>
+  {
+    FakeAudioInputSource source = new();
+    source.StartAction = () => source.EmitDeviceError(new IOException("controlled startup device loss"));
+    await using WasapiAudioCaptureService service = new(source, AudioCaptureOptions.Default);
+    await Xunit.Assert.ThrowsAsync<AudioCaptureException>(() => service.StartAsync()).ConfigureAwait(false);
+    Xunit.Assert.False(service.IsCapturing);
+    source.StartAction = null;
+    await service.StartAsync().ConfigureAwait(false);
+    Xunit.Assert.True(service.IsCapturing);
+    _ = await service.StopAsync().ConfigureAwait(false);
+  });
+
+  [Xunit.Fact]
   public async Task StreamingCapture_DoesNotRetainTheFullRecording()
   {
     await using FakeAudioInputSource source = new();
@@ -258,6 +338,15 @@ public sealed class WasapiAudioCaptureServiceTests
     public event EventHandler<AudioInputErrorEventArgs>? DeviceError;
 
     public bool Started { get; private set; }
+    internal Task DisposeGate { get; init; } = Task.CompletedTask;
+    internal Task StartGate { get; init; } = Task.CompletedTask;
+    internal int Disposals { get; private set; }
+    internal Action? StartAction { get; set; }
+    internal Action SnapshotData()
+    {
+      EventHandler<AudioRawDataEventArgs>? saved = DataAvailable;
+      return () => saved?.Invoke(this, new AudioRawDataEventArgs(new byte[8], 8, 16000, 1, 16, false));
+    }
 
     public IReadOnlyList<AudioInputDevice> GetInputDevices()
     {
@@ -275,7 +364,8 @@ public sealed class WasapiAudioCaptureServiceTests
     public Task StartAsync(string? preferredDeviceId, CancellationToken cancellationToken = default)
     {
       Started = true;
-      return Task.CompletedTask;
+      StartAction?.Invoke();
+      return StartGate;
     }
 
     public Task StopAsync(CancellationToken cancellationToken = default)
@@ -286,7 +376,8 @@ public sealed class WasapiAudioCaptureServiceTests
 
     public ValueTask DisposeAsync()
     {
-      return ValueTask.CompletedTask;
+      Disposals++;
+      return new ValueTask(DisposeGate);
     }
 
     public void EmitPcm16Mono(short[] samples, int sampleRateHz)
