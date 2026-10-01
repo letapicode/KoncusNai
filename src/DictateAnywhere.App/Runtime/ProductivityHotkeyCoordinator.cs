@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -21,7 +22,7 @@ internal sealed class ProductivityHotkeyCoordinator : IAsyncDisposable
     IDiagnostics diagnostics,
     Func<int, IHotkeyService>? createHotkeyService = null)
   {
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.createHotkeyService = createHotkeyService ?? (hotkeyId => new WindowsHotkeyService(hotkeyId));
   }
 
@@ -62,16 +63,16 @@ internal sealed class ProductivityHotkeyCoordinator : IAsyncDisposable
       HotkeyRegistrationResult result = await service.RegisterAsync(binding, cancellationToken).ConfigureAwait(false);
       if (!result.Success)
       {
-        diagnostics.Warning(
+        DiagnosticBoundary.Report(() => diagnostics.Warning(
           result.ErrorMessage
-          ?? $"Productivity hotkey for {name} could not register: {HotkeyFormatter.ToDisplayString(binding)}.");
+          ?? $"Productivity hotkey for {name} could not register: {HotkeyFormatter.ToDisplayString(binding)}."));
         await service.DisposeAsync().ConfigureAwait(false);
         continue;
       }
 
       service.HotkeyPressed += registration.OnHotkeyPressed;
       registrations.Add(registration);
-      diagnostics.Info($"Productivity hotkey registered for {name}: {HotkeyFormatter.ToDisplayString(binding)}.");
+      DiagnosticBoundary.Report(() => diagnostics.Info($"Productivity hotkey registered for {name}: {HotkeyFormatter.ToDisplayString(binding)}."));
     }
   }
 
@@ -115,7 +116,7 @@ internal sealed class ProductivityHotkeyCoordinator : IAsyncDisposable
       Binding = binding;
       Service = service;
       this.action = action;
-      this.diagnostics = diagnostics;
+      this.diagnostics = DiagnosticBoundary.Wrap(diagnostics);
     }
 
     public string Name { get; }
@@ -190,7 +191,7 @@ internal sealed class ProductivityHotkeyCoordinator : IAsyncDisposable
       }
       catch (Exception ex)
       {
-        diagnostics.Warning($"Productivity hotkey for {Name} failed: {ex.Message}");
+        DiagnosticBoundary.Report(() => diagnostics.Warning($"Productivity hotkey for {Name} failed: {ex.Message}"));
       }
     }
   }

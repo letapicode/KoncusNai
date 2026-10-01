@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -62,7 +63,7 @@ internal sealed class WorkbenchFileImportCommandController : IAsyncDisposable
     this.documentImportController = documentImportController ?? throw new ArgumentNullException(nameof(documentImportController));
     this.historyRecorder = historyRecorder ?? throw new ArgumentNullException(nameof(historyRecorder));
     this.chatController = chatController ?? throw new ArgumentNullException(nameof(chatController));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
   }
 
   public async Task<WorkbenchFileImportResult> ImportAsync(

@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using DictateAnywhere.Core.Contracts;
@@ -75,7 +76,7 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
     this.options = options ?? TextInsertionOptions.Default;
     this.elevatedInsertionBridge = elevatedInsertionBridge
       ?? new UiAccessHelperProcessBridge(UiAccessHelperProcessBridgeOptions.Default, diagnostics);
-    this.diagnostics = diagnostics;
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics);
 
     blockedProcessNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     IReadOnlyList<string> blockedList = this.options.BlockedProcessNames ?? Array.Empty<string>();
@@ -122,8 +123,8 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
     {
       return TargetChanged(preferredMethod);
     }
-    diagnostics?.Info(
-      $"Insertion request: textLength={text.Length}, preferredMethod={preferredMethod}, restoreClipboard={restoreClipboard}, target={WindowFocusContextLogFormatter.Describe(focusContext)}.");
+    DiagnosticBoundary.Report(() => diagnostics?.Info(
+      $"Insertion request: textLength={text.Length}, preferredMethod={preferredMethod}, restoreClipboard={restoreClipboard}, target={WindowFocusContextLogFormatter.Describe(focusContext)}."));
 
     InsertionResult? preflightResult = await PrepareTargetAsync(
       text,
@@ -177,7 +178,7 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
     }
     catch (ClipboardOperationException ex)
     {
-      diagnostics?.Warning($"Could not preserve the failed insertion on the clipboard: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics?.Warning($"Could not preserve the failed insertion on the clipboard: {ex.Message}"));
       return result with
       {
         ErrorMessage = AppendMessage(result.ErrorMessage, $"A recovery copy could not be placed on the clipboard: {ex.Message}"),
@@ -193,7 +194,7 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
       capturedTarget = focusContext;
     }
 
-    diagnostics?.Info($"Captured insertion target: target={WindowFocusContextLogFormatter.Describe(focusContext)}.");
+    DiagnosticBoundary.Report(() => diagnostics?.Info($"Captured insertion target: target={WindowFocusContextLogFormatter.Describe(focusContext)}."));
   }
 
   public void ClearCapturedTarget()
@@ -310,8 +311,8 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
     string recoveryReason = focusContext.IsEditable
       ? "Insertion target was promoted away from the raw focused surface; attempting explicit editable focus recovery."
       : "Insertion focus drift detected before dispatch; attempting editable focus recovery.";
-    diagnostics?.Warning(
-      $"{recoveryReason} target={WindowFocusContextLogFormatter.Describe(focusContext)}");
+    DiagnosticBoundary.Report(() => diagnostics?.Warning(
+      $"{recoveryReason} target={WindowFocusContextLogFormatter.Describe(focusContext)}"));
 
     if (!editableFocusRestorer.TryRestoreEditableFocus(focusContext))
     {
@@ -321,8 +322,8 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
 
     await Task.Delay(FocusRecoverySettleDelay, cancellationToken).ConfigureAwait(false);
     WindowFocusContext recoveredContext = windowFocusProvider.GetWindowFocusContext();
-    diagnostics?.Info(
-      $"Editable focus recovery result: target={WindowFocusContextLogFormatter.Describe(recoveredContext)}.");
+    DiagnosticBoundary.Report(() => diagnostics?.Info(
+      $"Editable focus recovery result: target={WindowFocusContextLogFormatter.Describe(recoveredContext)}."));
     return recoveredContext;
   }
 
@@ -368,7 +369,7 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
       if (capturedTarget is not null && capturedTarget.ForegroundWindowHandle != 0)
       {
         usingCapturedTarget = true;
-        diagnostics?.Info($"Using captured insertion target: target={WindowFocusContextLogFormatter.Describe(capturedTarget)}.");
+        DiagnosticBoundary.Report(() => diagnostics?.Info($"Using captured insertion target: target={WindowFocusContextLogFormatter.Describe(capturedTarget)}."));
         return capturedTarget;
       }
     }
@@ -393,8 +394,8 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
       return false;
     }
 
-    diagnostics?.Warning(
-      $"Insertion target drift detected after transcription; restoring captured target. captured={WindowFocusContextLogFormatter.Describe(capturedFocusContext)} current={WindowFocusContextLogFormatter.Describe(currentContext)}.");
+    DiagnosticBoundary.Report(() => diagnostics?.Warning(
+      $"Insertion target drift detected after transcription; restoring captured target. captured={WindowFocusContextLogFormatter.Describe(capturedFocusContext)} current={WindowFocusContextLogFormatter.Describe(currentContext)}."));
 
     for (int attempt = 1; attempt <= TargetRestoreAttempts; attempt++)
     {
@@ -414,8 +415,8 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
       WindowFocusContext restoredContext = windowFocusProvider.GetWindowFocusContext();
       if (!InsertionTargetIdentity.FromContext(capturedFocusContext).Matches(restoredContext))
       {
-        diagnostics?.Warning(
-          $"Captured insertion target restore did not land on the original target (attempt {attempt}/{TargetRestoreAttempts}). restored={WindowFocusContextLogFormatter.Describe(restoredContext)}.");
+        DiagnosticBoundary.Report(() => diagnostics?.Warning(
+          $"Captured insertion target restore did not land on the original target (attempt {attempt}/{TargetRestoreAttempts}). restored={WindowFocusContextLogFormatter.Describe(restoredContext)}."));
         continue;
       }
 
@@ -424,8 +425,8 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
         capturedTarget = restoredContext;
       }
 
-      diagnostics?.Info(
-        $"Captured insertion target restored on attempt {attempt}: target={WindowFocusContextLogFormatter.Describe(restoredContext)}.");
+      DiagnosticBoundary.Report(() => diagnostics?.Info(
+        $"Captured insertion target restored on attempt {attempt}: target={WindowFocusContextLogFormatter.Describe(restoredContext)}."));
       return true;
     }
 
@@ -484,8 +485,8 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
   {
     if (result.Success)
     {
-      diagnostics?.Info(
-        $"{(elevatedRoute ? "Elevated insertion" : "Insertion")} verified using {result.MethodUsed} for {WindowFocusContextLogFormatter.Describe(focusContext)}.");
+      DiagnosticBoundary.Report(() => diagnostics?.Info(
+        $"{(elevatedRoute ? "Elevated insertion" : "Insertion")} verified using {result.MethodUsed} for {WindowFocusContextLogFormatter.Describe(focusContext)}."));
       return result;
     }
 
@@ -493,13 +494,13 @@ public sealed class WindowsTextInsertionService : ITextInsertionService, IUndoIn
     string details = result.ErrorMessage ?? "No error message provided.";
     if (result.Outcome == InsertionOutcome.Dispatched)
     {
-      diagnostics?.Warning(
-        $"{routeLabel} only reached dispatch using {result.MethodUsed}; visible text was not verified. target={WindowFocusContextLogFormatter.Describe(focusContext)} details={details}");
+      DiagnosticBoundary.Report(() => diagnostics?.Warning(
+        $"{routeLabel} only reached dispatch using {result.MethodUsed}; visible text was not verified. target={WindowFocusContextLogFormatter.Describe(focusContext)} details={details}"));
     }
     else
     {
-      diagnostics?.Warning(
-        $"{routeLabel} outcome={result.Outcome} method={result.MethodUsed} target={WindowFocusContextLogFormatter.Describe(focusContext)} details={details}");
+      DiagnosticBoundary.Report(() => diagnostics?.Warning(
+        $"{routeLabel} outcome={result.Outcome} method={result.MethodUsed} target={WindowFocusContextLogFormatter.Describe(focusContext)} details={details}"));
     }
 
     return result;

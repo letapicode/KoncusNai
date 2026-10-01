@@ -46,7 +46,7 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
     capture = audioCaptureService ?? throw new ArgumentNullException(nameof(audioCaptureService));
     transcription = transcriptionService ?? throw new ArgumentNullException(nameof(transcriptionService));
     this.modelId = modelId;
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
     worker = Task.Run(ConsumeAsync);
   }
@@ -65,6 +65,7 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
   public void QueueChunk(AudioCaptureChunk? chunk)
   {
     if (chunk is null || chunk.Audio.Pcm16Mono.Length == 0) return;
+    bool limitReached = false;
     lock (sync)
     {
       if (!accepting || cancellation.IsCancellationRequested) return; // Captured callbacks cannot revive a canceled session.
@@ -74,14 +75,17 @@ internal sealed class ChunkedTranscriptionSession : IAsyncDisposable
         failure = new InvalidOperationException("Dictation exceeded the pending audio limit because transcription could not keep up. Use a shorter recording.");
         accepting = false;
         queue.Writer.TryComplete();
-        diagnostics.Warning("Dictation pending audio limit reached; this session cannot be completed without missing audio.");
-        return;
+        limitReached = true;
       }
-      pendingBytes += bytes;
-      totalDuration += chunk.Audio.Duration;
-      pendingDuration += chunk.Audio.Duration;
-      if (pendingDuration > peakPendingDuration) peakPendingDuration = pendingDuration;
+      else
+      {
+        pendingBytes += bytes;
+        totalDuration += chunk.Audio.Duration;
+        pendingDuration += chunk.Audio.Duration;
+        if (pendingDuration > peakPendingDuration) peakPendingDuration = pendingDuration;
+      }
     }
+    if (limitReached) diagnostics.Warning("Dictation pending audio limit reached; this session cannot be completed without missing audio.");
   }
 
   public async Task<IReadOnlyList<TranscriptionChunkResult>> CompleteAsync(CancellationToken completionCancellationToken)

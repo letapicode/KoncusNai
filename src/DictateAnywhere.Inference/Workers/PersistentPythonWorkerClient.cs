@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -99,7 +100,7 @@ internal sealed class PersistentPythonWorkerClient : IPersistentWorkerClient
           {
             // Keep implementation traces in the debugger, never in the reader
             // UI. A Python stack trace is not an actionable recovery message.
-            Debug.WriteLine($"Python worker request traceback:{Environment.NewLine}{envelope.Traceback!.Trim()}");
+            DiagnosticBoundary.Report(() => Debug.WriteLine("Python worker returned a traceback (payload omitted)."));
           }
 
           if (!string.IsNullOrWhiteSpace(stderr))
@@ -306,7 +307,7 @@ internal sealed class PersistentPythonWorkerClient : IPersistentWorkerClient
         : envelope.Error!;
       if (!string.IsNullOrWhiteSpace(envelope.Traceback))
       {
-        Debug.WriteLine($"Python worker startup traceback:{Environment.NewLine}{envelope.Traceback!.Trim()}");
+        DiagnosticBoundary.Report(() => Debug.WriteLine("Python worker returned a traceback (payload omitted)."));
       }
 
       if (!string.IsNullOrWhiteSpace(stderr))
@@ -423,7 +424,7 @@ internal sealed class PersistentPythonWorkerClient : IPersistentWorkerClient
           }
           catch (TimeoutException)
           {
-            Debug.WriteLine("Timed out waiting for the terminated Python worker to exit.");
+            DiagnosticBoundary.Report(() => Debug.WriteLine("Timed out waiting for the terminated Python worker to exit."));
           }
         }
       }
@@ -444,7 +445,7 @@ internal sealed class PersistentPythonWorkerClient : IPersistentWorkerClient
       }
       catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or IOException or TimeoutException)
       {
-        Debug.WriteLine($"Python worker stderr pump did not complete cleanly: {ex.Message}");
+        DiagnosticBoundary.Report(() => Debug.WriteLine("Python worker stderr pump did not complete cleanly."));
       }
 
       stderrPump = null;

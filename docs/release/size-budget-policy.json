@@ -22,8 +22,8 @@
       "baselineBytes": 9190329,
       "minimumFiles": 1000,
       "minimumBytes": 8271296,
-      "maximumBytes": 10255000,
-      "rationale": "September 22 source baseline after removal of generated previews and the unlicensed Cohere fixture. September 29 automatic runtime setup adds compiler-free provisioning, selection tests and speech-free measured evidence. September 30 awaitable shutdown adds lifecycle ownership, isolated dispatcher/barrier tests and its review report. Main measures 10,174,991 bytes against the 10,175,000 cap. Batch 3 cancellation/capture ownership, controlled regressions and documentation measure 10,253,286 candidate blob bytes including final validation evidence (78,295 bytes growth). An 80 KB source-only increase covers that measured growth and bounded review evidence. Bundled assets, release/native/model payloads and every other cap remain unchanged. A ten percent lower bound catches incomplete exports."
+      "maximumBytes": 10325000,
+      "rationale": "September 22 source baseline after removal of generated previews and the unlicensed Cohere fixture. September 29 automatic runtime setup adds compiler-free provisioning, selection tests and speech-free measured evidence. September 30 awaitable shutdown adds lifecycle ownership, isolated dispatcher/barrier tests and its review report. Main measures 10,174,991 bytes against the 10,175,000 cap. Batch 3 cancellation/capture ownership, controlled regressions and documentation measure 10,253,286 candidate blob bytes including final validation evidence (78,295 bytes growth). An 80 KB source-only increase covers that measured growth and bounded review evidence. Bundled assets, release/native/model payloads and every other cap remain unchanged. A ten percent lower bound catches incomplete exports. Batch 4 measured 10,310,605 bytes before the final five structured-consumer regressions and complete validation report. A 10,325,000 cap covers this measured diagnostic-isolation growth and bounded final evidence. All unrelated caps and historical baselines remain enforced."
     },
     {
       "id": "production-source",
@@ -61,8 +61,8 @@
       "baselineBytes": 1247869,
       "minimumFiles": 190,
       "minimumBytes": 1123082,
-      "maximumBytes": 1920000,
-      "rationale": "September 28 CI measured 1804048 Git blob bytes after adding tray lifecycle, diagnostics privacy, export, and model-readiness regression coverage. A 1920000-byte cap retains about six percent headroom for test source. Generated outputs and model assets remain prohibited, and the historical baseline is unchanged."
+      "maximumBytes": 1940000,
+      "rationale": "September 28 CI measured 1804048 Git blob bytes after adding tray lifecycle, diagnostics privacy, export, and model-readiness regression coverage. A 1920000-byte cap retains about six percent headroom for test source. Generated outputs and model assets remain prohibited, and the historical baseline is unchanged. Batch 4 measured 1,929,120 bytes before five final structured-consumer regressions. The 1,940,000 cap admits those controlled sink/storage/consumer tests and final test-isolation seams without removing coverage."
     },
     {
       "id": "scripts",
@@ -100,8 +100,8 @@
       "baselineBytes": 718389,
       "minimumFiles": 105,
       "minimumBytes": 646550,
-      "maximumBytes": 1700000,
-      "rationale": "September 29 documentation and planning measured approximately 1612000 Git blob bytes after adding the measured dictation latency report and compact numeric evidence. A 1700000-byte cap retains about five percent headroom for bounded documentation growth. Historical baselines are unchanged; private benchmark payloads and generated build outputs remain excluded, and the repository-wide ten-megabyte cap is unchanged."
+      "maximumBytes": 1725000,
+      "rationale": "September 29 documentation/planning historical baseline is approximately 1,612,000 Git blob bytes. Batch 4 measured 1,716,075 bytes before final validation evidence. The 1,725,000 cap admits the reviewed boundary/API policy, explicit validation violation, and bounded final evidence; unrelated documentation is retained."
     },
     {
       "id": "bundled-app-assets",

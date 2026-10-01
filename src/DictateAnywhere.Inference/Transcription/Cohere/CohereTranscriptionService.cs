@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -46,8 +47,8 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
     IPersistentWorkerClientFactory? workerClientFactory = null)
   {
     this.options = options ?? throw new ArgumentNullException(nameof(options));
-    this.diagnostics = diagnostics;
-    structuredDiagnostics = diagnostics as IStructuredDiagnostics;
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics);
+    structuredDiagnostics = this.diagnostics as IStructuredDiagnostics;
     this.workerClientFactory = workerClientFactory ?? new PersistentPythonWorkerClientFactory();
   }
 
@@ -110,13 +111,13 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
           }
           catch (Exception ex)
           {
-            LogError(
+            DiagnosticBoundary.Report(() => LogError(
               "Cohere background warmup failed.",
               ex,
               CreateProperties(
                 ("providerId", options.ProviderId),
                 ("modelId", modelId),
-                ("stage", "backgroundWarmupFailed")));
+                ("stage", "backgroundWarmupFailed"))));
           }
         });
     }
@@ -180,7 +181,7 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
     catch (InferenceException ex)
     {
       totalStopwatch.Stop();
-      LogError(
+      DiagnosticBoundary.Report(() => LogError(
         "Cohere worker warmup failed.",
         ex,
         CreateProperties(
@@ -189,7 +190,7 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
           ("modelId", modelId),
           ("stage", "warmupFailed"),
           ("totalMs", RoundMilliseconds(totalStopwatch.Elapsed)),
-          ("errorDetail", CohereFailureTranslator.GetExceptionDetail(ex))));
+          ("errorDetail", CohereFailureTranslator.GetExceptionDetail(ex)))));
       throw;
     }
     catch (OperationCanceledException)
@@ -200,7 +201,7 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
     {
       totalStopwatch.Stop();
       InferenceException translated = CohereFailureTranslator.TranslateWorkerException(ex, "warmup");
-      LogError(
+      DiagnosticBoundary.Report(() => LogError(
         "Cohere worker warmup failed.",
         translated,
         CreateProperties(
@@ -209,7 +210,7 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
           ("modelId", modelId),
           ("stage", "warmupFailed"),
           ("totalMs", RoundMilliseconds(totalStopwatch.Elapsed)),
-          ("errorDetail", CohereFailureTranslator.GetExceptionDetail(translated))));
+          ("errorDetail", CohereFailureTranslator.GetExceptionDetail(translated)))));
       throw translated;
     }
   }
@@ -400,7 +401,7 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
     catch (InferenceException ex)
     {
       totalStopwatch.Stop();
-      LogError(
+      DiagnosticBoundary.Report(() => LogError(
         "Cohere transcription failed.",
         ex,
         CreateProperties(
@@ -413,14 +414,14 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
           ("invokeMs", RoundMilliseconds(invokeDuration)),
           ("wavBytes", preparedAudio?.WavFileBytes > 0 ? preparedAudio.WavFileBytes : null),
           ("totalMs", RoundMilliseconds(totalStopwatch.Elapsed)),
-          ("errorDetail", CohereFailureTranslator.GetExceptionDetail(ex))));
+          ("errorDetail", CohereFailureTranslator.GetExceptionDetail(ex)))));
       throw;
     }
     catch (Exception ex)
     {
       totalStopwatch.Stop();
       InferenceException translated = CohereFailureTranslator.TranslateWorkerException(ex, stage);
-      LogError(
+      DiagnosticBoundary.Report(() => LogError(
         "Cohere transcription failed.",
         translated,
         CreateProperties(
@@ -433,7 +434,7 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
           ("invokeMs", RoundMilliseconds(invokeDuration)),
           ("wavBytes", preparedAudio?.WavFileBytes > 0 ? preparedAudio.WavFileBytes : null),
           ("totalMs", RoundMilliseconds(totalStopwatch.Elapsed)),
-          ("errorDetail", CohereFailureTranslator.GetExceptionDetail(translated))));
+          ("errorDetail", CohereFailureTranslator.GetExceptionDetail(translated)))));
       throw translated;
     }
     finally
@@ -644,7 +645,7 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
       return;
     }
 
-    diagnostics?.Info(FormatFallbackMessage(message, properties));
+    DiagnosticBoundary.Report(() => diagnostics?.Info(FormatFallbackMessage(message, properties)));
   }
 
   private void LogError(string message, Exception exception, IReadOnlyDictionary<string, object?> properties)
@@ -655,7 +656,7 @@ public sealed class CohereTranscriptionService : ITranscriptionService, ITranscr
       return;
     }
 
-    diagnostics?.Error(FormatFallbackMessage(message, properties), exception);
+    DiagnosticBoundary.Report(() => diagnostics?.Error(FormatFallbackMessage(message, properties), exception));
   }
 
   private static string FormatFallbackMessage(string message, IReadOnlyDictionary<string, object?> properties)

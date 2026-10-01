@@ -13,6 +13,65 @@ namespace DictateAnywhere.Inference.Tests;
 public sealed class IndicParlerTextToSpeechServiceTests
 {
   [Xunit.Fact]
+  public async Task ActualThrowingTraceListenerDoesNotReplaceSpeechResultAndIsRemoved()
+  {
+    using TempDirectoryScope temp = new();
+    string scriptName = await CreatePlaceholderWorkerAsync();
+    using MetadataListener listener = new();
+    System.Diagnostics.Trace.Listeners.Add(listener);
+    try
+    {
+      await using FakeWorkerClient worker = new();
+      await using IndicParlerTextToSpeechService service = new(CreateOptions(temp, scriptName) with { EnableCache = false },
+        new FakeWorkerClientFactory(worker), new FakeRuntimeProvisioner());
+      TextToSpeechResult result = await service.SynthesizeAsync(new TextToSpeechRequest("नमस्ते", "ne", "Amrita"));
+      Xunit.Assert.True(File.Exists(result.AudioPath));
+      Xunit.Assert.Equal(1, listener.Calls);
+      Xunit.Assert.True(File.Exists(Path.Combine(temp.DirectoryPath, "output", "diagnostics", "reader-indic-parler.log")));
+    }
+    finally { System.Diagnostics.Trace.Listeners.Remove(listener); DeletePlaceholderWorker(scriptName); }
+  }
+
+  private sealed class MetadataListener : System.Diagnostics.TraceListener
+  {
+    internal int Calls { get; private set; }
+    public override void Write(string? message)
+    {
+      if (message != "Indic Parler-TTS runtime metadata was written locally.") return;
+      Calls++;
+      throw new InvalidOperationException("controlled trace listener failure");
+    }
+    public override void WriteLine(string? message) => Write(message);
+  }
+
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task DiagnosticIoOrListenerFailureCannotFailSpeechOrRetryAfterRecovery(bool listener)
+  {
+    using TempDirectoryScope temp = new();
+    string scriptName = await CreatePlaceholderWorkerAsync();
+    try
+    {
+      await using FakeWorkerClient worker = new();
+      int reports = 0;
+      await using IndicParlerTextToSpeechService service = new(CreateOptions(temp, scriptName) with { EnableCache = false },
+        new FakeWorkerClientFactory(worker), new FakeRuntimeProvisioner(), (_, _, _) =>
+        {
+          reports++;
+          if (reports == 1) throw listener ? new InvalidOperationException("controlled listener failure") : new IOException("controlled disk failure");
+        });
+      for (int i = 0; i < 2; i++)
+      {
+        TextToSpeechResult result = await service.SynthesizeAsync(new TextToSpeechRequest("नमस्ते", "ne", "Amrita"));
+        Xunit.Assert.True(File.Exists(result.AudioPath));
+      }
+      Xunit.Assert.Equal(1, reports);
+      Xunit.Assert.Equal(2, worker.Requests.Count);
+    }
+    finally { DeletePlaceholderWorker(scriptName); }
+  }
+  [Xunit.Fact]
   public void Worker_PreservesStandardHuggingFaceCredentialHome()
   {
     string scriptPath = Path.Combine(

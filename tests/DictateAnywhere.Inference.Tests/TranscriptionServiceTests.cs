@@ -9,6 +9,23 @@ namespace DictateAnywhere.Inference.Tests;
 
 public sealed class TranscriptionServiceTests
 {
+  [Xunit.Theory]
+  [Xunit.InlineData("success")]
+  [Xunit.InlineData("fault")]
+  [Xunit.InlineData("cancel")]
+  public async Task StructuredSinkFailurePreservesProviderOutcome(string outcome)
+  {
+    Exception original = new InvalidOperationException("provider fault");
+    FakeTranscriptionModel model = new(TranscriptionProviderIds.CohereLocal, "speech", outcome == "fault" ? original : null);
+    await using TranscriptionService service = new(model.ProviderId, new TranscriptionModelRegistry([model]), new ThrowingStructuredSink());
+    using CancellationTokenSource cancellation = new();
+    if (outcome == "cancel") cancellation.Cancel();
+    Task<TranscriptionResult> operation = service.TranscribeAsync(new AudioCaptureResult([1, 0], 16000, TimeSpan.FromMilliseconds(1)), "model", cancellation.Token);
+    if (outcome == "success") Xunit.Assert.Equal("speech", (await operation).Text);
+    else if (outcome == "fault") Xunit.Assert.Same(original, await Xunit.Assert.ThrowsAsync<InvalidOperationException>(() => operation));
+    else Xunit.Assert.Equal(cancellation.Token, (await Xunit.Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation)).CancellationToken);
+  }
+
   [Xunit.Fact]
   public async Task TranscribeAsync_DispatchesToSelectedProvider_AndNormalizesResult()
   {
@@ -82,11 +99,13 @@ public sealed class TranscriptionServiceTests
   private sealed class FakeTranscriptionModel : ITranscriptionModel
   {
     private readonly string text;
+    private readonly Exception? error;
 
-    public FakeTranscriptionModel(string providerId, string text)
+    public FakeTranscriptionModel(string providerId, string text, Exception? error = null)
     {
       ProviderId = providerId;
       this.text = text;
+      this.error = error;
     }
 
     public string ProviderId { get; }
@@ -100,6 +119,7 @@ public sealed class TranscriptionServiceTests
     {
       cancellationToken.ThrowIfCancellationRequested();
       CallCount++;
+      if (error is not null) return Task.FromException<TranscriptionResult>(error);
       return Task.FromResult(new TranscriptionResult(text, modelId, TimeSpan.FromMilliseconds(42)));
     }
   }
@@ -150,4 +170,14 @@ public sealed class TranscriptionServiceTests
     string Message,
     Exception? Exception,
     IReadOnlyDictionary<string, object?> Properties);
+}
+
+internal sealed class ThrowingStructuredSink : IStructuredDiagnostics
+{
+  public void Info(string message) => throw new System.IO.IOException("reporting fault");
+  public void Warning(string message) => throw new System.IO.IOException("reporting fault");
+  public void Error(string message, Exception? exception = null) => throw new System.IO.IOException("reporting fault");
+  public void Info(string message, IReadOnlyDictionary<string, object?> properties) => throw new System.IO.IOException("reporting fault");
+  public void Warning(string message, IReadOnlyDictionary<string, object?> properties) => throw new System.IO.IOException("reporting fault");
+  public void Error(string message, Exception? exception, IReadOnlyDictionary<string, object?> properties) => throw new System.IO.IOException("reporting fault");
 }

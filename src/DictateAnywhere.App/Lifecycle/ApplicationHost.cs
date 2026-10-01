@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.IO;
 using System.Threading;
@@ -52,7 +53,7 @@ internal sealed class ApplicationHost : IRuntimeSupervisor, IAsyncDisposable
   {
     this.runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
     this.modelReadiness = modelReadiness ?? throw new ArgumentNullException(nameof(modelReadiness));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.modelReadiness.SnapshotChanged += OnModelReadinessSnapshotChanged;
   }
 
@@ -114,7 +115,7 @@ internal sealed class ApplicationHost : IRuntimeSupervisor, IAsyncDisposable
       if (runtime.IsRunning && runtime.CurrentState != DictationSessionState.Idle)
       {
         pendingSettings = settings;
-        diagnostics.Info($"Runtime settings update deferred until dictation is idle (state={runtime.CurrentState}).");
+        DiagnosticBoundary.Report(() => diagnostics.Info($"Runtime settings update deferred until dictation is idle (state={runtime.CurrentState})."));
         return new RuntimeSettingsApplyResult(true, true, null, null);
       }
 

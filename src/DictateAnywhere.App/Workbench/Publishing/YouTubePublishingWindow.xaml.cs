@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -42,7 +43,7 @@ internal partial class YouTubePublishingWindow : Window, IAsyncDisposable
     this.configurationStore = configurationStore ?? new YouTubeOAuthConfigurationStore();
     this.episodeCount = Math.Max(1, episodeCount);
     this.recoverableJob = recoverableJob;
-    this.diagnostics = diagnostics;
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics);
     _ = theme;
     if (Application.Current?.Dispatcher.CheckAccess() is true)
     {
@@ -320,7 +321,7 @@ internal partial class YouTubePublishingWindow : Window, IAsyncDisposable
   }
 
   private void ReportFailure(string operation, Exception exception) =>
-    diagnostics?.Warning($"{operation} failed: {exception.Message}");
+    DiagnosticBoundary.Report(() => diagnostics?.Warning($"{operation} failed: {exception.Message}"));
 
   private void OnCloseClicked(object sender, RoutedEventArgs e) => Close();
 }

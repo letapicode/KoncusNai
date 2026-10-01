@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Hotkeys;
@@ -42,6 +43,7 @@ internal static class GlobalHotkeyTriggerDiagnostics
   {
     ArgumentNullException.ThrowIfNull(outcome);
     ArgumentNullException.ThrowIfNull(diagnostics);
+    diagnostics = DiagnosticBoundary.Wrap(diagnostics);
 
     if (outcome.Success && !outcome.UsedFallbackBinding)
     {

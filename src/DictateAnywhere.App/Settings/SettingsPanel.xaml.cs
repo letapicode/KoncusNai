@@ -62,7 +62,7 @@ public partial class SettingsPanel : UserControl, IAsyncDisposable
     this.controller = controller ?? throw new ArgumentNullException(nameof(controller));
     this.validator = validator ?? throw new ArgumentNullException(nameof(validator));
     this.settingsFileDialogService = settingsFileDialogService ?? throw new ArgumentNullException(nameof(settingsFileDialogService));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
 
     AppThemeManager.ApplyThemeResources(AppThemeManager.CurrentPreference);
     InitializeComponent();

@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
@@ -27,7 +28,7 @@ internal sealed class UndoHotkeyCoordinator : IAsyncDisposable
   {
     this.hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
     this.undoInsertionService = undoInsertionService ?? throw new ArgumentNullException(nameof(undoInsertionService));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.undoHotkeyBinding = undoHotkeyBinding;
   }
 
@@ -137,7 +138,7 @@ internal sealed class UndoHotkeyCoordinator : IAsyncDisposable
     }
     catch (Exception ex)
     {
-      diagnostics.Warning($"Undo hotkey failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Undo hotkey failed: {ex.Message}"));
     }
   }
 }

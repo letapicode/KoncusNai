@@ -5,20 +5,27 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using DictateAnywhere.Core.Contracts;
+using DictateAnywhere.Core.Services;
 
 namespace DictateAnywhere.Diagnostics;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types",
+  Justification = "Formatting/write/release failures are diagnostics-only; invalid configuration remains a constructor error.")]
 public sealed class StructuredLocalDiagnostics : IStructuredDiagnostics, IDisposable
 {
   private readonly object sync = new();
   private readonly StructuredDiagnosticsOptions options;
   private readonly JsonSerializerOptions jsonOptions;
 
-  private FileStream? logStream;
+  private readonly IDiagnosticLogStorage storage;
+  private Stream? logStream;
   private StreamWriter? logWriter;
   private string currentLogPath = string.Empty;
   private int fileSequence;
   private bool disposed;
+  private bool degraded;
+  private bool writing;
+  [ThreadStatic] private static bool preparing;
 
   public StructuredLocalDiagnostics()
     : this(StructuredDiagnosticsOptions.Default)
@@ -26,17 +33,26 @@ public sealed class StructuredLocalDiagnostics : IStructuredDiagnostics, IDispos
   }
 
   public StructuredLocalDiagnostics(StructuredDiagnosticsOptions options)
+    : this(options, new DiagnosticLogStorage()) { }
+
+  internal StructuredLocalDiagnostics(StructuredDiagnosticsOptions options, IDiagnosticLogStorage storage)
   {
     this.options = options ?? throw new ArgumentNullException(nameof(options));
     ValidateOptions(this.options);
+    _ = Path.GetFullPath(this.options.LogsDirectoryPath);
+    if (this.options.FileNamePrefix.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+      throw new ArgumentException("Invalid log file prefix.", nameof(options));
 
-    Directory.CreateDirectory(this.options.LogsDirectoryPath);
+    this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
     jsonOptions = new JsonSerializerOptions
     {
       PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    RotateCore();
+    try { storage.CreateDirectory(this.options.LogsDirectoryPath); RotateCore(); }
+    catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+    { DisableWriter(); }
+    catch { ReleaseWriter(); throw; }
   }
 
   public string LogsDirectoryPath => options.LogsDirectoryPath;
@@ -87,21 +103,29 @@ public sealed class StructuredLocalDiagnostics : IStructuredDiagnostics, IDispos
 
   public void Dispose()
   {
-    if (disposed)
-    {
-      return;
-    }
-
-    disposed = true;
     lock (sync)
     {
-      logWriter?.Flush();
-      logWriter?.Dispose();
-      logWriter = null;
-
-      logStream?.Dispose();
-      logStream = null;
+      disposed = true;
+      // Reentrant disposal from an owned writer callback is deferred until its write unwinds.
+      if (!writing) ReleaseWriter();
     }
+  }
+
+  private void ReleaseWriter()
+  {
+    StreamWriter? writer = logWriter;
+    Stream? stream = logStream;
+    logWriter = null;
+    logStream = null; // Detach before external release: reentrant/late calls cannot resurrect ownership.
+    DiagnosticBoundary.Report(() => writer?.Dispose());
+    DiagnosticBoundary.Report(() => stream?.Dispose());
+  }
+
+  private void DisableWriter()
+  {
+    degraded = true; // No automatic retry per message, even if the filesystem recovers.
+    DiagnosticBoundary.RecordFailure();
+    ReleaseWriter();
   }
 
   private static void ValidateOptions(StructuredDiagnosticsOptions options)
@@ -134,71 +158,87 @@ public sealed class StructuredLocalDiagnostics : IStructuredDiagnostics, IDispos
     IReadOnlyDictionary<string, object?>? properties)
   {
     ArgumentException.ThrowIfNullOrWhiteSpace(message);
-    ObjectDisposedException.ThrowIf(disposed, this);
-
+    lock (sync) { if (disposed || degraded) return; }
+    if (preparing) { DiagnosticBoundary.RecordFailure(); return; }
+    string? jsonLine = null;
+    preparing = true;
+    try { DiagnosticBoundary.Report(() => jsonLine = PrepareRecord(level, message, exception, properties)); }
+    finally { preparing = false; }
+    if (jsonLine is null) return; // Fail closed: never emit a partially sanitized/raw record.
     lock (sync)
     {
-      EnsureWriter();
-
-      if (logStream is not null && logStream.Length >= options.MaxFileSizeBytes)
+      if (disposed || degraded) return;
+      if (writing) { DiagnosticBoundary.RecordFailure(); return; }
+      writing = true;
+      try
       {
-        RotateCore();
+        EnsureWriter();
+        if (logStream!.Length >= options.MaxFileSizeBytes) RotateCore();
+        logWriter!.WriteLine(jsonLine);
       }
-
-      ExceptionDiagnosticMetadata exceptionMetadata = ExceptionDiagnosticMetadataExtractor.Extract(exception);
-      DiagnosticFailureCategory category = DiagnosticErrorClassifier.Classify(message, exception);
-      string safeMessage = Sanitize(message);
-      string? exceptionText = null;
-      if (exception is not null)
-      {
-        exceptionText = ExceptionDiagnosticMetadataExtractor.ShouldPreferDiagnosticSummary(exceptionMetadata)
-          ? exceptionMetadata.DiagnosticSummary
-          : exceptionMetadata.Message;
-      }
-
-      string? safeExceptionMessage = string.IsNullOrWhiteSpace(exceptionText) ? null : Sanitize(exceptionText);
-      string? safeExceptionStackTrace = string.IsNullOrWhiteSpace(exception?.StackTrace)
-        ? null
-        : Sanitize(exception.StackTrace!);
-
-      string? operationId = TryGetStringProperty(properties, DiagnosticPropertyKeys.OperationId)
-        ?? TryGetStringProperty(properties, "correlationId")
-        ?? TryGetStringProperty(properties, "operation_id");
-
-      string? parentOperationId = TryGetStringProperty(properties, DiagnosticPropertyKeys.ParentOperationId)
-        ?? TryGetStringProperty(properties, "parent_operation_id");
-
-      string? stage = TryGetStringProperty(properties, DiagnosticPropertyKeys.Stage);
-      string? outcome = TryGetStringProperty(properties, DiagnosticPropertyKeys.Outcome);
-      double? durationMs = TryGetDoubleProperty(properties, DiagnosticPropertyKeys.DurationMs)
-        ?? TryGetDoubleProperty(properties, "totalMs")
-        ?? TryGetDoubleProperty(properties, "duration_ms");
-
-      string? remediationCode = TryGetStringProperty(properties, DiagnosticPropertyKeys.RemediationCode);
-      if (string.IsNullOrWhiteSpace(remediationCode) && (category != DiagnosticFailureCategory.Unknown || exception is not null || string.Equals(level, "ERROR", StringComparison.OrdinalIgnoreCase)))
-      {
-        remediationCode = DiagnosticRemediationCodes.GetRemediationCode(category, exception);
-      }
-
-      LogEntry entry = new(
-        TimestampUtc: DateTimeOffset.UtcNow,
-        Level: level,
-        Category: category.ToString(),
-        Message: safeMessage,
-        ExceptionType: string.IsNullOrWhiteSpace(exceptionMetadata.TypeName) ? null : exceptionMetadata.TypeName,
-        ExceptionMessage: safeExceptionMessage,
-        ExceptionStackTrace: safeExceptionStackTrace,
-        Properties: SanitizeProperties(properties),
-        OperationId: operationId,
-        ParentOperationId: parentOperationId,
-        Stage: stage,
-        Outcome: outcome,
-        DurationMs: durationMs,
-        RemediationCode: remediationCode);
-
-      string jsonLine = JsonSerializer.Serialize(entry, jsonOptions);
-      logWriter!.WriteLine(jsonLine);
+      catch (Exception) { DisableWriter(); }
+      finally { writing = false; if (disposed) ReleaseWriter(); }
     }
+  }
+
+  private string PrepareRecord(string level, string message, Exception? exception, IReadOnlyDictionary<string, object?>? properties)
+  {
+    if (message.Length > options.MaxFileSizeBytes) throw new InvalidDataException("Oversized diagnostic record.");
+    properties = SanitizeProperties(properties, sanitize: false); // Snapshot/validate outside the writer lock.
+    ExceptionDiagnosticMetadata exceptionMetadata = ExceptionDiagnosticMetadataExtractor.Extract(exception);
+    DiagnosticFailureCategory category = DiagnosticErrorClassifier.Classify(message, exception);
+    string safeMessage = Sanitize(message);
+    string? exceptionText = null;
+    if (exception is not null)
+    {
+      exceptionText = ExceptionDiagnosticMetadataExtractor.ShouldPreferDiagnosticSummary(exceptionMetadata)
+        ? exceptionMetadata.DiagnosticSummary
+        : exceptionMetadata.Message;
+    }
+
+    string? safeExceptionMessage = string.IsNullOrWhiteSpace(exceptionText) ? null : Sanitize(exceptionText);
+    string? safeExceptionStackTrace = string.IsNullOrWhiteSpace(exception?.StackTrace)
+      ? null
+      : Sanitize(exception.StackTrace!);
+
+    string? operationId = TryGetStringProperty(properties, DiagnosticPropertyKeys.OperationId)
+      ?? TryGetStringProperty(properties, "correlationId")
+      ?? TryGetStringProperty(properties, "operation_id");
+
+    string? parentOperationId = TryGetStringProperty(properties, DiagnosticPropertyKeys.ParentOperationId)
+      ?? TryGetStringProperty(properties, "parent_operation_id");
+
+    string? stage = TryGetStringProperty(properties, DiagnosticPropertyKeys.Stage);
+    string? outcome = TryGetStringProperty(properties, DiagnosticPropertyKeys.Outcome);
+    double? durationMs = TryGetDoubleProperty(properties, DiagnosticPropertyKeys.DurationMs)
+      ?? TryGetDoubleProperty(properties, "totalMs")
+      ?? TryGetDoubleProperty(properties, "duration_ms");
+
+    string? remediationCode = TryGetStringProperty(properties, DiagnosticPropertyKeys.RemediationCode);
+    if (string.IsNullOrWhiteSpace(remediationCode) && (category != DiagnosticFailureCategory.Unknown || exception is not null || string.Equals(level, "ERROR", StringComparison.OrdinalIgnoreCase)))
+    {
+      remediationCode = DiagnosticRemediationCodes.GetRemediationCode(category, exception);
+    }
+
+    LogEntry entry = new(
+      TimestampUtc: DateTimeOffset.UtcNow,
+      Level: level,
+      Category: category.ToString(),
+      Message: safeMessage,
+      ExceptionType: string.IsNullOrWhiteSpace(exceptionMetadata.TypeName) ? null : exceptionMetadata.TypeName,
+      ExceptionMessage: safeExceptionMessage,
+      ExceptionStackTrace: safeExceptionStackTrace,
+      Properties: SanitizeProperties(properties),
+      OperationId: operationId,
+      ParentOperationId: parentOperationId,
+      Stage: stage,
+      Outcome: outcome,
+      DurationMs: durationMs,
+      RemediationCode: remediationCode);
+
+    string jsonLine = JsonSerializer.Serialize(entry, jsonOptions);
+    if (Encoding.UTF8.GetByteCount(jsonLine) > options.MaxFileSizeBytes) throw new InvalidDataException("Oversized diagnostic record.");
+    return jsonLine;
   }
 
   private string Sanitize(string text)
@@ -209,17 +249,23 @@ public sealed class StructuredLocalDiagnostics : IStructuredDiagnostics, IDispos
   }
 
   private IReadOnlyDictionary<string, object?>? SanitizeProperties(
-    IReadOnlyDictionary<string, object?>? properties)
+    IReadOnlyDictionary<string, object?>? properties, bool sanitize = true)
   {
     if (properties is null || properties.Count == 0)
     {
       return null;
     }
 
-    Dictionary<string, object?> sanitized = new(properties.Count, StringComparer.Ordinal);
+    if (properties.Count > 256) throw new InvalidDataException("Too many diagnostic properties.");
+    Dictionary<string, object?> sanitized = new(StringComparer.Ordinal);
     foreach ((string key, object? value) in properties)
     {
-      if (!options.IncludeSensitiveData && SensitiveDiagnosticsRedactor.IsSensitiveKey(key))
+      if (sanitized.Count >= 256 || key.Length > 1024 || value is string large && large.Length > options.MaxFileSizeBytes)
+        throw new InvalidDataException("Oversized diagnostic property.");
+      if (value is not (null or string or bool or char or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal or DateTime or DateTimeOffset or Guid or Enum))
+        throw new InvalidDataException("Only scalar diagnostic properties are supported.");
+      if (!sanitize) { sanitized[key] = value; }
+      else if (!options.IncludeSensitiveData && SensitiveDiagnosticsRedactor.IsSensitiveKey(key))
       {
         sanitized[key] = IsSafeTimingMeasurement(key, value)
           ? value
@@ -252,20 +298,11 @@ public sealed class StructuredLocalDiagnostics : IStructuredDiagnostics, IDispos
 
   private void RotateCore()
   {
-    logWriter?.Flush();
-    logWriter?.Dispose();
-    logWriter = null;
-
-    logStream?.Dispose();
-    logStream = null;
-
+    ReleaseWriter();
     currentLogPath = BuildNextLogPath();
-    logStream = new FileStream(currentLogPath, FileMode.Create, FileAccess.Write, FileShare.Read);
-    logWriter = new StreamWriter(logStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
-    {
-      AutoFlush = true,
-    };
-
+    logStream = storage.Open(currentLogPath);
+    logWriter = new StreamWriter(logStream, new UTF8Encoding(false), bufferSize: 1024, leaveOpen: true);
+    logWriter.AutoFlush = true;
     ApplyRetentionPolicy();
   }
 
@@ -285,15 +322,17 @@ public sealed class StructuredLocalDiagnostics : IStructuredDiagnostics, IDispos
   private void ApplyRetentionPolicy()
   {
     string pattern = string.Concat(options.FileNamePrefix, "-*.log");
-    string[] files = Directory.GetFiles(options.LogsDirectoryPath, pattern, SearchOption.TopDirectoryOnly);
+    string[] files = storage.GetFiles(options.LogsDirectoryPath, pattern);
     if (files.Length <= options.RetainedFileCount)
     {
       return;
     }
 
-    List<string> sorted = new(files);
-    sorted.Sort(static (left, right) =>
-      File.GetLastWriteTimeUtc(right).CompareTo(File.GetLastWriteTimeUtc(left)));
+    // Read filesystem metadata before sorting: List.Sort wraps comparator I/O faults as contract errors.
+    List<(string Path, DateTime LastWrite)> timestamps = new(files.Length);
+    foreach (string file in files) timestamps.Add((file, storage.GetLastWriteTimeUtc(file)));
+    timestamps.Sort(static (left, right) => right.LastWrite.CompareTo(left.LastWrite));
+    List<string> sorted = timestamps.ConvertAll(static item => item.Path);
 
     sorted.RemoveAll(candidate =>
       string.Equals(candidate, currentLogPath, StringComparison.OrdinalIgnoreCase));
@@ -304,13 +343,15 @@ public sealed class StructuredLocalDiagnostics : IStructuredDiagnostics, IDispos
       string candidate = sorted[i];
       try
       {
-        File.Delete(candidate);
+        storage.Delete(candidate);
       }
       catch (IOException)
       {
+        DiagnosticBoundary.RecordFailure();
       }
       catch (UnauthorizedAccessException)
       {
+        DiagnosticBoundary.RecordFailure();
       }
     }
   }

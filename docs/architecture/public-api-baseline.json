@@ -66,7 +66,6 @@
         "System.ComponentModel.Primitives",
         "System.ComponentModel.TypeConverter",
         "System.Diagnostics.Process",
-        "System.Diagnostics.TraceSource",
         "System.Drawing.Common",
         "System.Drawing.Primitives",
         "System.IO.Compression",
@@ -837,6 +836,9 @@
         "M|DictateAnywhere.Core.Contracts.UndoInsertionResult|public|static op_Inequality(DictateAnywhere.Core.Contracts.UndoInsertionResult? left,DictateAnywhere.Core.Contracts.UndoInsertionResult? right)-\u003ESystem.Boolean",
         "M|DictateAnywhere.Core.Contracts.UndoInsertionResult|public|virtual sealed Equals(DictateAnywhere.Core.Contracts.UndoInsertionResult? other)-\u003ESystem.Boolean",
         "M|DictateAnywhere.Core.Services.CurrentSettingsPolicy|public|static Normalize(DictateAnywhere.Core.Contracts.AppSettings settings)-\u003EDictateAnywhere.Core.Contracts.AppSettings",
+        "M|DictateAnywhere.Core.Services.DiagnosticBoundary|public|static RecordFailure()-\u003ESystem.Void",
+        "M|DictateAnywhere.Core.Services.DiagnosticBoundary|public|static Report(System.Action reporting)-\u003ESystem.Void",
+        "M|DictateAnywhere.Core.Services.DiagnosticBoundary|public|static Wrap(DictateAnywhere.Core.Contracts.IDiagnostics? sink)-\u003EDictateAnywhere.Core.Contracts.IDiagnostics?",
         "M|DictateAnywhere.Core.Services.DictationPipelineCoordinator|public|StartAsync(System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task",
         "M|DictateAnywhere.Core.Services.DictationPipelineCoordinator|public|StopAsync(System.Threading.CancellationToken cancellationToken=null)-\u003ESystem.Threading.Tasks.Task",
         "M|DictateAnywhere.Core.Services.DictationPipelineCoordinator|public|virtual sealed DisposeAsync()-\u003ESystem.Threading.Tasks.ValueTask",
@@ -1032,6 +1034,7 @@
         "P|DictateAnywhere.Core.Contracts.TranscriptionResult|Text[]:System.String|get:public|init:public",
         "P|DictateAnywhere.Core.Contracts.UndoInsertionResult|ErrorMessage[]:System.String?|get:public|init:public",
         "P|DictateAnywhere.Core.Contracts.UndoInsertionResult|Success[]:System.Boolean|get:public|init:public",
+        "P|DictateAnywhere.Core.Services.DiagnosticBoundary|FailureCount[]:System.Int64|get:public static|",
         "P|DictateAnywhere.Core.Services.DictationPipelineCoordinator|CurrentState[]:DictateAnywhere.Core.Domain.DictationSessionState|get:public|",
         "P|DictateAnywhere.Core.Services.FaultTolerantOverlayService|DefaultOperationTimeout[]:System.TimeSpan|get:public static|",
         "T|public|class|sealed DictateAnywhere.Core.Contracts.AppSettings|base=System.Object|interfaces=System.IEquatable\u003CDictateAnywhere.Core.Contracts.AppSettings\u003E|generic=",
@@ -1082,6 +1085,7 @@
         "T|public|class|static DictateAnywhere.Core.Contracts.TranscriptionLanguageSettings|base=System.Object|interfaces=|generic=",
         "T|public|class|static DictateAnywhere.Core.Contracts.TranscriptionProviderIds|base=System.Object|interfaces=|generic=",
         "T|public|class|static DictateAnywhere.Core.Services.CurrentSettingsPolicy|base=System.Object|interfaces=|generic=",
+        "T|public|class|static DictateAnywhere.Core.Services.DiagnosticBoundary|base=System.Object|interfaces=|generic=",
         "T|public|class|static DictateAnywhere.Core.Services.SpeechTextChunker|base=System.Object|interfaces=|generic=",
         "T|public|enum|DictateAnywhere.Core.Contracts.AppThemePreference|base=System.Enum|interfaces=System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable|generic=",
         "T|public|enum|DictateAnywhere.Core.Contracts.HotkeyModifiers|base=System.Enum|interfaces=System.IComparable,System.IConvertible,System.IFormattable,System.ISpanFormattable|generic=",
@@ -1128,7 +1132,9 @@
         "DictateAnywhere.App",
         "DictateAnywhere.Diagnostics.Tests"
       ],
-      "friends": [],
+      "friends": [
+        "DictateAnywhere.Diagnostics.Tests"
+      ],
       "declaredProjectReferences": [
         "DictateAnywhere.Core"
       ],

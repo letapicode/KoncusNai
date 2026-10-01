@@ -47,6 +47,8 @@ public sealed class IndicParlerTextToSpeechService : ITextToSpeechService, IAsyn
   private readonly SemaphoreSlim clientGate = new(1, 1);
   private IPersistentWorkerClient? client;
   private bool disposed;
+  private readonly Action<TextToSpeechRuntimeMetadata, int, string> diagnosticReporter;
+  private int diagnosticReportingDisabled;
 
   public IndicParlerTextToSpeechService(IndicParlerTextToSpeechOptions? options = null)
     : this(options ?? IndicParlerTextToSpeechOptions.Default, workerClientFactory: null, textNormalizer: null, runtimeProvisioner: null)
@@ -63,15 +65,16 @@ public sealed class IndicParlerTextToSpeechService : ITextToSpeechService, IAsyn
   internal IndicParlerTextToSpeechService(
     IndicParlerTextToSpeechOptions options,
     IPersistentWorkerClientFactory? workerClientFactory)
-    : this(options, workerClientFactory, textNormalizer: null, runtimeProvisioner: NoOpIndicParlerRuntimeProvisioner.Instance)
+    : this(options, workerClientFactory, textNormalizer: null, runtimeProvisioner: NoOpIndicParlerRuntimeProvisioner.Instance, diagnosticDirectory: Path.Combine((options ?? throw new ArgumentNullException(nameof(options))).OutputRootPath, "diagnostics"))
   {
   }
 
   internal IndicParlerTextToSpeechService(
     IndicParlerTextToSpeechOptions options,
     IPersistentWorkerClientFactory workerClientFactory,
-    IIndicParlerRuntimeProvisioner runtimeProvisioner)
-    : this(options, workerClientFactory, textNormalizer: null, runtimeProvisioner)
+    IIndicParlerRuntimeProvisioner runtimeProvisioner,
+    Action<TextToSpeechRuntimeMetadata, int, string>? diagnosticReporter = null)
+    : this(options, workerClientFactory, textNormalizer: null, runtimeProvisioner, diagnosticReporter, Path.Combine((options ?? throw new ArgumentNullException(nameof(options))).OutputRootPath, "diagnostics"))
   {
   }
 
@@ -79,13 +82,16 @@ public sealed class IndicParlerTextToSpeechService : ITextToSpeechService, IAsyn
     IndicParlerTextToSpeechOptions options,
     IPersistentWorkerClientFactory? workerClientFactory,
     IIndicParlerTextNormalizer? textNormalizer,
-    IIndicParlerRuntimeProvisioner? runtimeProvisioner)
+    IIndicParlerRuntimeProvisioner? runtimeProvisioner,
+    Action<TextToSpeechRuntimeMetadata, int, string>? diagnosticReporter = null, string? diagnosticDirectory = null)
   {
     this.options = options ?? throw new ArgumentNullException(nameof(options));
     this.workerClientFactory = workerClientFactory ?? new PersistentPythonWorkerClientFactory();
     this.textNormalizer = textNormalizer;
     this.runtimeProvisioner = runtimeProvisioner ?? new IndicParlerRuntimeProvisioner();
     ValidateOptions(options);
+    this.diagnosticReporter = diagnosticReporter ?? ((metadata, count, language) =>
+      WriteRuntimeDiagnostic(metadata, count, language, diagnosticDirectory));
   }
 
   public Task<TextToSpeechResult> SynthesizeAsync(
@@ -207,7 +213,12 @@ public sealed class IndicParlerTextToSpeechService : ITextToSpeechService, IAsyn
           options.ModelId,
           WordTimings: wordTimings.Count > 0 ? wordTimings : null,
           RuntimeMetadata: metadata);
-        WriteRuntimeDiagnostic(metadata, segments.Count, language.Code);
+        if (Volatile.Read(ref diagnosticReportingDisabled) == 0)
+          DiagnosticBoundary.Report(() =>
+          {
+            try { diagnosticReporter(metadata, segments.Count, language.Code); }
+            catch { Interlocked.Exchange(ref diagnosticReportingDisabled, 1); throw; }
+          });
 
         if (options.EnableCache)
         {
@@ -463,25 +474,18 @@ public sealed class IndicParlerTextToSpeechService : ITextToSpeechService, IAsyn
       last.SampleRate);
   }
 
-  private static void WriteRuntimeDiagnostic(TextToSpeechRuntimeMetadata metadata, int segmentCount, string language)
+  private static void WriteRuntimeDiagnostic(TextToSpeechRuntimeMetadata metadata, int segmentCount, string language, string? diagnosticDirectory)
   {
-    try
-    {
-      string directory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "DictateAnywhere",
-        "logs");
-      Directory.CreateDirectory(directory);
-      string line = string.Create(
-        CultureInfo.InvariantCulture,
-        $"{DateTimeOffset.UtcNow:O}\tlanguage={language}\tsegments={segmentCount}\tdevice={metadata.SelectedDevice}\tbackend={metadata.Backend}\tdtype={metadata.DataType}\tgpu={SanitizeDiagnostic(metadata.GpuName)}\tfallback={metadata.FallbackOccurred}\tfallbackReason={SanitizeDiagnostic(metadata.FallbackReason)}\tgenerationSeconds={metadata.GenerationTime.TotalSeconds:F3}\taudioSeconds={metadata.AudioDuration.TotalSeconds:F3}\trtf={metadata.RealTimeFactor:F3}\tsampleRate={metadata.SampleRate?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}\tpeakBytes={metadata.PeakMemoryBytes?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}");
-      File.AppendAllText(Path.Combine(directory, "reader-indic-parler.log"), line + Environment.NewLine, Encoding.UTF8);
-      Trace.WriteLine($"Indic Parler-TTS: {line}");
-    }
-    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-    {
-      Trace.WriteLine($"Indic Parler-TTS diagnostics could not be written: {ex.Message}");
-    }
+    string directory = diagnosticDirectory ?? Path.Combine(
+      Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+      "DictateAnywhere",
+      "logs");
+    Directory.CreateDirectory(directory);
+    string line = string.Create(
+      CultureInfo.InvariantCulture,
+      $"{DateTimeOffset.UtcNow:O}\tlanguage={language}\tsegments={segmentCount}\tdevice={metadata.SelectedDevice}\tbackend={metadata.Backend}\tdtype={metadata.DataType}\tgpu={SanitizeDiagnostic(metadata.GpuName)}\tfallback={metadata.FallbackOccurred}\tfallbackReason={SanitizeDiagnostic(metadata.FallbackReason)}\tgenerationSeconds={metadata.GenerationTime.TotalSeconds:F3}\taudioSeconds={metadata.AudioDuration.TotalSeconds:F3}\trtf={metadata.RealTimeFactor:F3}\tsampleRate={metadata.SampleRate?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}\tpeakBytes={metadata.PeakMemoryBytes?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}");
+    File.AppendAllText(Path.Combine(directory, "reader-indic-parler.log"), line + Environment.NewLine, Encoding.UTF8);
+    Trace.WriteLine("Indic Parler-TTS runtime metadata was written locally.");
   }
 
   private static void ValidateOptions(IndicParlerTextToSpeechOptions value)

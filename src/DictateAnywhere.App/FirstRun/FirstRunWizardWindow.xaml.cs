@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -44,7 +45,7 @@ public partial class FirstRunWizardWindow : Window
     this.validator = validator ?? throw new ArgumentNullException(nameof(validator));
     this.modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
     this.benchmarkService = benchmarkService ?? throw new ArgumentNullException(nameof(benchmarkService));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
 
     InitializeComponent();
     if (modelManager is AutomaticDictationModelManager automatic)
@@ -361,7 +362,7 @@ public partial class FirstRunWizardWindow : Window
   }
 
   private void ReportFailure(string operation, Exception exception) =>
-    diagnostics.Warning($"{operation} failed: {exception.Message}");
+    DiagnosticBoundary.Report(() => diagnostics.Warning($"{operation} failed: {exception.Message}"));
 
   private static string FormatModelIdentity(TranscriptionModelSelection selection)
   {

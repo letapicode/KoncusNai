@@ -4,6 +4,12 @@
 This workflow defines how local diagnostics are collected, triaged, and converted into prioritized bugfix work during and after rollout.
 
 ## Inputs
+Local reporting can degrade without failing product operations. The
+[batch 4 policy](diagnostic-sink-isolation-audit-batch-4-2026-09-30.md) defines the
+payload-free in-memory failure counter, disabled-writer recovery, file ownership,
+and synchronous blocking limits. Explicit bundle export still reports failures;
+an unavailable disk does not guarantee durable diagnostic evidence.
+
 - Local logs:
   - `%LocalAppData%\DictateAnywhere\logs`
 - Release evidence reports under:

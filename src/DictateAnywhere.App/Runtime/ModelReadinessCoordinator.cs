@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -36,7 +37,7 @@ public sealed class ModelReadinessCoordinator : IModelReadinessSession
     Func<AppSettings, IDiagnostics, ITranscriptionService> fallbackTranscriptionServiceFactory)
   {
     this.modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.modelRegistryFactory = modelRegistryFactory ?? throw new ArgumentNullException(nameof(modelRegistryFactory));
     this.fallbackTranscriptionServiceFactory = fallbackTranscriptionServiceFactory ?? throw new ArgumentNullException(nameof(fallbackTranscriptionServiceFactory));
   }

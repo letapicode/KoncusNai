@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -34,7 +35,7 @@ internal sealed class WorkbenchAudioImportController
     Func<string, CancellationToken, Task<AudioCaptureResult>> decodeAsync,
     Func<AudioCaptureResult, CancellationToken, Task<TranscriptionResult>> transcribeAsync)
   {
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.decodeAsync = decodeAsync ?? throw new ArgumentNullException(nameof(decodeAsync));
     this.transcribeAsync = transcribeAsync ?? throw new ArgumentNullException(nameof(transcribeAsync));
   }
@@ -71,7 +72,7 @@ internal sealed class WorkbenchAudioImportController
       }
       catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or NotSupportedException)
       {
-        diagnostics.Warning($"File transcription failed for '{file}': {ex.Message}");
+        DiagnosticBoundary.Report(() => diagnostics.Warning($"File transcription failed for '{file}': {ex.Message}"));
         item = new WorkbenchAudioImportItem(file, WorkbenchAudioImportStatus.Failed, string.Empty);
       }
 

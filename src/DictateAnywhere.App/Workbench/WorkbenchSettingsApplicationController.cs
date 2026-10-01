@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.IO;
 using System.Threading;
@@ -53,7 +54,7 @@ internal sealed class WorkbenchSettingsApplicationController : IAsyncDisposable
     WorkbenchChatController chatController,
     WorkbenchReadAloudController readAloudController)
   {
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.quickSettingsController = quickSettingsController ?? throw new ArgumentNullException(nameof(quickSettingsController));
     this.operationSession = operationSession ?? throw new ArgumentNullException(nameof(operationSession));
     this.dictationController = dictationController ?? throw new ArgumentNullException(nameof(dictationController));

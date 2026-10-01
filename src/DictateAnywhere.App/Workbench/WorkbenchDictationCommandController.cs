@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -74,7 +75,7 @@ internal sealed class WorkbenchDictationCommandController
     this.operationSession = operationSession ?? throw new ArgumentNullException(nameof(operationSession));
     this.dictationController = dictationController ?? throw new ArgumentNullException(nameof(dictationController));
     this.historyRecorder = historyRecorder ?? throw new ArgumentNullException(nameof(historyRecorder));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
   }
 
   public async Task<WorkbenchDictationCommandResult> StartAsync(

@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
@@ -30,7 +31,7 @@ internal sealed class WorkbenchChatModelSetupCommandController
     this.chatController = chatController ?? throw new ArgumentNullException(nameof(chatController));
     this.modelController = modelController ?? throw new ArgumentNullException(nameof(modelController));
     this.chatSendController = chatSendController ?? throw new ArgumentNullException(nameof(chatSendController));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
   }
 
   public async Task<WorkbenchChatModelSetupCommandResult> SetupAsync(

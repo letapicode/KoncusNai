@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -44,7 +45,7 @@ internal sealed class WorkbenchChatModelController
   {
     this.modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
     this.runtimeReadinessProbe = runtimeReadinessProbe ?? throw new ArgumentNullException(nameof(runtimeReadinessProbe));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.approveExternalOllama = approveExternalOllama ?? (_ => false);
   }
 
@@ -83,7 +84,7 @@ internal sealed class WorkbenchChatModelController
                                or HttpRequestException
                                || IsModelManagementException(ex))
     {
-      diagnostics.Warning($"Local chat model setup failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Local chat model setup failed: {ex.Message}"));
       return new WorkbenchChatModelSetupResult("Model setup failed. See Diagnostics.", RefreshReadiness: false, ex);
     }
   }

@@ -27,7 +27,7 @@ internal sealed class WorkbenchDocumentImportController : IAsyncDisposable
     IDiagnostics diagnostics)
   {
     this.documentOcrServiceFactory = documentOcrServiceFactory ?? throw new ArgumentNullException(nameof(documentOcrServiceFactory));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
   }
 
   public async Task<WorkbenchDocumentImportResult> ImportAsync(
@@ -68,7 +68,7 @@ internal sealed class WorkbenchDocumentImportController : IAsyncDisposable
       }
       catch (Exception ex) when (ex is IOException or InvalidOperationException or NotSupportedException or UnauthorizedAccessException or TimeoutException)
       {
-        diagnostics.Warning($"Chat file import failed for '{file}': {ex.Message}");
+        DiagnosticBoundary.Report(() => diagnostics.Warning($"Chat file import failed for '{file}': {ex.Message}"));
         failures.Add(fileName);
       }
     }

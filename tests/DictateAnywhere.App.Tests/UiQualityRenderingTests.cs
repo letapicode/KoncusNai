@@ -39,7 +39,12 @@ public sealed class UiQualityRenderingTests
       }
       // Construct the production window and event handlers, but do not load settings,
       // register hotkeys, query history, send a request or write to user stores.
-      DictateAnywhere.App.Composition.ApplicationComposition composition = DictateAnywhere.App.Composition.ApplicationComposition.CreateProduction();
+      string logRoot = Path.Combine(Path.GetTempPath(), "KoncusNai.Rendering.Diagnostics.Tests", Guid.NewGuid().ToString("N"));
+      using DictateAnywhere.App.Diagnostics.LocalFileDiagnostics isolatedDiagnostics = new(
+        DictateAnywhere.Diagnostics.StructuredDiagnosticsOptions.Default with { LogsDirectoryPath = logRoot },
+        new DictateAnywhere.Diagnostics.DiagnosticsBundleExporter(), Path.Combine(logRoot, "unused-settings.json"));
+      DictateAnywhere.App.Composition.ApplicationComposition composition = DictateAnywhere.App.Composition.ApplicationComposition.CreateProduction(isolatedDiagnostics);
+      Assert.Same(isolatedDiagnostics, composition.Diagnostics);
       TextboxWorkbenchWindow window = composition.CreateWorkbenchWindow();
       try
       {
@@ -189,6 +194,10 @@ public sealed class UiQualityRenderingTests
         disposal.GetAwaiter().GetResult();
         window.Close();
         composition.Diagnostics.Dispose();
+        Assert.NotEmpty(Directory.GetFiles(logRoot, "*.log"));
+        string ownedParent = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "KoncusNai.Rendering.Diagnostics.Tests")) + Path.DirectorySeparatorChar;
+        Assert.StartsWith(ownedParent, Path.GetFullPath(logRoot), StringComparison.OrdinalIgnoreCase);
+        Directory.Delete(logRoot, recursive: true);
       }
     });
   }

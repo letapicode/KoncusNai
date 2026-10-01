@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -40,7 +41,7 @@ public sealed class CrisperWhisperTranscriptionService : ITranscriptionService, 
   {
     this.options = options ?? throw new ArgumentNullException(nameof(options));
     this.workerClientFactory = workerClientFactory ?? new PersistentPythonWorkerClientFactory();
-    this.diagnostics = diagnostics;
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics);
   }
 
   public string ProviderId => options.ProviderId;
@@ -52,45 +53,48 @@ public sealed class CrisperWhisperTranscriptionService : ITranscriptionService, 
   public void WarmUpInBackground(string modelId, IDiagnostics? diagnostics = null)
   {
     ObjectDisposedException.ThrowIf(disposed, this);
+    diagnostics = DiagnosticBoundary.Wrap(diagnostics);
     this.diagnostics ??= diagnostics;
     if (string.IsNullOrWhiteSpace(modelId))
     {
       return;
     }
 
+    string? skippedMessage = null;
     lock (backgroundWarmUpSync)
     {
       if (backgroundWarmUpTask is not null && !backgroundWarmUpTask.IsCompleted)
       {
         if (!string.Equals(backgroundWarmUpModelId, modelId, StringComparison.OrdinalIgnoreCase))
         {
-          diagnostics?.Warning(
-            $"CrisperWhisper warm-up for '{modelId}' was skipped because '{backgroundWarmUpModelId}' is already warming.");
+          skippedMessage = $"CrisperWhisper warm-up for '{modelId}' was skipped because '{backgroundWarmUpModelId}' is already warming.";
         }
 
-        return;
       }
-
-      backgroundWarmUpModelId = modelId;
-      backgroundWarmUpTask = Task.Run(
-        async () =>
-        {
-          try
+      else
+      {
+        backgroundWarmUpModelId = modelId;
+        backgroundWarmUpTask = Task.Run(
+          async () =>
           {
-            backgroundWarmUpCancellationSource.Token.ThrowIfCancellationRequested();
-            await WarmUpAsync(modelId, backgroundWarmUpCancellationSource.Token).ConfigureAwait(false);
-            diagnostics?.Info("CrisperWhisper local worker warm-up completed.");
-          }
-          catch (OperationCanceledException) when (backgroundWarmUpCancellationSource.IsCancellationRequested)
-          {
-          }
-          catch (Exception ex)
-          {
-            diagnostics?.Warning($"CrisperWhisper background warm-up failed: {ex.Message}");
-          }
-        },
-        CancellationToken.None);
+            try
+            {
+              backgroundWarmUpCancellationSource.Token.ThrowIfCancellationRequested();
+              await WarmUpAsync(modelId, backgroundWarmUpCancellationSource.Token).ConfigureAwait(false);
+              diagnostics?.Info("CrisperWhisper local worker warm-up completed.");
+            }
+            catch (OperationCanceledException) when (backgroundWarmUpCancellationSource.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+              DiagnosticBoundary.Report(() => diagnostics?.Warning($"CrisperWhisper background warm-up failed: {ex.Message}"));
+            }
+          },
+          CancellationToken.None);
+      }
     }
+    if (skippedMessage is not null) diagnostics?.Warning(skippedMessage);
   }
 
   public async Task WarmUpAsync(string modelId, CancellationToken cancellationToken = default)

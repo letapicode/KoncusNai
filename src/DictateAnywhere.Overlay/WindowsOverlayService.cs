@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
@@ -39,7 +40,7 @@ public sealed class WindowsOverlayService : IOverlayService, IAsyncDisposable
     ArgumentNullException.ThrowIfNull(presenterFactory);
     this.options = options ?? throw new ArgumentNullException(nameof(options));
     this.anchorProvider = anchorProvider;
-    this.diagnostics = diagnostics;
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics);
     presenter = new Lazy<IOverlayPresenter>(
       () => presenterFactory() ?? throw new InvalidOperationException("Overlay presenter factory returned null."),
       LazyThreadSafetyMode.ExecutionAndPublication);
@@ -414,7 +415,7 @@ public sealed class WindowsOverlayService : IOverlayService, IAsyncDisposable
     }
     catch (Exception ex)
     {
-      diagnostics?.Warning($"Overlay auto-hide failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics?.Warning($"Overlay auto-hide failed: {ex.Message}"));
     }
     finally
     {

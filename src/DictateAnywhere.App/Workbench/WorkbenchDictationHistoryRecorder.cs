@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
@@ -27,7 +28,7 @@ internal sealed class WorkbenchDictationHistoryRecorder
     IDiagnostics diagnostics)
   {
     this.recordAsync = recordAsync ?? throw new ArgumentNullException(nameof(recordAsync));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
   }
 
   [SuppressMessage(

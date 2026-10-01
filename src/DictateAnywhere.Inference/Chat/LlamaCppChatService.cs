@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -246,13 +247,13 @@ public sealed class LlamaCppChatService : IChatCompletionService, IAsyncDisposab
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
-          Debug.WriteLine("Timed out waiting for the owned llama.cpp process to exit after termination.");
+          DiagnosticBoundary.Report(() => Debug.WriteLine("Timed out waiting for the owned llama.cpp process to exit after termination."));
         }
       }
     }
     catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
     {
-      Debug.WriteLine($"Unable to terminate the owned llama.cpp process: {ex.Message}");
+      DiagnosticBoundary.Report(() => Debug.WriteLine("Unable to terminate the owned llama.cpp process."));
     }
     finally
     {

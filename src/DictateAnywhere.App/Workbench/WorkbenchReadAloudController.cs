@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -25,7 +26,7 @@ internal sealed class WorkbenchReadAloudController : IAsyncDisposable
   public WorkbenchReadAloudController(WorkbenchSpeechSession session, IDiagnostics diagnostics)
   {
     this.session = session ?? throw new ArgumentNullException(nameof(session));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     session.PlaybackEnded += OnPlaybackEnded;
     session.PlaybackFailed += OnPlaybackFailed;
   }
@@ -86,13 +87,13 @@ internal sealed class WorkbenchReadAloudController : IAsyncDisposable
     }
     catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException or UnauthorizedAccessException)
     {
-      diagnostics.Warning($"Local speech synthesis failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Local speech synthesis failed: {ex.Message}"));
       Publish("Could not prepare speech. See Diagnostics.");
     }
     catch (Exception ex)
     {
       diagnostics.Error("Unexpected Workbench read-aloud failure.", ex);
-      Publish("Could not prepare speech. The error was recorded in Diagnostics.");
+      Publish("Could not prepare speech. Diagnostics may contain details.");
     }
   }
 
@@ -132,7 +133,7 @@ internal sealed class WorkbenchReadAloudController : IAsyncDisposable
 
   private void OnPlaybackFailed(object? sender, WavAudioPlaybackFailedEventArgs eventArgs)
   {
-    diagnostics.Warning($"Workbench speech playback failed: {eventArgs.Exception.Message}");
+    DiagnosticBoundary.Report(() => diagnostics.Warning($"Workbench speech playback failed: {eventArgs.Exception.Message}"));
     Publish("Could not play speech. Check the audio device or see Diagnostics.");
   }
 

@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -165,7 +166,7 @@ internal sealed class ReaderPublishingController : IAsyncDisposable
     this.exportEngine = exportEngine ?? throw new ArgumentNullException(nameof(exportEngine));
     this.coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
     this.jobStore = jobStore ?? throw new ArgumentNullException(nameof(jobStore));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.mediaRoot = mediaRoot ?? Path.Combine(
       Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
       "DictateAnywhere",
@@ -234,7 +235,7 @@ internal sealed class ReaderPublishingController : IAsyncDisposable
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
     {
-      diagnostics.Warning($"Reader publishing recovery failed: {ex}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Reader publishing recovery failed: {ex}"));
       return new ReaderPublishingRecoveryResult(ReaderPublishingRecoveryStatus.Failed);
     }
   }
@@ -275,7 +276,7 @@ internal sealed class ReaderPublishingController : IAsyncDisposable
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
     {
-      diagnostics.Warning($"Reader publishing workspace creation failed: {ex}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Reader publishing workspace creation failed: {ex}"));
       return new ReaderPublishingJobCreationResult(false);
     }
   }
@@ -440,7 +441,7 @@ internal sealed class ReaderPublishingController : IAsyncDisposable
     catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException
       or System.Net.Http.HttpRequestException or Google.GoogleApiException or TimeoutException)
     {
-      diagnostics.Warning($"Reader publishing failed: {ex}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Reader publishing failed: {ex}"));
       YouTubePublishingJob? recovery = coordinator.LastKnownJob;
       ReaderPublishingStatus status = ex is PublishingReceiptPersistenceException
         ? ReaderPublishingStatus.ReceiptNotSaved

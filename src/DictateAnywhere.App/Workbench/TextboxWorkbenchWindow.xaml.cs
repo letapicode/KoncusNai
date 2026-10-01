@@ -83,7 +83,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     IDiagnostics diagnostics,
     WorkbenchDependencies dependencies)
   {
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     ArgumentNullException.ThrowIfNull(dependencies);
     quickSettingsController = dependencies.QuickSettingsController;
     settingsApplicationController = dependencies.SettingsApplicationController;
@@ -575,7 +575,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     catch (Exception ex)
     {
       diagnostics.Error("Unexpected chat model readiness failure.", ex);
-      SetChatStatus("Could not check the selected chat model. The error was recorded in Diagnostics.", modelStatus: true);
+      SetChatStatus("Could not check the selected chat model. Diagnostics may contain details.", modelStatus: true);
     }
   }
 
@@ -671,7 +671,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
         try { Clipboard.SetText(recovery.Text); }
         catch (COMException ex)
         {
-          diagnostics.Warning($"Could not copy recovered dictation: {ex.Message}");
+          DiagnosticBoundary.Report(() => diagnostics.Warning($"Could not copy recovered dictation: {ex.Message}"));
           if (recoveries.Current?.Id != recovery.Id) return;
           ShowTransientSessionOutcome("Could not copy dictation; another app is using the clipboard. Try again.", autoExpire: false, recoveryNotice: true);
           return;
@@ -800,7 +800,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     }
     catch (InvalidOperationException ex)
     {
-      diagnostics.Warning($"Reading Studio could not open: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Reading Studio could not open: {ex.Message}"));
       SetChatStatus("Could not open Reading Studio. See Diagnostics.");
     }
   }
@@ -1244,7 +1244,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     }
     catch (COMException ex)
     {
-      diagnostics.Warning($"Could not copy chat {label}: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Could not copy chat {label}: {ex.Message}"));
       SetChatStatus($"Could not copy {label}; another app is using the clipboard.");
     }
   }
@@ -1268,7 +1268,7 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
     {
-      diagnostics.Warning($"Chat export failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Chat export failed: {ex.Message}"));
       SetChatStatus("Could not export chat. See Diagnostics.");
     }
   }

@@ -100,7 +100,13 @@ internal sealed class ApplicationComposition
   public LocalChatProviderRegistry ChatProviderRegistry { get; }
   public LocalFileDiagnostics Diagnostics { get; }
 
-  public static ApplicationComposition CreateProduction()
+  public static ApplicationComposition CreateProduction() => CreateProductionCore(null);
+
+  // Explicit sink ownership lets production-window tests use only their own temporary log files.
+  internal static ApplicationComposition CreateProduction(LocalFileDiagnostics diagnostics) =>
+    CreateProductionCore(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
+
+  private static ApplicationComposition CreateProductionCore(LocalFileDiagnostics? diagnostics)
   {
     IModelManager transcriptionModels = CreateTranscriptionModelManager();
     return new ApplicationComposition(
@@ -120,7 +126,7 @@ internal sealed class ApplicationComposition
       new LocalPythonRuntimeDependencyProbe(),
       LocalTranscriptionProviderRegistry.CreateDefault(),
       LocalChatProviderRegistry.CreateDefault(),
-      new LocalFileDiagnostics());
+      diagnostics ?? new LocalFileDiagnostics());
   }
 
   public FirstRunWizardWindow CreateFirstRunWizard()

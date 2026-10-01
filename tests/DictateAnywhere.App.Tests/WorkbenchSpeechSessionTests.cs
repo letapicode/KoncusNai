@@ -54,7 +54,7 @@ public sealed class WorkbenchSpeechSessionTests
 
     await controller.ReadAsync("Read this response.", "this response");
 
-    Xunit.Assert.Contains(states, state => state.StatusMessage == "Could not prepare speech. The error was recorded in Diagnostics.");
+    Xunit.Assert.Contains(states, state => state.StatusMessage == "Could not prepare speech. Diagnostics may contain details.");
     Xunit.Assert.Contains(diagnostics.Errors, item => ReferenceEquals(item.Exception, failure));
   }
 

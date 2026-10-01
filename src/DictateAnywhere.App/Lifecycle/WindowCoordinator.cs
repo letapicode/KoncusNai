@@ -36,7 +36,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
   {
     this.composition = composition ?? throw new ArgumentNullException(nameof(composition));
     settingsStore = composition.SettingsStore;
-    diagnostics = composition.Diagnostics;
+    diagnostics = DiagnosticBoundary.Wrap(composition.Diagnostics);
     this.dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
     this.historyChangeNotifier = historyChangeNotifier ?? throw new ArgumentNullException(nameof(historyChangeNotifier));
     historyRefreshSession = new CoalescingRefreshSession(RefreshOpenHistoryViewsAsync);
@@ -269,7 +269,7 @@ internal sealed class WindowCoordinator : IAsyncDisposable
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
     {
-      diagnostics.Warning($"Open history view refresh failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Open history view refresh failed: {ex.Message}"));
     }
     catch (Exception ex)
     {

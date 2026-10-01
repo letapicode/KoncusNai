@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,6 +11,7 @@ public sealed class OperationDiagnosticScope : IDisposable
 {
   private readonly IDiagnostics diagnostics;
   private readonly Stopwatch stopwatch;
+  private readonly object state = new();
   private bool completed;
   private bool disposed;
 
@@ -22,7 +24,7 @@ public sealed class OperationDiagnosticScope : IDisposable
     string? model = null,
     string? runtime = null)
   {
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     OperationName = string.IsNullOrWhiteSpace(operationName) ? "operation" : operationName;
     OperationId = string.IsNullOrWhiteSpace(operationId) ? Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture) : operationId;
     ParentOperationId = parentOperationId;
@@ -95,49 +97,40 @@ public sealed class OperationDiagnosticScope : IDisposable
 
   public void Stage(string stageName, IReadOnlyDictionary<string, object?>? properties = null)
   {
-    if (completed || disposed)
+    lock (state)
     {
-      return;
+      if (completed || disposed) return;
+      CurrentStage = string.IsNullOrWhiteSpace(stageName) ? "stage" : stageName;
     }
-
-    CurrentStage = string.IsNullOrWhiteSpace(stageName) ? "stage" : stageName;
     LogEvent("INFO", $"{OperationName} stage '{CurrentStage}' entered.", Outcome, exception: null, remediationCode: null, properties);
   }
 
   public void Complete(string? message = null, IReadOnlyDictionary<string, object?>? properties = null)
   {
-    if (completed)
+    if (!Finish(OperationOutcome.Completed)) return;
+
+    DiagnosticBoundary.Report(() =>
     {
-      return;
-    }
+      string logMessage = string.IsNullOrWhiteSpace(message)
+        ? $"{OperationName} completed in {Elapsed.TotalMilliseconds:F1} ms."
+        : message;
 
-    stopwatch.Stop();
-    completed = true;
-    Outcome = OperationOutcome.Completed;
-
-    string logMessage = string.IsNullOrWhiteSpace(message)
-      ? $"{OperationName} completed in {Elapsed.TotalMilliseconds:F1} ms."
-      : message;
-
-    LogEvent("INFO", logMessage, Outcome, exception: null, remediationCode: null, properties);
+      LogEvent("INFO", logMessage, Outcome, exception: null, remediationCode: null, properties);
+    });
   }
 
   public void Cancel(string? reason = null, IReadOnlyDictionary<string, object?>? properties = null)
   {
-    if (completed)
+    if (!Finish(OperationOutcome.Cancelled)) return;
+
+    DiagnosticBoundary.Report(() =>
     {
-      return;
-    }
+      string logMessage = string.IsNullOrWhiteSpace(reason)
+        ? $"{OperationName} cancelled after {Elapsed.TotalMilliseconds:F1} ms."
+        : $"{OperationName} cancelled after {Elapsed.TotalMilliseconds:F1} ms: {reason}";
 
-    stopwatch.Stop();
-    completed = true;
-    Outcome = OperationOutcome.Cancelled;
-
-    string logMessage = string.IsNullOrWhiteSpace(reason)
-      ? $"{OperationName} cancelled after {Elapsed.TotalMilliseconds:F1} ms."
-      : $"{OperationName} cancelled after {Elapsed.TotalMilliseconds:F1} ms: {reason}";
-
-    LogEvent("INFO", logMessage, Outcome, exception: null, remediationCode: DiagnosticRemediationCodes.OperationCancelled, properties);
+      LogEvent("INFO", logMessage, Outcome, exception: null, remediationCode: DiagnosticRemediationCodes.OperationCancelled, properties);
+    });
   }
 
   public void Fail(
@@ -147,37 +140,41 @@ public sealed class OperationDiagnosticScope : IDisposable
     string level = "ERROR",
     IReadOnlyDictionary<string, object?>? properties = null)
   {
-    if (completed)
+    if (!Finish(OperationOutcome.Failed)) return;
+
+    DiagnosticBoundary.Report(() =>
     {
-      return;
-    }
+      string effectiveCode = remediationCode ?? DiagnosticRemediationCodes.GetRemediationCode(
+        DiagnosticErrorClassifier.Classify(message ?? exception?.Message ?? string.Empty, exception),
+        exception);
 
-    stopwatch.Stop();
-    completed = true;
-    Outcome = OperationOutcome.Failed;
+      string logMessage = string.IsNullOrWhiteSpace(message)
+        ? $"{OperationName} failed after {Elapsed.TotalMilliseconds:F1} ms: {exception?.Message ?? "unspecified error"}"
+        : message;
 
-    string effectiveCode = remediationCode ?? DiagnosticRemediationCodes.GetRemediationCode(
-      DiagnosticErrorClassifier.Classify(message ?? exception?.Message ?? string.Empty, exception),
-      exception);
-
-    string logMessage = string.IsNullOrWhiteSpace(message)
-      ? $"{OperationName} failed after {Elapsed.TotalMilliseconds:F1} ms: {exception?.Message ?? "unspecified error"}"
-      : message;
-
-    LogEvent(level, logMessage, Outcome, exception, effectiveCode, properties);
+      LogEvent(level, logMessage, Outcome, exception, effectiveCode, properties);
+    });
   }
 
   public void Dispose()
   {
-    if (disposed)
+    lock (state)
     {
-      return;
+      if (disposed) return;
+      disposed = true;
     }
+    Complete();
+  }
 
-    disposed = true;
-    if (!completed)
+  private bool Finish(string outcome)
+  {
+    lock (state)
     {
-      Complete();
+      if (completed) return false;
+      completed = true;
+      stopwatch.Stop();
+      Outcome = outcome;
+      return true;
     }
   }
 
@@ -188,6 +185,11 @@ public sealed class OperationDiagnosticScope : IDisposable
     Exception? exception,
     string? remediationCode,
     IReadOnlyDictionary<string, object?>? additionalProperties)
+  {
+    DiagnosticBoundary.Report(() => LogEventCore(level, message, outcome, exception, remediationCode, additionalProperties));
+  }
+
+  private void LogEventCore(string level, string message, string outcome, Exception? exception, string? remediationCode, IReadOnlyDictionary<string, object?>? additionalProperties)
   {
     Dictionary<string, object?> payload = new(StringComparer.Ordinal)
     {

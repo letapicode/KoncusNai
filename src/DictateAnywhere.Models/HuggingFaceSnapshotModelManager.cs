@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -410,7 +411,7 @@ public sealed class HuggingFaceSnapshotModelManager : IProviderModelManager
       }
       catch (Exception ex) when (ex is IOException or ObjectDisposedException or TimeoutException)
       {
-        Debug.WriteLine($"Model download output cleanup did not complete cleanly: {ex.Message}");
+        DiagnosticBoundary.Report(() => Debug.WriteLine("Model download output cleanup did not complete cleanly."));
       }
       throw;
     }
@@ -676,7 +677,7 @@ public sealed class HuggingFaceSnapshotModelManager : IProviderModelManager
     }
     catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or TimeoutException)
     {
-      Debug.WriteLine($"Model download process cleanup did not complete cleanly: {ex.Message}");
+      DiagnosticBoundary.Report(() => Debug.WriteLine("Model download process cleanup did not complete cleanly."));
     }
   }
 

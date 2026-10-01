@@ -9,6 +9,34 @@ namespace DictateAnywhere.App.Tests;
 
 public sealed class RuntimeWatchdogTests
 {
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task ThrowingSinkCannotPreventRecoveryOrReplaceItsOutcome(bool failure)
+  {
+    FakeRuntimeSupervisor runtime = new() { StartException = failure ? new IOException("provider failure") : null };
+    RuntimeWatchdog watchdog = new(runtime, new ThrowingSink(), TimeSpan.FromMinutes(1));
+    await watchdog.TickAsync();
+    Xunit.Assert.Equal(1, runtime.StartCallCount);
+    Xunit.Assert.Equal(failure ? 1 : 0, watchdog.FailedRecoveryAttempts);
+    Xunit.Assert.Equal(!failure, runtime.IsRunning);
+  }
+
+  [Xunit.Fact]
+  public async Task CancellationRemainsCancellationWhenReportingThrows()
+  {
+    OperationCanceledException original = new("controlled cancellation");
+    RuntimeWatchdog watchdog = new(new FakeRuntimeSupervisor { StartException = original }, new ThrowingSink(), TimeSpan.FromMinutes(1));
+    Xunit.Assert.Same(original, await Xunit.Assert.ThrowsAsync<OperationCanceledException>(() => watchdog.TickAsync()));
+    Xunit.Assert.Equal(0, watchdog.FailedRecoveryAttempts);
+  }
+
+  private sealed class ThrowingSink : IDiagnostics
+  {
+    public void Info(string message) => throw new IOException("sink failed");
+    public void Warning(string message) => throw new IOException("sink failed");
+    public void Error(string message, Exception? exception = null) => throw new IOException("sink failed");
+  }
   [Xunit.Fact]
   public async Task TickAsync_RuntimeAlreadyRunning_DoesNotStartAgain()
   {

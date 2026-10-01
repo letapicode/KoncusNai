@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,7 +22,7 @@ public sealed class GlobalToggleHotkeyService : IHotkeyService
   {
     this.inner = inner ?? throw new ArgumentNullException(nameof(inner));
     this.windowFocusProvider = windowFocusProvider;
-    this.diagnostics = diagnostics;
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics);
     registrationCoordinator = new GlobalHotkeyRegistrationCoordinator(this.inner.RegisterAsync);
     this.inner.HotkeyPressed += ForwardHotkeyPressed;
     this.inner.HotkeyReleased += ForwardHotkeyReleased;
@@ -79,14 +80,17 @@ public sealed class GlobalToggleHotkeyService : IHotkeyService
         && windowFocusProvider is not null
         && LastRegistrationOutcome is { Success: true } outcome)
     {
-      WindowFocusContext focusContext = windowFocusProvider.GetWindowFocusContext();
-      GlobalHotkeyTriggerDiagnostic triggerDiagnostic = GlobalHotkeyTriggerDiagnostics
-        .AnalyzeTrigger(outcome.ActiveBinding, focusContext);
-      diagnostics.Info(triggerDiagnostic.FiredMessage);
-      if (!string.IsNullOrWhiteSpace(triggerDiagnostic.SecondaryMessage))
+      DiagnosticBoundary.Report(() =>
       {
-        diagnostics.Warning(triggerDiagnostic.SecondaryMessage);
-      }
+        WindowFocusContext focusContext = windowFocusProvider.GetWindowFocusContext();
+        GlobalHotkeyTriggerDiagnostic triggerDiagnostic = GlobalHotkeyTriggerDiagnostics
+          .AnalyzeTrigger(outcome.ActiveBinding, focusContext);
+        diagnostics.Info(triggerDiagnostic.FiredMessage);
+        if (!string.IsNullOrWhiteSpace(triggerDiagnostic.SecondaryMessage))
+        {
+          diagnostics.Warning(triggerDiagnostic.SecondaryMessage);
+        }
+      });
     }
 
     HotkeyPressed?.Invoke(this, e);
