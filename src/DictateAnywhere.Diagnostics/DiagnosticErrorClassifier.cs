@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using DictateAnywhere.Core.Services;
 
 namespace DictateAnywhere.Diagnostics;
 
@@ -76,7 +77,8 @@ public static class DiagnosticErrorClassifier
 
   public static UserFacingDiagnosticError Describe(string operationName, string message, Exception? exception = null)
   {
-    DiagnosticFailureCategory category = Classify(message, exception);
+    DiagnosticFailureCategory category = DiagnosticFailureCategory.Unknown;
+    DiagnosticBoundary.Report(() => category = Classify(message, exception));
     string remediationCode = DiagnosticRemediationCodes.GetRemediationCode(category, exception);
     return category switch
     {

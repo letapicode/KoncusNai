@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,7 +45,7 @@ internal sealed class WorkbenchDictationController : IAsyncDisposable
     Func<IHotkeyService> hotkeyServiceFactory,
     Func<AppSettings, IOverlayService>? overlayFactory = null)
   {
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.audioCaptureServiceFactory = audioCaptureServiceFactory ?? throw new ArgumentNullException(nameof(audioCaptureServiceFactory));
     this.transcriptionServiceFactory = transcriptionServiceFactory ?? throw new ArgumentNullException(nameof(transcriptionServiceFactory));
     this.hotkeyServiceFactory = hotkeyServiceFactory ?? throw new ArgumentNullException(nameof(hotkeyServiceFactory));

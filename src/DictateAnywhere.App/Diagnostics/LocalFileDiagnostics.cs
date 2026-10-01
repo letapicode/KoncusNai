@@ -33,9 +33,9 @@ public sealed class LocalFileDiagnostics : IStructuredDiagnostics, IDisposable
     DiagnosticsBundleExporter bundleExporter,
     string settingsPath)
   {
-    diagnostics = new StructuredLocalDiagnostics(options);
     this.bundleExporter = bundleExporter ?? throw new ArgumentNullException(nameof(bundleExporter));
     this.settingsPath = settingsPath ?? throw new ArgumentNullException(nameof(settingsPath));
+    diagnostics = new StructuredLocalDiagnostics(options);
     logFilePrefix = options.FileNamePrefix;
   }
 

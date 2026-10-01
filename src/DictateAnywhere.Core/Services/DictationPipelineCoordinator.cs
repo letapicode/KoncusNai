@@ -54,7 +54,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     this.textTransformationService = textTransformationService ?? throw new ArgumentNullException(nameof(textTransformationService));
     this.overlayService = overlayService ?? throw new ArgumentNullException(nameof(overlayService));
     this.settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.historyRecorder = historyRecorder ?? throw new ArgumentNullException(nameof(historyRecorder));
     insertionTargetSession = textInsertionService as ITextInsertionTargetSession;
   }
@@ -346,12 +346,9 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     }
   }
 
-  [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-    Justification = "Only terminal event/drain reporting is isolated here; sink failure must not escape async void or revive stopped work.")]
   private void ReportCallbackFailure(string message, Exception failure)
   {
-    try { diagnostics.Error(message, failure); }
-    catch (Exception) { /* General diagnostic sink policy is a separate remediation batch. */ }
+    diagnostics.Error(message, failure);
   }
 
   private Task ProcessHotkeySignalAsync(RunLifetime owner, HotkeySignal signal)
@@ -670,7 +667,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     }
     catch (Exception ex)
     {
-      diagnostics.Warning($"Local history write failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Local history write failed: {ex.Message}"));
       return false;
     }
   }
@@ -821,24 +818,27 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     Justification = "Error recovery must swallow secondary failures while attempting safe reset.")]
   private async Task HandlePipelineErrorAsync(RunLifetime owner, string message, Exception? exception)
   {
-    Dictionary<string, object?> errorProps = new(StringComparer.Ordinal)
+    DiagnosticBoundary.Report(() =>
     {
-      ["operationId"] = activeOperationId ?? Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture),
-      ["stage"] = "pipeline",
-      ["outcome"] = exception is OperationCanceledException ? "Cancelled" : "Failed",
-      ["provider"] = (activeSessionSettings ?? settings).GetConfiguredTranscriptionProviderId(),
-      ["model"] = (activeSessionSettings ?? settings).GetConfiguredTranscriptionModelId(),
-    };
+      Dictionary<string, object?> errorProps = new(StringComparer.Ordinal)
+      {
+        ["operationId"] = activeOperationId ?? Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture),
+        ["stage"] = "pipeline",
+        ["outcome"] = exception is OperationCanceledException ? "Cancelled" : "Failed",
+        ["provider"] = (activeSessionSettings ?? settings).GetConfiguredTranscriptionProviderId(),
+        ["model"] = (activeSessionSettings ?? settings).GetConfiguredTranscriptionModelId(),
+      };
 
-    if (diagnostics is IStructuredDiagnostics structuredDiagnostics)
-    {
-      structuredDiagnostics.Error(message, exception, errorProps);
-    }
-    else
-    {
-      diagnostics.Error(message, exception);
-    }
+      if (diagnostics is IStructuredDiagnostics structuredDiagnostics)
+      {
+        structuredDiagnostics.Error(message, exception, errorProps);
+      }
+      else
+      {
+        diagnostics.Error(message, exception);
+      }
 
+    });
     DictationSessionState state = stateMachine.CurrentState;
     if (state is DictationSessionState.Recording or DictationSessionState.Transcribing or DictationSessionState.Inserting)
     {
@@ -858,7 +858,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
     catch (OperationCanceledException) when (!owner.Accepting || owner.Token.IsCancellationRequested) { }
     catch (Exception overlayException)
     {
-      diagnostics.Warning($"Failed to show error overlay: {overlayException.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Failed to show error overlay: {overlayException.Message}"));
     }
 
     if (audioCaptureService.IsCapturing)
@@ -876,7 +876,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
       }
       catch (Exception stopException)
       {
-        diagnostics.Warning($"Failed to stop capture during error recovery: {stopException.Message}");
+        DiagnosticBoundary.Report(() => diagnostics.Warning($"Failed to stop capture during error recovery: {stopException.Message}"));
       }
     }
 
@@ -907,7 +907,7 @@ public sealed class DictationPipelineCoordinator : IAsyncDisposable
       }
       catch (Exception ex)
       {
-        diagnostics.Warning($"Failed to hide overlay while resetting state: {ex.Message}");
+        DiagnosticBoundary.Report(() => diagnostics.Warning($"Failed to hide overlay while resetting state: {ex.Message}"));
       }
     }
 

@@ -10,6 +10,25 @@ namespace DictateAnywhere.App.Tests;
   Justification = "The runtime owns fake services; every barrier is released before its bounded cleanup is awaited.")]
 public sealed class DictationRuntimeShutdownTests
 {
+  [Xunit.Fact]
+  public async Task ReportingOnlyFailuresAllowOwnedRuntimeStopAndRestart()
+  {
+    FakeService service = new() { ThrowDiagnostics = true };
+    int graphs = 0;
+    await using DictationRuntime runtime = new(service, service, null, new DictationHistoryChangeNotifier(), (_, _, _, _) =>
+    {
+      graphs++;
+      return new(new FakeService(), new FakeService(), service, service, service, service, service, service, service);
+    });
+    await runtime.StartAsync();
+    await runtime.StopAsync();
+    int released = service.Disposals;
+    Xunit.Assert.True(released > 0);
+    await runtime.StartAsync();
+    Xunit.Assert.True(runtime.IsRunning);
+    Xunit.Assert.Equal(2, graphs);
+  }
+
   [Xunit.Theory]
   [Xunit.InlineData(false)]
   [Xunit.InlineData(true)]
@@ -121,7 +140,7 @@ public sealed class DictationRuntimeShutdownTests
     context.ReleaseOnTimeout(() => release.TrySetResult());
     FakeService hotkey = new();
     FakeService undo = new() { UnregisterFailure = unregisterFails ? new IOException("controlled unregister failure") : null };
-    FakeService service = new() { UndoGate = release.Task };
+    FakeService service = new() { UndoGate = release.Task, ThrowDiagnostics = true };
     DictationRuntime.RuntimeServices services = new(hotkey, undo, service, service, service, service, service, service, service);
     DictationRuntime runtime = new(service, service, null, new DictationHistoryChangeNotifier(), (_, _, _, _) => services);
     Task? stop = null;
@@ -227,6 +246,7 @@ public sealed class DictationRuntimeShutdownTests
     internal Task RegistrationGate { get; init; } = Task.CompletedTask;
     internal TaskCompletionSource RegistrationEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     internal Exception? DisposeFailure { get; init; }
+    internal bool ThrowDiagnostics { get; init; }
     public event EventHandler<HotkeyEventArgs>? HotkeyPressed { add => pressed += value; remove => pressed -= value; }
     public event EventHandler<HotkeyEventArgs>? HotkeyReleased { add => released += value; remove => released -= value; }
     internal void Press() => pressed?.Invoke(this, new HotkeyEventArgs(DateTimeOffset.UtcNow));
@@ -283,8 +303,8 @@ public sealed class DictationRuntimeShutdownTests
       return AppSettings.Default;
     }
     public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    public void Info(string message) { }
-    public void Warning(string message) { }
-    public void Error(string message, Exception? exception = null) { }
+    public void Info(string message) { if (ThrowDiagnostics) throw new IOException("diagnostic failure"); }
+    public void Warning(string message) { if (ThrowDiagnostics) throw new IOException("diagnostic failure"); }
+    public void Error(string message, Exception? exception = null) { if (ThrowDiagnostics) throw new IOException("diagnostic failure"); }
   }
 }

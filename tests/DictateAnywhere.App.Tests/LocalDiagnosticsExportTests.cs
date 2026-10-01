@@ -12,6 +12,25 @@ namespace DictateAnywhere.App.Tests;
 public sealed class LocalDiagnosticsExportTests
 {
   [Xunit.Fact]
+  public void ExportFailureRemainsExplicitEvenWhenLoggerIsDegraded()
+  {
+    string root = Path.Combine(Path.GetTempPath(), "KoncusNai.ExportFault.Tests", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+      string blocked = Path.Combine(root, "blocked");
+      File.WriteAllText(blocked, "owned fixture");
+      using LocalFileDiagnostics diagnostics = new(StructuredDiagnosticsOptions.Default with { LogsDirectoryPath = blocked },
+        new DiagnosticsBundleExporter(), Path.Combine(root, "missing-settings.json"));
+      diagnostics.Info("successful operation with unavailable logging");
+      Xunit.Assert.ThrowsAny<IOException>(() => diagnostics.ExportBundle(blocked));
+      diagnostics.Dispose();
+      Xunit.Assert.Throws<ObjectDisposedException>(() => diagnostics.ExportBundle(Path.Combine(root, "export")));
+      Xunit.Assert.Equal("owned fixture", File.ReadAllText(blocked));
+    }
+    finally { Directory.Delete(root, recursive: true); }
+  }
+  [Xunit.Fact]
   public void LocalFileDiagnostics_ExportsReadablePrivacyFilteredBundle()
   {
     string root = Path.Combine(Path.GetTempPath(), "KoncusNai.Diagnostics.Tests", Guid.NewGuid().ToString("N"));

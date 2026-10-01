@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -30,7 +31,7 @@ public sealed class UiAccessHelperProcessBridge : IElevatedInsertionBridge
   public UiAccessHelperProcessBridge(UiAccessHelperProcessBridgeOptions options, IDiagnostics? diagnostics)
   {
     this.options = options ?? throw new ArgumentNullException(nameof(options));
-    this.diagnostics = diagnostics;
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics);
     if (string.IsNullOrWhiteSpace(this.options.HelperExecutablePath))
     {
       throw new ArgumentException("Helper executable path must not be empty.", nameof(options));
@@ -284,7 +285,7 @@ public sealed class UiAccessHelperProcessBridge : IElevatedInsertionBridge
     }
     catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or TimeoutException)
     {
-      diagnostics?.Warning($"UIAccess helper cleanup did not complete cleanly: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics?.Warning($"UIAccess helper cleanup did not complete cleanly: {ex.Message}"));
     }
   }
 

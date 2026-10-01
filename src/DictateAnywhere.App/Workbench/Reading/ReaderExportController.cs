@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -154,7 +155,7 @@ internal sealed class ReaderExportController : IAsyncDisposable
     this.operationSession = operationSession ?? throw new ArgumentNullException(nameof(operationSession));
     this.preparationService = preparationService ?? throw new ArgumentNullException(nameof(preparationService));
     this.exportEngine = exportEngine ?? throw new ArgumentNullException(nameof(exportEngine));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
   }
 
   public event EventHandler<ReaderExportState>? StateChanged;
@@ -289,7 +290,7 @@ internal sealed class ReaderExportController : IAsyncDisposable
     }
     catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or System.Net.Http.HttpRequestException)
     {
-      diagnostics.Warning($"Reader {kind.ToString().ToLowerInvariant()} export failed: {ex}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Reader {kind.ToString().ToLowerInvariant()} export failed: {ex}"));
       ReaderExportStatus status = kind == ReaderExportKind.Audio
         ? ReaderExportStatus.AudioFailed
         : ReaderExportStatus.VideoFailed;

@@ -58,7 +58,7 @@ internal sealed class WorkbenchChatSendController
     this.chatController = chatController ?? throw new ArgumentNullException(nameof(chatController));
     this.checkReadinessAsync = checkReadinessAsync ?? throw new ArgumentNullException(nameof(checkReadinessAsync));
     this.saveChatAsync = saveChatAsync ?? throw new ArgumentNullException(nameof(saveChatAsync));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
   }
 
   public async Task<WorkbenchChatModelReadinessState?> RefreshReadinessAsync(
@@ -96,7 +96,7 @@ internal sealed class WorkbenchChatSendController
     chatController.SetModelStatus(state.Status);
     if (state.Failure is not null)
     {
-      diagnostics.Warning($"Chat model readiness check failed: {state.Failure.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Chat model readiness check failed: {state.Failure.Message}"));
     }
 
     progress?.Invoke(new WorkbenchChatSendProgress(WorkbenchChatSendProgressKind.ReadinessChanged, state));
@@ -230,7 +230,7 @@ internal sealed class WorkbenchChatSendController
       progress?.Invoke(new WorkbenchChatSendProgress(WorkbenchChatSendProgressKind.FailureAdded, Conversation: identity));
       await TryRefreshReadinessAfterFailureAsync(progress).ConfigureAwait(true);
       return new WorkbenchChatSendResult(
-        $"{modelDisplayName} stopped after {ChatRequestDurationFormatter.Format(stopwatch.Elapsed)}. The error was recorded in Diagnostics.",
+        $"{modelDisplayName} stopped after {ChatRequestDurationFormatter.Format(stopwatch.Elapsed)}. Diagnostics may contain details.",
         currentTitle,
         ShouldRefreshHistory: false,
         OperationAccepted: true,
@@ -316,7 +316,7 @@ internal sealed class WorkbenchChatSendController
     }
     catch (Exception ex)
     {
-      diagnostics.Warning($"Chat readiness refresh after failure also failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Chat readiness refresh after failure also failed: {ex.Message}"));
     }
   }
 

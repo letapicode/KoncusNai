@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -27,8 +28,8 @@ public sealed class TranscriptionService : ITranscriptionService, IAsyncDisposab
       ? throw new ArgumentException("Provider id must not be empty.", nameof(providerId))
       : providerId.Trim();
     this.modelRegistry = modelRegistry ?? throw new ArgumentNullException(nameof(modelRegistry));
-    this.diagnostics = diagnostics;
-    structuredDiagnostics = diagnostics as IStructuredDiagnostics;
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics);
+    structuredDiagnostics = this.diagnostics as IStructuredDiagnostics;
     this.ownsModelRegistry = ownsModelRegistry;
   }
 
@@ -140,7 +141,7 @@ public sealed class TranscriptionService : ITranscriptionService, IAsyncDisposab
       return;
     }
 
-    diagnostics?.Info(FormatFallbackMessage(message, properties));
+    DiagnosticBoundary.Report(() => diagnostics?.Info(FormatFallbackMessage(message, properties)));
   }
 
   private void LogError(string message, Exception exception, IReadOnlyDictionary<string, object?> properties)
@@ -151,7 +152,7 @@ public sealed class TranscriptionService : ITranscriptionService, IAsyncDisposab
       return;
     }
 
-    diagnostics?.Error(FormatFallbackMessage(message, properties), exception);
+    DiagnosticBoundary.Report(() => diagnostics?.Error(FormatFallbackMessage(message, properties), exception));
   }
 
   private static IReadOnlyDictionary<string, object?> CreateProperties(params (string Key, object? Value)[] entries)

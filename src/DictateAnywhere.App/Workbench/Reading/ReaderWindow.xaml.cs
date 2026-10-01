@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -77,7 +78,7 @@ public partial class ReaderWindow : Window, IAsyncDisposable
     audioExportFileDialogService = dependencies.AudioExportFileDialogService;
     videoExportFileDialogService = dependencies.VideoExportFileDialogService;
     readableDocumentFileDialogService = dependencies.ReadableDocumentFileDialogService;
-    diagnostics = dependencies.Diagnostics;
+    diagnostics = DiagnosticBoundary.Wrap(dependencies.Diagnostics);
     playbackMedia = new WpfReaderPlaybackMedia();
     preparationController = new ReaderPreparationController(
       operationSession, playbackSession, narrationSession, narrationPrefetchSession, playbackMedia, diagnostics);
@@ -367,7 +368,7 @@ public partial class ReaderWindow : Window, IAsyncDisposable
   private void OnMediaFailed(object? sender, ReaderPlaybackMediaFailedEventArgs e)
   {
     if (disposed) return;
-    diagnostics.Warning($"Reader playback failed: {e.Exception}");
+    DiagnosticBoundary.Report(() => diagnostics.Warning($"Reader playback failed: {e.Exception}"));
     idleStatus = "Playback failed. Try preparing this section again.";
     isPlaying = false;
     playbackTimer.Stop();
@@ -443,7 +444,7 @@ public partial class ReaderWindow : Window, IAsyncDisposable
     {
       if (disposed) return;
       _ = voicePreviewSession.FinishPlayback();
-      diagnostics.Warning($"Reader voice preview failed: {ex}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Reader voice preview failed: {ex}"));
       SidebarView.RenderVoicePreview("Preview unavailable. See Diagnostics.", isBusy: false, canStop: false);
       idleStatus = "Could not preview this voice. See Diagnostics.";
     }
@@ -470,7 +471,7 @@ public partial class ReaderWindow : Window, IAsyncDisposable
   {
     if (disposed) return;
     if (!voicePreviewSession.FinishPlayback()) return;
-    diagnostics.Warning($"Reader voice preview playback failed: {exception}");
+    DiagnosticBoundary.Report(() => diagnostics.Warning($"Reader voice preview playback failed: {exception}"));
     SidebarView.RenderVoicePreview("Preview unavailable. See Diagnostics.", isBusy: false, canStop: false);
     idleStatus = "Could not play the voice preview. See Diagnostics.";
     RenderPresentation();
@@ -515,7 +516,7 @@ public partial class ReaderWindow : Window, IAsyncDisposable
     }
     catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException or NotSupportedException or UnauthorizedAccessException or TimeoutException or System.Xml.XmlException)
     {
-      diagnostics.Warning($"Reader document import failed: {ex}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Reader document import failed: {ex}"));
       if (!disposed) idleStatus = "Could not open that document. See Diagnostics.";
     }
     finally

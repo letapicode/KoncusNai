@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,7 +42,7 @@ internal sealed class ReaderPreparationController : IAsyncDisposable
     this.narrationSession = narrationSession ?? throw new ArgumentNullException(nameof(narrationSession));
     this.prefetchSession = prefetchSession ?? throw new ArgumentNullException(nameof(prefetchSession));
     this.media = media ?? throw new ArgumentNullException(nameof(media));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.timeProvider = timeProvider ?? TimeProvider.System;
     state = ReaderPreparationState.Idle(this.timeProvider.GetUtcNow());
   }
@@ -281,7 +282,7 @@ internal sealed class ReaderPreparationController : IAsyncDisposable
 
       media.Stop();
       playbackSession.BeginSectionPreparation();
-      diagnostics.Warning($"{operationName} failed: {ex}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"{operationName} failed: {ex}"));
       ReaderPreparationStatus status = request.Kind == ReaderPreparationKind.CurrentSection
         ? ReaderPreparationStatus.SectionFailed
         : ReaderPreparationStatus.RangeFailed;

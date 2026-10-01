@@ -8,6 +8,43 @@ namespace DictateAnywhere.Core.Tests;
 public sealed class DictationCancellationOwnershipTests
 {
   [Theory]
+  [InlineData(false)]
+  [InlineData(true)]
+  public Task SuccessfulDictationStillCommitsWithThrowingReporting(bool queued) => RunAsync("completed", queued, async rig =>
+  {
+    rig.Services.ThrowOnInfo = true;
+    rig.Services.ThrowOnError = true;
+    await rig.StartPipelineAsync();
+    Assert.Contains("insert", rig.Services.Tokens.Keys);
+    Assert.Contains("history", rig.Services.Tokens.Keys);
+    rig.Services.Release.TrySetResult();
+    await rig.Coordinator.StopAsync();
+    Assert.Equal(DictationSessionState.Idle, rig.Coordinator.CurrentState);
+  });
+
+  [Fact]
+  public Task ReportingOnlyFailureDoesNotFaultHealthyStopOrRestart() => RunAsync("unused", true, async rig =>
+  {
+    await rig.Coordinator.StartAsync();
+    rig.Services.ThrowOnInfo = true;
+    await rig.Coordinator.StopAsync();
+    await rig.Coordinator.StartAsync();
+    rig.Hotkey.Press();
+    Assert.True(rig.Services.IsCapturing);
+  });
+
+  [Fact]
+  public Task ThrowingErrorSinkCannotSkipCaptureRecovery() => RunAsync("unused", false, async rig =>
+  {
+    await rig.Coordinator.StartAsync();
+    rig.Services.CaptureFailure = new IOException("controlled capture failure");
+    rig.Services.ThrowOnError = true;
+    rig.Hotkey.Press(); // Every fake await completes inline; the callback has finished on return.
+    Assert.False(rig.Services.IsCapturing);
+    Assert.Equal(DictationSessionState.Idle, rig.Coordinator.CurrentState);
+    Assert.Contains(rig.Services.CaptureFailure, rig.Services.ReportedErrors);
+  });
+  [Theory]
   [InlineData("recording", false)]
   [InlineData("capture", true)]
   [InlineData("transcribing", false)]
@@ -234,6 +271,9 @@ public sealed class DictationCancellationOwnershipTests
     internal int Hides { get; private set; }
     internal Exception? ProviderFailure { get; set; }
     internal bool ThrowOnError { get; set; }
+    internal bool ThrowOnInfo { get; set; }
+    internal Exception? CaptureFailure { get; set; }
+    internal List<Exception?> ReportedErrors { get; } = [];
     internal int ErrorReports { get; private set; }
     public bool IsCapturing { get; private set; }
     internal Services(string stage, bool queued)
@@ -253,6 +293,7 @@ public sealed class DictationCancellationOwnershipTests
       Captures++;
       await StepAsync("capture", cancellationToken).ConfigureAwait(false);
       IsCapturing = true;
+      if (CaptureFailure is not null) throw CaptureFailure;
       Captured.TrySetResult();
     }
     public async Task<AudioCaptureResult> StopAsync(CancellationToken cancellationToken = default)
@@ -294,11 +335,12 @@ public sealed class DictationCancellationOwnershipTests
     }
     public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task RecordAsync(DictationHistoryRecord record, CancellationToken cancellationToken = default) => StepAsync("history", cancellationToken);
-    public void Info(string message) { }
+    public void Info(string message) { if (ThrowOnInfo) throw new IOException("controlled info sink failure"); }
     public void Warning(string message) { }
     public void Error(string message, Exception? exception = null)
     {
       ErrorReports++;
+      ReportedErrors.Add(exception);
       if (ThrowOnError) throw new IOException("controlled diagnostic sink fault");
     }
   }

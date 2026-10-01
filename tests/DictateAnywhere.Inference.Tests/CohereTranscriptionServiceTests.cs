@@ -14,6 +14,45 @@ namespace DictateAnywhere.Inference.Tests;
 
 public sealed class CohereTranscriptionServiceTests
 {
+  [Xunit.Theory]
+  [Xunit.InlineData(false)]
+  [Xunit.InlineData(true)]
+  public async Task StructuredSinkFailurePreservesWorkerStartupOutcome(bool fails)
+  {
+    using TempDirectoryScope scope = new();
+    using TempScriptScope script = new();
+    const string modelId = "cohere-transcribe-03-2026";
+    InferenceException original = new("worker fault", InferenceFailureReason.ProcessStartFailed, "controlled");
+    await using FakeWorkerClient worker = new(startException: fails ? original : null);
+    await using CohereTranscriptionService service = new(CohereTranscriptionOptions.Default with
+    {
+      ModelRootPath = CreateInstalledModel(scope.DirectoryPath, modelId), ScriptFileName = script.FileName,
+      EnableWorkerHealthCheck = false,
+    }, new ThrowingStructuredSink(), new FakeWorkerClientFactory(worker));
+    if (fails) Xunit.Assert.Same(original, await Xunit.Assert.ThrowsAsync<InferenceException>(() => service.WarmUpAsync(modelId)));
+    else { await service.WarmUpAsync(modelId); Xunit.Assert.Equal(1, worker.StartCallCount); }
+  }
+
+  [Xunit.Fact]
+  public async Task DiagnosticArgumentFailureCannotReplaceOriginalWorkerFailure()
+  {
+    using TempDirectoryScope scope = new();
+    using TempScriptScope script = new();
+    const string modelId = "cohere-transcribe-03-2026";
+    InferenceException original = new("controlled worker failure", InferenceFailureReason.ProcessStartFailed,
+      "controlled summary", new ThrowingDiagnosticMessage());
+    await using FakeWorkerClient worker = new(startException: original);
+    await using CohereTranscriptionService service = new(CohereTranscriptionOptions.Default with
+    {
+      ModelRootPath = CreateInstalledModel(scope.DirectoryPath, modelId), ScriptFileName = script.FileName,
+      EnableWorkerHealthCheck = false,
+    }, new RecordingStructuredDiagnostics(), new FakeWorkerClientFactory(worker));
+    Xunit.Assert.Same(original, await Xunit.Assert.ThrowsAsync<InferenceException>(() => service.WarmUpAsync(modelId)));
+  }
+
+  private sealed class ThrowingDiagnosticMessage : Exception
+  { public override string Message => throw new IOException("private diagnostic accessor"); }
+
   [Xunit.Fact]
   public async Task WarmUpInBackground_WhenInferenceEnabled_ExercisesConfiguredLanguageWithoutAudio()
   {

@@ -769,7 +769,7 @@ public partial class App : Application
     catch (OperationCanceledException) when (isShuttingDown) { }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
     {
-      diagnostics?.Warning($"Runtime watchdog tick failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics?.Warning($"Runtime watchdog tick failed: {ex.Message}"));
     }
     finally
     {

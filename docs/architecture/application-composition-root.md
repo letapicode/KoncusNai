@@ -70,8 +70,8 @@ Shutdown does **not** add an autosave flush guarantee: the existing autosave
 owner can cancel a pending debounce. Global dictation now retains a per-run
 token and accepted callback/startup leases through teardown; see the
 [batch 3 lifecycle decision](../release/dictation-cancellation-audit-batch-3-2026-09-30.md).
-General diagnostic sink hardening and settings concurrency/flush policy remain
-separate remediation batches.
+Reporting failures are isolated by the [batch 4 diagnostic boundary](../release/diagnostic-sink-isolation-audit-batch-4-2026-09-30.md).
+Settings concurrency/flush policy remains a separate remediation batch.
 
 Tests use a resource-only WPF application rather than booting production App.
 Actual Application shutdown runs only in child test hosts whose startup skips

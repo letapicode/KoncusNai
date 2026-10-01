@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using DictateAnywhere.Core.Services;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
@@ -34,12 +34,7 @@ internal static class LifecycleCleanup
     Justification = "The final lifecycle reporting boundary cannot throw, including through a trace listener.")]
   internal static void Report(Action<string, Exception> report, string name, Exception exception)
   {
-    try { report(name, exception); }
-    catch
-    {
-      try { Trace.TraceError("Lifecycle cleanup failed: {0}; {1}", name, exception.GetType().Name); }
-      catch { /* A failing trace listener must not prevent cleanup. */ }
-    }
+    DiagnosticBoundary.Report(() => report(name, exception));
   }
 
   [SuppressMessage("Design", "CA1031:Do not catch general exception types",

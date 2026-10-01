@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using DictateAnywhere.Core.Contracts;
@@ -12,10 +13,10 @@ internal static class RetryActionDiagnostics
     ArgumentNullException.ThrowIfNull(result);
 
     // Outcome codes are fixed by our retry flow. Do not record the result message or dictation text.
-    diagnostics.Info("Retry last dictation completed.", new Dictionary<string, object?>
+    DiagnosticBoundary.Report(() => diagnostics.Info("Retry last dictation completed.", new Dictionary<string, object?>
     {
       ["outcome"] = result.OutcomeCode.ToString(),
       ["succeeded"] = result.Success,
-    });
+    }));
   }
 }

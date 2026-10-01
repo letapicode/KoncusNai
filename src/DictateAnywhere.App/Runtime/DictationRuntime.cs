@@ -59,7 +59,7 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
       RuntimeServices> runtimeServicesFactory)
   {
     this.settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.modelReadinessCoordinator = modelReadinessCoordinator;
     this.historyChangeNotifier = historyChangeNotifier ?? throw new ArgumentNullException(nameof(historyChangeNotifier));
     this.runtimeServicesFactory = runtimeServicesFactory ?? throw new ArgumentNullException(nameof(runtimeServicesFactory));
@@ -322,7 +322,7 @@ public sealed class DictationRuntime : IApplicationRuntimeSession
           }
           catch (Exception ex) when (ex is InvalidOperationException or OperationCanceledException)
           {
-            diagnostics.Warning($"Undo hotkey unavailable: {ex.Message}");
+            DiagnosticBoundary.Report(() => diagnostics.Warning($"Undo hotkey unavailable: {ex.Message}"));
             await runtimeUndoCoordinator.DisposeAsync().ConfigureAwait(false);
             runtimeUndoCoordinator = null;
           }

@@ -37,7 +37,7 @@ public sealed class FaultTolerantOverlayService : IOverlayService, IAsyncDisposa
     TimeProvider timeProvider)
   {
     this.inner = inner ?? throw new ArgumentNullException(nameof(inner));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.operationTimeout = operationTimeout ?? DefaultOperationTimeout;
     this.timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     if (this.operationTimeout <= TimeSpan.Zero)
@@ -145,7 +145,7 @@ public sealed class FaultTolerantOverlayService : IOverlayService, IAsyncDisposa
     }
     catch (Exception ex)
     {
-      diagnostics.Warning($"Overlay operation '{operationName}' failed; dictation will continue. {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Overlay operation '{operationName}' failed; dictation will continue. {ex.Message}"));
     }
   }
 
@@ -178,7 +178,7 @@ public sealed class FaultTolerantOverlayService : IOverlayService, IAsyncDisposa
     }
     catch (Exception ex)
     {
-      diagnostics.Warning($"Timed-out overlay operation '{operationName}' later failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Timed-out overlay operation '{operationName}' later failed: {ex.Message}"));
     }
   }
 }

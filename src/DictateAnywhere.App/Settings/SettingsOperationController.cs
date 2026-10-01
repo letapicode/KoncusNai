@@ -55,7 +55,7 @@ internal sealed class SettingsOperationController : IAsyncDisposable
     this.modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
     this.audioDeviceService = audioDeviceService ?? throw new ArgumentNullException(nameof(audioDeviceService));
     this.benchmarkService = benchmarkService ?? throw new ArgumentNullException(nameof(benchmarkService));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     if (modelManager is AutomaticDictationModelManager automatic)
       automatic.PreparationProgress += OnPreparationProgress;
 

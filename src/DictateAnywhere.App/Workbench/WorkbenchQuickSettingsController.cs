@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -47,7 +48,7 @@ internal sealed class WorkbenchQuickSettingsController : IAsyncDisposable
   public WorkbenchQuickSettingsController(IModelManager modelManager, IDiagnostics diagnostics)
   {
     this.modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
   }
 
   public Task<WorkbenchTranscriptionModelState> QueryModelsAsync(
@@ -98,7 +99,7 @@ internal sealed class WorkbenchQuickSettingsController : IAsyncDisposable
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException || IsModelManagementException(ex))
     {
-      diagnostics.Warning($"Workbench speech-model query failed: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Workbench speech-model query failed: {ex.Message}"));
       return new WorkbenchTranscriptionModelState(
         Array.Empty<TranscriptionModelOptionViewModel>(),
         Selected: null,

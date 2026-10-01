@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
@@ -21,7 +22,7 @@ public sealed class RuntimeWatchdog
     TimeSpan retryInterval)
   {
     this.runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.retryInterval = retryInterval > TimeSpan.Zero
       ? retryInterval
       : throw new ArgumentOutOfRangeException(nameof(retryInterval), "Retry interval must be positive.");
@@ -66,8 +67,8 @@ public sealed class RuntimeWatchdog
     {
       failedRecoveryAttempts++;
       nextRetryNotBeforeUtc = DateTimeOffset.UtcNow + retryInterval;
-      diagnostics.Warning(
-        $"Runtime watchdog restart failed (attempt {failedRecoveryAttempts}). Next retry at {nextRetryNotBeforeUtc:O}. Error: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning(
+        $"Runtime watchdog restart failed (attempt {failedRecoveryAttempts}). Next retry at {nextRetryNotBeforeUtc:O}. Error: {ex.Message}"));
     }
   }
 }

@@ -38,7 +38,7 @@ public partial class HistoryWindow : Window
   {
     currentSettings = CurrentSettingsPolicy.Normalize(
       settings ?? throw new ArgumentNullException(nameof(settings)));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
     this.queryCoordinator = queryCoordinator ?? throw new ArgumentNullException(nameof(queryCoordinator));
     this.commandCoordinator = commandCoordinator ?? throw new ArgumentNullException(nameof(commandCoordinator));
     InitializeComponent();
@@ -141,7 +141,7 @@ public partial class HistoryWindow : Window
     }
     catch (COMException ex)
     {
-      diagnostics.Warning($"Could not copy dictation: {ex.Message}");
+      DiagnosticBoundary.Report(() => diagnostics.Warning($"Could not copy dictation: {ex.Message}"));
       ActionStatusTextBlock.Text = "Could not copy; another app is using the clipboard. Try again.";
     }
   }

@@ -15,7 +15,7 @@ supply-chain policies.
 | --- | --- | --- | --- | ---: |
 | `DictateAnywhere.Audio` | Reusable capture and PCM library | App, Audio tests, Spikes | Compiled baseline | 116 |
 | `DictateAnywhere.Benchmark` | Reusable benchmark policy and scoring library | App and Benchmark tests | Compiled baseline | 78 |
-| `DictateAnywhere.Core` | Provider-neutral contracts, domain types, and orchestration | All production implementation layers, executable hosts/tools, and Core tests | Compiled baseline | 710 |
+| `DictateAnywhere.Core` | Provider-neutral contracts, domain types, and orchestration | All production implementation layers, executable hosts/tools, and Core tests | Compiled baseline | 715 |
 | `DictateAnywhere.Diagnostics` | Structured diagnostics and redaction library | App and Diagnostics tests | Compiled baseline | 170 |
 | `DictateAnywhere.Hotkeys` | Windows hotkey implementation library | App, Hotkeys tests, Spikes | Compiled baseline | 38 |
 | `DictateAnywhere.Inference` | Provider implementations and worker boundaries | App, tests, ModelBenchmark, TtsCli, Spikes, VoicePreviewGenerator | Compiled baseline | 452 |
@@ -31,8 +31,8 @@ supply-chain policies.
 | `DictateAnywhere.Spikes` | Milestone and interactive validation tool | Milestone, insertion, audio, and hotkey scripts | Tool contract only | 0 |
 | `DictateAnywhere.VoicePreviewGenerator` | Voice-preview asset-generation tool | Tool README/workflow, App friendship, preview manifest contract | Tool contract only | 0 |
 
-The 11 reusable libraries currently contain 1,976 deterministic signatures,
-including 216 type signatures. Executable hosts and tools are deliberately not
+The 11 reusable libraries currently contain 1,981 deterministic signatures,
+including 217 type signatures. Executable hosts and tools are deliberately not
 presented as reusable APIs. Their assembly identities, project/package/compiled
 references, real consumers, and `InternalsVisibleTo` friendships are still
 baselined. Protocol and persisted-data behavior continue to be protected by
@@ -144,3 +144,12 @@ controlled native capture lifetime tests. Candidate comparison changes only
 that friendship; public signatures, consumers, packages, and references stay
 unchanged. The lifetime decision and validation are recorded in the
 [batch 3 report](../release/dictation-cancellation-audit-batch-3-2026-09-30.md).
+
+Batch 4 adds the provider-neutral DiagnosticBoundary type, three methods, and
+one counter property in Core. Diagnostics grants its tests an explicit friendship
+for controlled storage seams. Removing App's unsafe Trace fallback removes only
+its System.Diagnostics.TraceSource compiled reference. Existing interfaces,
+packages, project edges, consumers, and remaining signatures stay unchanged.
+The candidate was regenerated after a normal locked Release build (the API gate
+reads normal project output paths), compared by assembly, and explicitly promoted.
+See the [batch 4 decision](../release/diagnostic-sink-isolation-audit-batch-4-2026-09-30.md).

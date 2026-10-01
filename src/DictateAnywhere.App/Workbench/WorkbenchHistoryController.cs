@@ -1,3 +1,4 @@
+using DictateAnywhere.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -93,7 +94,7 @@ internal sealed class WorkbenchHistoryController : IAsyncDisposable
   {
     this.queryCoordinator = queryCoordinator ?? throw new ArgumentNullException(nameof(queryCoordinator));
     this.commandCoordinator = commandCoordinator ?? throw new ArgumentNullException(nameof(commandCoordinator));
-    this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+    this.diagnostics = DiagnosticBoundary.Wrap(diagnostics ?? throw new ArgumentNullException(nameof(diagnostics)));
   }
 
   public bool IsCommandBusy => commandCoordinator.IsBusy;
@@ -163,7 +164,7 @@ internal sealed class WorkbenchHistoryController : IAsyncDisposable
       operation: "save history edits",
       successMessage: "History edits saved.",
       notFoundMessage: "Selected history item was not found.",
-      unexpectedMessage: "History save failed unexpectedly. The error was recorded in Diagnostics.",
+      unexpectedMessage: "History save failed unexpectedly. Diagnostics may contain details.",
       dictationRecord: updated).ConfigureAwait(true);
   }
 
@@ -195,7 +196,7 @@ internal sealed class WorkbenchHistoryController : IAsyncDisposable
       operation: "rename history",
       successMessage: "History renamed.",
       notFoundMessage: "Selected history item was not found.",
-      unexpectedMessage: "History rename failed unexpectedly. The error was recorded in Diagnostics.",
+      unexpectedMessage: "History rename failed unexpectedly. Diagnostics may contain details.",
       dictationRecord: updated).ConfigureAwait(true);
   }
 
@@ -225,7 +226,7 @@ internal sealed class WorkbenchHistoryController : IAsyncDisposable
       operation: "delete history",
       successMessage: string.Empty,
       notFoundMessage: "Selected history sessions were not found.",
-      unexpectedMessage: "History deletion failed unexpectedly. The error was recorded in Diagnostics.")
+      unexpectedMessage: "History deletion failed unexpectedly. Diagnostics may contain details.")
       .ConfigureAwait(true);
     return result.Status == HistoryCommandStatus.Succeeded
       ? result with
@@ -252,7 +253,7 @@ internal sealed class WorkbenchHistoryController : IAsyncDisposable
       operation: "rename chat history",
       successMessage: "Chat renamed.",
       notFoundMessage: "Selected chat was not found.",
-      unexpectedMessage: "Chat rename failed unexpectedly. The error was recorded in Diagnostics.",
+      unexpectedMessage: "Chat rename failed unexpectedly. Diagnostics may contain details.",
       chatRecord: normalized).ConfigureAwait(true);
   }
 
@@ -273,7 +274,7 @@ internal sealed class WorkbenchHistoryController : IAsyncDisposable
       operation: "save chat history",
       successMessage: "Chat saved.",
       notFoundMessage: "Chat was not found.",
-      unexpectedMessage: "Chat not saved; the error was recorded in Diagnostics.",
+      unexpectedMessage: "Chat not saved; diagnostics may contain details.",
       chatRecord: normalized).ConfigureAwait(true);
     return result.Status == HistoryCommandStatus.Canceled
       ? result with { Message = "Chat save canceled." }
@@ -304,7 +305,7 @@ internal sealed class WorkbenchHistoryController : IAsyncDisposable
       operation: "delete chat history",
       successMessage: string.Empty,
       notFoundMessage: "Selected chats were not found.",
-      unexpectedMessage: "Chat deletion failed unexpectedly. The error was recorded in Diagnostics.")
+      unexpectedMessage: "Chat deletion failed unexpectedly. Diagnostics may contain details.")
       .ConfigureAwait(true);
     return result.Status == HistoryCommandStatus.Succeeded
       ? result with
