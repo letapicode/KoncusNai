@@ -691,21 +691,29 @@ public partial class TextboxWorkbenchWindow : Window, IAsyncDisposable
         RenderPresentation();
         return;
       }
+      bool acceptingProgress = true;
       Progress<WorkbenchChatModelSetupProgress> progress = new(update =>
       {
-        if (disposed || !chatController.IsModelSetupActive) return;
+        if (disposed || !acceptingProgress || !chatController.IsModelSetupActive) return;
+        DiagnosticBoundary.Report(() =>
+        {
         ModelNotice.SetProgress(update.Completion);
         ExpandedPromptView.Notice.SetProgress(update.Completion);
         SetChatStatus(update.Status, modelStatus: true);
         OperationalStatusView.SetProgress(update.Completion is null or <= 0
           ? null
           : update.Completion.Value * 100);
+        });
       });
-      WorkbenchChatModelSetupCommandResult result = await chatModelSetupCommandController
-        .SetupAsync(progress, ApplyChatSendProgress, () => RenderPresentation())
-        .ConfigureAwait(true);
-      OperationalStatusView.StopProgress();
-      SetChatStatus(result.StatusMessage, modelStatus: true);
+      try
+      {
+        WorkbenchChatModelSetupCommandResult result = await chatModelSetupCommandController
+          .SetupAsync(progress, ApplyChatSendProgress, () => RenderPresentation())
+          .ConfigureAwait(true);
+        OperationalStatusView.StopProgress();
+        SetChatStatus(result.StatusMessage, modelStatus: true);
+      }
+      finally { acceptingProgress = false; }
     }
     finally
     {

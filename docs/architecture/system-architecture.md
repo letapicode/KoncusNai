@@ -50,7 +50,7 @@ flowchart TB
 
 - Microphone audio, dictated text, imported documents, OCR, chat prompts, narration, and alignment stay on the device during normal local workflows.
 - Model/runtime downloads cross the network only during explicit setup or acquisition.
-- Ollama communication is local loopback. Koncus Nai may stop only an Ollama process it started and ownership-tracked.
+- Ollama communication is local loopback. Only retained, directly launched handles confer termination authority; external-use consent, polling and PID markers do not. Accepted users drain before handles are released. See the [ownership/adoption decision](../release/process-ownership-adoption-audit-batch-6-2026-10-01.md).
 - YouTube receives video and metadata only after an explicit publishing action.
 - UIAccess does not bypass Windows security. It is a separately packaged, signed, narrowly scoped helper subject to UIPI and integrity boundaries.
 - Diagnostics must not persist raw user audio or text by default.

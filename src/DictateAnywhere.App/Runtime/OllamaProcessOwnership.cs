@@ -2,186 +2,215 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
-using System.Text;
-using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using System.Threading.Tasks;
+using DictateAnywhere.Core.Services;
 
 namespace DictateAnywhere.App.Runtime;
 
-/// <summary>Tracks only an Ollama server process started by this Koncus Nai process.</summary>
-internal sealed class OllamaProcessOwnership
+/// <summary>Retains direct launch handles and accepted users. Persisted PIDs never confer ownership.</summary>
+[SuppressMessage("Design", "CA1031", Justification = "Independent cleanup continues after faults; accepted work retains its original failure.")]
+internal sealed class OllamaProcessOwnership : IAsyncDisposable
 {
+  internal static OllamaProcessOwnership Default { get; } = new();
+  private static readonly AsyncLocal<Operation?> Executing = new();
   private readonly object sync = new();
-  private readonly string markerPath;
-  private readonly IProcessSource processes;
-  private IProcess? ownedProcess;
+  private readonly List<OwnedProcess> processes = [];
+  private readonly List<Operation> operations = [];
+  private readonly List<Exception> cancellationFailures = [];
+  private readonly List<Exception> completedProcessFailures = [];
+  private Task? stopTask;
+  private Task stopExecution = Task.CompletedTask;
+  private bool closing;
+  internal SemaphoreSlim SetupGate { get; } = new(1, 1);
 
-  internal static string MarkerPath { get; } = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-    "DictateAnywhere",
-    "runtime",
-    "owned-ollama.pid");
-
-  private static readonly OllamaProcessOwnership Default = new(MarkerPath, new SystemProcessSource());
-
-  // Tests supply both boundaries, so an isolated marker cannot fall back to real processes.
-  internal OllamaProcessOwnership(string markerPath, IProcessSource processes)
+  internal Task CleanupExecution => stopExecution;
+  internal bool IsStopping { get { lock (sync) return closing; } }
+  internal void ThrowIfStopping(CancellationToken token)
   {
-    ArgumentException.ThrowIfNullOrWhiteSpace(markerPath);
-    ArgumentNullException.ThrowIfNull(processes);
-    this.markerPath = Path.GetFullPath(markerPath);
-    this.processes = processes;
+    token.ThrowIfCancellationRequested();
+    if (IsStopping) throw new OperationCanceledException(token);
   }
 
-  public static void Track(Process process)
+  internal Task<T> RunAsync<T>(Func<CancellationToken, Task<T>> run, CancellationToken token = default)
   {
-    ArgumentNullException.ThrowIfNull(process);
-    Default.TrackProcess(new SystemProcess(process));
-  }
-
-  public static void TrackNewProcess(IReadOnlySet<int> processIdsBeforeStart) =>
-    Default.TrackNewProcesses(processIdsBeforeStart);
-
-  public static Task StopOwnedAsync() => Default.StopAsync();
-
-  internal void TrackProcess(IProcess process)
-  {
-    ArgumentNullException.ThrowIfNull(process);
+    ArgumentNullException.ThrowIfNull(run);
+    token.ThrowIfCancellationRequested();
+    Operation operation;
     lock (sync)
     {
-      ownedProcess?.Dispose();
-      ownedProcess = process;
-      Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
-      OwnedProcessMarker marker = new(
-        process.Id,
-        process.StartTimeUtc,
-        process.ExecutablePath);
-      File.WriteAllText(markerPath, JsonSerializer.Serialize(marker), Encoding.UTF8);
+      ObjectDisposedException.ThrowIf(closing, this);
+      operation = new(this);
+      operations.Add(operation);
     }
+    operation.Execution = ExecuteAsync(operation, run, token);
+    return ResultAsync<T>(operation.Completion.Task);
   }
 
-  internal void TrackNewProcesses(IReadOnlySet<int> processIdsBeforeStart)
+  private static async Task<T> ResultAsync<T>(Task<object?> task) => (T)(await task.ConfigureAwait(false))!;
+
+  private async Task ExecuteAsync<T>(Operation operation, Func<CancellationToken, Task<T>> run, CancellationToken caller)
   {
-    ArgumentNullException.ThrowIfNull(processIdsBeforeStart);
-    IProcess? newest = null;
-    foreach (IProcess candidate in processes.GetOllamaProcesses())
-    {
-      try
-      {
-        if (processIdsBeforeStart.Contains(candidate.Id)
-            || (newest is not null && candidate.StartTimeUtc <= newest.StartTimeUtc))
-        {
-          candidate.Dispose();
-          continue;
-        }
-
-        newest?.Dispose();
-        newest = candidate;
-      }
-      catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
-      {
-        candidate.Dispose();
-      }
-    }
-
-    if (newest is not null)
-    {
-      TrackProcess(newest);
-    }
-  }
-
-  internal async Task StopAsync()
-  {
-    IProcess? process;
-    lock (sync)
-    {
-      process = ownedProcess;
-      ownedProcess = null;
-    }
-
+    await Task.Yield();
+    Operation? previous = Executing.Value;
+    Executing.Value = operation;
+    object? result = null;
+    Exception? failure = null;
+    using CancellationTokenRegistration registration = caller.UnsafeRegister(static state => ((Operation)state!).Cancel(), operation);
     try
     {
-      if (process is not null)
-      {
-        await process.StopAsync().ConfigureAwait(false);
-      }
-      else if (TryReadOwnedProcess(out IProcess? recorded) && recorded is not null)
-      {
-        await recorded.StopAsync().ConfigureAwait(false);
-      }
+      ThrowIfStopping(operation.Token);
+      result = await run(operation.Token).ConfigureAwait(false);
+      operation.Token.ThrowIfCancellationRequested();
+      if (IsStopping) throw new OperationCanceledException(operation.Token);
     }
+    catch (Exception error) { failure = error; }
     finally
     {
-      process?.Dispose();
-      TryDeleteMarker();
+      registration.Dispose();
+      await operation.FinishCancellationAsync().ConfigureAwait(false);
+      operation.Source.Dispose();
+      Executing.Value = previous;
+      if (failure is OperationCanceledException canceled) operation.Completion.TrySetCanceled(canceled.CancellationToken);
+      else if (failure is not null) operation.Completion.TrySetException(failure);
+      else operation.Completion.TrySetResult(result);
+      // Completed entries can be removed only after their stable completion settles.
+      lock (sync) operations.Remove(operation);
     }
   }
 
-  private bool TryReadOwnedProcess(out IProcess? process)
+  internal OwnedProcess TrackProcess(IProcess process)
   {
-    process = null;
-    try
+    ArgumentNullException.ThrowIfNull(process);
+    lock (sync)
     {
-      if (!File.Exists(markerPath))
+      // A launch already admitted by RunAsync can finish after stop closes admission.
+      // Stop drains that operation before taking its final process snapshot.
+      ObjectDisposedException.ThrowIf(closing && !(Executing.Value is { } operation
+        && operation.Owner == this && !operation.Completion.Task.IsCompleted), this);
+      OwnedProcess owned = new(this, process);
+      processes.Add(owned);
+      return owned;
+    }
+  }
+
+  internal static IProcess Launch(ProcessStartInfo startInfo) => new SystemProcess(
+    Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start the Ollama local service."));
+  internal static Task StopOwnedAsync() => Default.StopAsync();
+
+  internal Task RequestStop()
+  {
+    lock (sync)
+    {
+      if (stopTask is not null) return stopTask;
+      closing = true;
+      TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      stopTask = completion.Task;
+      stopExecution = FinishStopAsync(completion, operations.ToArray());
+      return stopTask;
+    }
+  }
+
+  internal Task StopAsync(CancellationToken caller = default)
+  {
+    Task completion = RequestStop();
+    if (Executing.Value is { } operation && operation.Owner == this && !operation.Completion.Task.IsCompleted)
+      return Task.FromException(new InvalidOperationException("Request Ollama stop without awaiting it from an accepted runtime callback."));
+    return caller.CanBeCanceled ? completion.WaitAsync(caller) : completion;
+  }
+
+  public ValueTask DisposeAsync() => new(StopAsync());
+
+  private async Task FinishStopAsync(TaskCompletionSource completion, Operation[] pending)
+  {
+    await Task.Yield();
+    List<Exception> failures = [];
+    foreach (Operation operation in pending) operation.Cancel();
+    foreach (Operation operation in pending)
+    {
+      try { await operation.Completion.Task.ConfigureAwait(false); }
+      catch (OperationCanceledException) { }
+      catch (Exception) { /* The operation's caller owns its original failure. */ }
+      await operation.Execution.ConfigureAwait(false);
+    }
+    OwnedProcess[] owned;
+    lock (sync)
+    {
+      owned = processes.ToArray();
+      failures.AddRange(cancellationFailures);
+      failures.AddRange(completedProcessFailures);
+    }
+    SetupGate.Dispose();
+    // Initiate every independent stop before awaiting an uncooperative child.
+    Task[] stops = Array.ConvertAll(owned, static process => process.StopAsync());
+    for (int index = 0; index < stops.Length; index++)
+    {
+      try { await stops[index].ConfigureAwait(false); }
+      catch (Exception error) { failures.Add(error); }
+      await owned[index].CleanupExecution.ConfigureAwait(false);
+    }
+    if (failures.Count > 0) completion.TrySetException(new AggregateException("Ollama cleanup failed.", failures));
+    else completion.TrySetResult();
+  }
+
+  internal sealed class OwnedProcess(OllamaProcessOwnership owner, IProcess process)
+  {
+    private readonly object sync = new();
+    private Task? stop;
+    private Task? exit;
+    private Task execution = Task.CompletedTask;
+    internal IProcess Process => process;
+    internal Task CleanupExecution => execution;
+    internal Task WaitForExitAsync()
+    {
+      lock (sync)
       {
-        return false;
+        if (exit is not null) return exit;
+        try { exit = process.WaitForExitAsync(); }
+        catch (Exception error) { exit = Task.FromException(error); }
+        return exit;
       }
-
-      OwnedProcessMarker? marker = JsonSerializer.Deserialize<OwnedProcessMarker>(File.ReadAllText(markerPath, Encoding.UTF8));
-      if (marker is null || marker.ProcessId <= 0)
+    }
+    internal Task StopAsync()
+    {
+      lock (sync)
       {
-        return false;
+        if (stop is not null) return stop;
+        TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        stop = completion.Task;
+        execution = Task.Run(() => StopCoreAsync(completion));
+        return stop;
       }
-
-      IProcess candidate = processes.GetProcessById(marker.ProcessId);
-      if (!IsExpectedProcess(marker, candidate.Name, candidate.StartTimeUtc))
+    }
+    private async Task StopCoreAsync(TaskCompletionSource completion)
+    {
+      await Task.Yield();
+      Exception? failure = null;
+      try { await process.StopAsync().ConfigureAwait(false); }
+      catch (Exception error) { failure = error; }
+      try { await WaitForExitAsync().ConfigureAwait(false); }
+      catch (Exception error)
       {
-        candidate.Dispose();
-        return false;
+        // Unverifiable exit is incomplete cleanup; retain the handle.
+        completion.TrySetException(failure is null ? error : new AggregateException(failure, error));
+        return;
       }
-
-      process = candidate;
-      return true;
-    }
-    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or JsonException or Win32Exception)
-    {
-      return false;
-    }
-  }
-
-  private void TryDeleteMarker()
-  {
-    try { File.Delete(markerPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
-  }
-
-  internal static bool IsExpectedProcess(OwnedProcessMarker marker, string processName, DateTime startTimeUtc)
-  {
-    bool sameStart = Math.Abs((startTimeUtc - marker.StartTimeUtc).TotalSeconds) < 2;
-    string executableName = Path.GetFileName(marker.ExecutablePath);
-    bool expectedExecutable = executableName.Equals("ollama.exe", StringComparison.OrdinalIgnoreCase)
-      || executableName.Equals("ollama", StringComparison.OrdinalIgnoreCase);
-    return sameStart && expectedExecutable && processName.Equals("ollama", StringComparison.OrdinalIgnoreCase);
-  }
-
-  private static string ResolveExecutablePath(Process process)
-  {
-    if (!string.IsNullOrWhiteSpace(process.StartInfo.FileName))
-    {
-      return process.StartInfo.FileName;
-    }
-
-    try
-    {
-      return process.MainModule?.FileName ?? process.ProcessName;
-    }
-    catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
-    {
-      return process.ProcessName;
+      bool released = true;
+      try { process.Dispose(); }
+      catch (Exception error) { released = false; failure = failure is null ? error : new AggregateException(failure, error); }
+      if (failure is null) completion.TrySetResult();
+      else completion.TrySetException(failure);
+      if (released)
+      {
+        lock (owner.sync)
+        {
+          if (failure is not null) owner.completedProcessFailures.Add(failure);
+          owner.processes.Remove(this);
+        }
+      }
     }
   }
-
-  internal sealed record OwnedProcessMarker(int ProcessId, DateTime StartTimeUtc, string ExecutablePath);
 
   internal interface IProcess : IDisposable
   {
@@ -189,21 +218,10 @@ internal sealed class OllamaProcessOwnership
     DateTime StartTimeUtc { get; }
     string Name { get; }
     string ExecutablePath { get; }
+    bool HasExited { get; }
+    int ExitCode { get; }
     Task StopAsync();
-  }
-
-  internal interface IProcessSource
-  {
-    IEnumerable<IProcess> GetOllamaProcesses();
-    IProcess GetProcessById(int processId);
-  }
-
-  private sealed class SystemProcessSource : IProcessSource
-  {
-    public IEnumerable<IProcess> GetOllamaProcesses() =>
-      Process.GetProcessesByName("ollama").Select(static process => (IProcess)new SystemProcess(process));
-
-    public IProcess GetProcessById(int processId) => new SystemProcess(Process.GetProcessById(processId));
+    Task WaitForExitAsync();
   }
 
   private sealed class SystemProcess(Process process) : IProcess
@@ -211,21 +229,71 @@ internal sealed class OllamaProcessOwnership
     public int Id => process.Id;
     public DateTime StartTimeUtc => process.StartTime.ToUniversalTime();
     public string Name => process.ProcessName;
-    public string ExecutablePath => ResolveExecutablePath(process);
-
-    public async Task StopAsync()
+    public string ExecutablePath => process.MainModule?.FileName ?? throw new InvalidOperationException("Ollama executable identity unavailable.");
+    public bool HasExited => process.HasExited;
+    public int ExitCode => process.ExitCode;
+    public Task StopAsync()
     {
-      try
+      try { if (!process.HasExited) process.Kill(); }
+      catch (Exception error) when (error is Win32Exception or InvalidOperationException)
       {
-        if (process.HasExited) return;
-        process.Kill(entireProcessTree: true);
-        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        DiagnosticBoundary.RecordFailure();
+        return Task.FromException(error);
       }
-      catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or TimeoutException)
-      {
-      }
+      // The launched Process retains its OS handle; never reopen a recorded PID.
+      // No tree termination: installer-created servers/descendants are not proven owned.
+      return Task.CompletedTask;
     }
-
+    public Task WaitForExitAsync() => process.WaitForExitAsync();
     public void Dispose() => process.Dispose();
+  }
+
+  private sealed class Operation(OllamaProcessOwnership owner)
+  {
+    internal readonly OllamaProcessOwnership Owner = owner;
+    internal readonly CancellationTokenSource Source = new();
+    internal readonly TaskCompletionSource<object?> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal Task Execution = Task.CompletedTask;
+    private readonly object sync = new();
+    private Task cancellation = Task.CompletedTask;
+    private Task cancellationExecution = Task.CompletedTask;
+    private bool finishing;
+    private bool cancelRequested;
+    internal CancellationToken Token => Source.Token;
+    internal void Cancel()
+    {
+      TaskCompletionSource completion;
+      lock (sync)
+      {
+        if (finishing || cancelRequested) return;
+        cancelRequested = true;
+        completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        cancellation = completion.Task;
+      }
+      // CancelAsync publishes token cancellation synchronously, runs callbacks
+      // asynchronously, and keeps their faults/completion in the returned task.
+      Task callbacks;
+      try { callbacks = Source.CancelAsync(); }
+      catch (Exception failure) { callbacks = Task.FromException(failure); }
+      cancellationExecution = CancelCoreAsync(callbacks, completion);
+    }
+    private async Task CancelCoreAsync(Task callbacks, TaskCompletionSource completion)
+    {
+      await Task.Yield();
+      try { await callbacks.ConfigureAwait(false); }
+      catch (Exception failure)
+      {
+        lock (Owner.sync) Owner.cancellationFailures.Add(failure);
+        DiagnosticBoundary.RecordFailure();
+      }
+      finally { completion.TrySetResult(); }
+    }
+    internal async Task FinishCancellationAsync()
+    {
+      Task pending;
+      lock (sync) { finishing = true; pending = cancellation; }
+      await pending.ConfigureAwait(false);
+      await cancellationExecution.ConfigureAwait(false);
+    }
   }
 }

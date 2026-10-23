@@ -35,7 +35,7 @@ Network activity is strictly restricted to user-initiated flows on an explicit a
    - Communicates with Google OAuth (`oauth2.googleapis.com`) and YouTube Data API v3 (`www.googleapis.com`).
 6. **Localhost Loopback HTTP (`127.0.0.1`)**:
    - Inter-process communication with Ollama daemon (`http://127.0.0.1:11434/`) and llama.cpp server (`http://127.0.0.1:8090/`).
-   - Koncus Nai connects to the literal loopback endpoint. Ollama chat disables HTTP redirects and proxies, and requires review of an externally started listener before private chat text is sent. A locally running process may have its own networking behavior; see `docs/security/threat-model.md` for the process-identity race and approval limits.
+   - Koncus Nai connects to the literal loopback endpoint. Ollama chat disables HTTP redirects and proxies, and requires review of an externally started listener before private chat text is sent. Consent permits use only, and each request connects afresh. Polling and persisted PIDs never authorize termination; only direct launch handles are managed. Legacy markers and Ollama startup configuration are left untouched. A locally running process may have its own networking behavior; see `docs/security/threat-model.md` for the process-identity race and approval limits.
 
 Explicit Cohere preparation also permits `www.python.org`, `pypi.org`,
 `files.pythonhosted.org`, `github.com`, `codeload.github.com` and

@@ -129,7 +129,6 @@ public partial class App : Application
       AppSettings settings = CurrentSettingsPolicy.Normalize(await settingsStore.LoadAsync(shutdownCancellation.Token).ConfigureAwait(true));
       shutdownCancellation.Token.ThrowIfCancellationRequested();
       AppThemeManager.ApplyThemeResources(settings.ThemePreference);
-      _ = OllamaStartupShortcutPolicy.TryDisableAutomaticStartup();
       if (!AppLegalAcceptancePolicy.HasCurrentAcceptance(settings))
       {
         LegalAcknowledgementWindow legalAcknowledgement = new();
@@ -223,6 +222,7 @@ public partial class App : Application
     {
       await LifecycleCleanup.RunAsync(
         LifecycleCleanup.Sync("Stop tray input", () => trayCommandCoordinator?.BeginShutdown()),
+        LifecycleCleanup.Sync("Stop Ollama admission", () => { if (composition is not null) OllamaProcessOwnership.Default.RequestStop(); }),
         LifecycleCleanup.Sync("Cancel application startup", shutdownCancellation.Cancel),
         LifecycleCleanup.Sync("Stop runtime admission", () => applicationHost?.BeginShutdown()),
         LifecycleCleanup.Sync("Stop activation timer", () =>
@@ -274,7 +274,7 @@ public partial class App : Application
       new CleanupStep("Productivity hotkeys", () => shellDrained
         ? productivityHotkeyCoordinator?.DisposeAsync().AsTask() ?? Task.CompletedTask
         : Task.FromException(new InvalidOperationException("Hotkey resources retained because commands have not drained."))),
-      new CleanupStep("Owned Ollama", () => composition is not null && shellDrained && windowsDrained
+      new CleanupStep("Owned Ollama", () => composition is not null
         ? OllamaProcessOwnership.StopOwnedAsync() : Task.CompletedTask),
       new CleanupStep("Final process resources", () => LifecycleCleanup.RunAsync(
         LifecycleCleanup.Sync("Activation signal", () => activationSignal?.Dispose()),

@@ -27,7 +27,10 @@ internal static class LocalOllamaRuntimeReadiness
   private static readonly HttpClient DownloadClient = new() { Timeout = TimeSpan.FromMinutes(30) };
   private static readonly Uri LocalEndpoint = new("http://127.0.0.1:11434/");
 
-  public static async Task<LocalChatRuntimeReadiness> CheckAsync(string modelId, CancellationToken cancellationToken = default)
+  public static Task<LocalChatRuntimeReadiness> CheckAsync(string modelId, CancellationToken cancellationToken = default) =>
+    OllamaProcessOwnership.Default.RunAsync(token => CheckCoreAsync(modelId, token), cancellationToken);
+
+  private static async Task<LocalChatRuntimeReadiness> CheckCoreAsync(string modelId, CancellationToken cancellationToken)
   {
     try
     {
@@ -64,7 +67,15 @@ internal static class LocalOllamaRuntimeReadiness
         && string.Equals(digest.GetString(), expectedDigest, StringComparison.OrdinalIgnoreCase));
   }
 
-  public static async Task<LocalChatRuntimeReadiness> PullAsync(
+  public static Task<LocalChatRuntimeReadiness> PullAsync(string modelId, IProgress<double>? progress,
+    CancellationToken cancellationToken = default) => OllamaProcessOwnership.Default.RunAsync(
+      token => PullCoreAsync(modelId, progress, token), cancellationToken);
+
+  public static Task<LocalChatRuntimeReadiness> StartAsync(string modelId, IProgress<double>? progress,
+    CancellationToken cancellationToken = default) => OllamaProcessOwnership.Default.RunAsync(
+      token => StartCoreAsync(modelId, progress, token), cancellationToken);
+
+  private static async Task<LocalChatRuntimeReadiness> PullCoreAsync(
     string modelId,
     IProgress<double>? progress,
     CancellationToken cancellationToken = default)
@@ -74,6 +85,9 @@ internal static class LocalOllamaRuntimeReadiness
     {
       await EnsureInstalledAndRunningAsync(progress, cancellationToken).ConfigureAwait(false);
       progress?.Report(0.25);
+      cancellationToken.ThrowIfCancellationRequested();
+      if (!OllamaListenerTrust.IsCurrentTrusted())
+        throw new InvalidOperationException("The Ollama listener changed. Review it before downloading a model.");
       using HttpRequestMessage request = new(HttpMethod.Post, new Uri(LocalEndpoint, "api/pull"))
       {
         Content = new StringContent(JsonSerializer.Serialize(new { model = modelId, stream = false }), Encoding.UTF8, "application/json"),
@@ -99,7 +113,7 @@ internal static class LocalOllamaRuntimeReadiness
   /// use it. This does not load or pull a model; Ollama loads the model on the
   /// first chat request.
   /// </summary>
-  public static async Task<LocalChatRuntimeReadiness> StartAsync(
+  private static async Task<LocalChatRuntimeReadiness> StartCoreAsync(
     string modelId,
     IProgress<double>? progress,
     CancellationToken cancellationToken = default)
@@ -115,41 +129,75 @@ internal static class LocalOllamaRuntimeReadiness
     IProgress<double>? progress,
     CancellationToken cancellationToken)
   {
-    _ = OllamaStartupShortcutPolicy.TryDisableAutomaticStartup();
-    if (await IsApiReachableAsync(cancellationToken).ConfigureAwait(false))
+    await EnsureRunningAsync(OllamaProcessOwnership.Default, IsApiReachableAsync,
+      PrepareInstallationAsync, StartOllamaServer,
+      token => WaitForApiAsync(TimeSpan.FromSeconds(20), token),
+      token => WaitForApiAsync(TimeSpan.FromSeconds(30), token),
+      OllamaListenerTrust.ApproveManaged, progress, cancellationToken).ConfigureAwait(false);
+  }
+
+  internal static Task<bool> EnsureRunningAsync(OllamaProcessOwnership owner,
+    Func<CancellationToken, Task<bool>> reachable,
+    Func<IProgress<double>?, CancellationToken, Task<string>> prepare,
+    Func<string, OllamaProcessOwnership.IProcess> launch,
+    Func<CancellationToken, Task<bool>> waitExternal,
+    Func<CancellationToken, Task<bool>> waitOwned,
+    Action<OllamaProcessOwnership.IProcess> approve,
+    IProgress<double>? progress, CancellationToken cancellationToken) => owner.RunAsync(async token =>
+  {
+    await owner.SetupGate.WaitAsync(token).ConfigureAwait(false);
+    try
     {
-      return;
-    }
-
-    HashSet<int> existingOllamaProcessIds = Process.GetProcessesByName("ollama")
-      .Select(process =>
+      owner.ThrowIfStopping(token);
+      if (await reachable(token).ConfigureAwait(false)) return false;
+      string executable = await prepare(progress, token).ConfigureAwait(false);
+      owner.ThrowIfStopping(token);
+      // Polling and installer timing establish availability, never launch ownership.
+      if (await waitExternal(token).ConfigureAwait(false)) return false;
+      owner.ThrowIfStopping(token);
+      OllamaProcessOwnership.OwnedProcess owned = owner.TrackProcess(launch(executable));
+      try
       {
-        int id = process.Id;
-        process.Dispose();
-        return id;
-      })
-      .ToHashSet();
+        owner.ThrowIfStopping(token);
+        if (!await waitOwned(token).ConfigureAwait(false))
+          throw new InvalidOperationException("Ollama was installed but its local service did not become ready.");
+        owner.ThrowIfStopping(token);
+        if (owned.Process.HasExited)
+          throw new InvalidOperationException($"The directly launched Ollama service exited with code {owned.Process.ExitCode} before readiness completed.");
+        approve(owned.Process);
+        owner.ThrowIfStopping(token);
+        return true;
+      }
+      catch
+      {
+        await CleanupLaunchedAsync(owned).ConfigureAwait(false);
+        throw;
+      }
+    }
+    finally { owner.SetupGate.Release(); }
+  }, cancellationToken);
 
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "Independent owned installer cleanup must preserve the original acquisition/launch failure.")]
+  private static async Task<string> PrepareInstallationAsync(IProgress<double>? progress, CancellationToken cancellationToken)
+  {
     string executablePath = GetInstalledExecutablePath();
     if (!File.Exists(executablePath))
     {
       progress?.Report(0.02);
-      string tempDirectory = Path.Combine(Path.GetTempPath(), "Notype");
+      string tempDirectory = Path.Combine(Path.GetTempPath(), $"KoncusNai.OllamaSetup-{Guid.NewGuid():N}");
       string installerPath = Path.Combine(tempDirectory, "OllamaSetup.exe");
       Directory.CreateDirectory(tempDirectory);
+      Exception? failure = null;
       try
       {
         await DownloadInstallerAsync(installerPath, progress, cancellationToken).ConfigureAwait(false);
         await VerifyOfficialInstallerAsync(installerPath, cancellationToken).ConfigureAwait(false);
-        CreateOllamaUpgradeMarker();
         await RunInstallerAsync(installerPath, cancellationToken).ConfigureAwait(false);
       }
+      catch (Exception error) { failure = error; throw; }
       finally
       {
-        if (File.Exists(installerPath))
-        {
-          File.Delete(installerPath);
-        }
+        RemoveInstallerFiles(() => File.Delete(installerPath), () => Directory.Delete(tempDirectory), failure);
       }
 
       executablePath = GetInstalledExecutablePath();
@@ -158,23 +206,8 @@ internal static class LocalOllamaRuntimeReadiness
         throw new InvalidOperationException("Ollama installation completed but its executable was not found.");
       }
 
-      _ = OllamaStartupShortcutPolicy.TryDisableAutomaticStartup();
     }
-
-    if (await WaitForApiAsync(TimeSpan.FromSeconds(20), cancellationToken).ConfigureAwait(false))
-    {
-      // The official installer can start Ollama itself. Record only a process that appeared
-      // during this explicit Koncus Nai operation so a pre-existing user service is never owned.
-      OllamaProcessOwnership.TrackNewProcess(existingOllamaProcessIds);
-    }
-    else
-    {
-      StartOllamaServer(executablePath);
-      if (!await WaitForApiAsync(TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false))
-      {
-        throw new InvalidOperationException("Ollama was installed but its local service did not start.");
-      }
-    }
+    return executablePath;
   }
 
   private static string GetInstalledExecutablePath() => Path.Combine(
@@ -196,7 +229,7 @@ internal static class LocalOllamaRuntimeReadiness
     response.EnsureSuccessStatusCode();
     long totalBytes = response.Content.Headers.ContentLength ?? -1;
     await using Stream source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-    await using FileStream destination = new(installerPath, FileMode.Create, FileAccess.Write, FileShare.None);
+    await using FileStream destination = new(installerPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
     byte[] buffer = new byte[81_920];
     long downloadedBytes = 0;
     int read;
@@ -226,8 +259,6 @@ internal static class LocalOllamaRuntimeReadiness
       FileName = "powershell.exe",
       UseShellExecute = false,
       CreateNoWindow = true,
-      RedirectStandardOutput = true,
-      RedirectStandardError = true,
     };
     startInfo.ArgumentList.Add("-NoProfile");
     startInfo.ArgumentList.Add("-NonInteractive");
@@ -236,17 +267,8 @@ internal static class LocalOllamaRuntimeReadiness
       "$signature = Get-AuthenticodeSignature -LiteralPath '" + installerPath.Replace("'", "''", StringComparison.Ordinal) +
       "'; if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch '(^|, )O=Ollama Inc\\.(,|$)') { exit 1 }");
 
-    using Process process = Process.Start(startInfo)
-      ?? throw new InvalidOperationException("Could not verify the Ollama installer signature.");
-    await WaitForOwnedProcessAsync(
-      process,
-      TimeSpan.FromMinutes(2),
-      "Ollama installer signature verification timed out.",
-      cancellationToken).ConfigureAwait(false);
-    if (process.ExitCode != 0)
-    {
-      throw new InvalidOperationException("The Ollama installer signature could not be validated.");
-    }
+    await RunHelperAsync(OllamaProcessOwnership.Default, () => OllamaProcessOwnership.Launch(startInfo),
+      TimeSpan.FromMinutes(2), "Ollama installer signature verification", cancellationToken).ConfigureAwait(false);
   }
 
   private static async Task RunInstallerAsync(string installerPath, CancellationToken cancellationToken)
@@ -260,17 +282,8 @@ internal static class LocalOllamaRuntimeReadiness
     startInfo.ArgumentList.Add("/VERYSILENT");
     startInfo.ArgumentList.Add("/NORESTART");
     startInfo.ArgumentList.Add("/SUPPRESSMSGBOXES");
-    using Process process = Process.Start(startInfo)
-      ?? throw new InvalidOperationException("Could not start the Ollama installer.");
-    await WaitForOwnedProcessAsync(
-      process,
-      TimeSpan.FromMinutes(15),
-      "Ollama installation timed out.",
-      cancellationToken).ConfigureAwait(false);
-    if (process.ExitCode != 0)
-    {
-      throw new InvalidOperationException($"Ollama installation failed with exit code {process.ExitCode}.");
-    }
+    await RunHelperAsync(OllamaProcessOwnership.Default, () => OllamaProcessOwnership.Launch(startInfo),
+      TimeSpan.FromMinutes(15), "Ollama installation", cancellationToken).ConfigureAwait(false);
   }
 
   internal static void ValidateInstallerDownloadSource(Uri? finalUri)
@@ -284,64 +297,56 @@ internal static class LocalOllamaRuntimeReadiness
     }
   }
 
-  private static async Task WaitForOwnedProcessAsync(
-    Process process,
-    TimeSpan timeout,
-    string timeoutMessage,
-    CancellationToken cancellationToken)
+  internal static Task<int> RunHelperAsync(OllamaProcessOwnership owner,
+    Func<OllamaProcessOwnership.IProcess> launch, TimeSpan timeout, string operation,
+    CancellationToken cancellationToken,
+    Func<Task, TimeSpan, CancellationToken, Task>? wait = null) => owner.RunAsync(async token =>
   {
-    using CancellationTokenSource timeoutSource = new(timeout);
-    using CancellationTokenSource linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
-      cancellationToken,
-      timeoutSource.Token);
+    owner.ThrowIfStopping(token);
+    OllamaProcessOwnership.OwnedProcess owned = owner.TrackProcess(launch());
+    Exception? failure = null;
     try
     {
-      await process.WaitForExitAsync(linkedSource.Token).ConfigureAwait(false);
+      owner.ThrowIfStopping(token);
+      Task exit = owned.WaitForExitAsync();
+      await (wait is null ? exit.WaitAsync(timeout, token) : wait(exit, timeout, token)).ConfigureAwait(false);
+      owner.ThrowIfStopping(token);
+      int code = owned.Process.ExitCode;
+      if (code != 0) throw new InvalidOperationException($"{operation} failed with exit code {code}.");
+      return code;
     }
-    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+    catch (TimeoutException error)
     {
-      TryTerminateOwnedProcess(process);
-      throw new InvalidOperationException(timeoutMessage);
+      failure = new InvalidOperationException($"{operation} timed out.", error);
+      throw failure;
     }
-    catch (OperationCanceledException)
+    catch (Exception error) { failure = error; throw; }
+    finally
     {
-      TryTerminateOwnedProcess(process);
-      throw;
+      if (failure is null) await owned.StopAsync().WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+      else await CleanupLaunchedAsync(owned).ConfigureAwait(false);
     }
-  }
+  }, cancellationToken);
 
-  private static void TryTerminateOwnedProcess(Process process)
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "Retain bounded cleanup and preserve the initiating readiness/cancellation/installer failure.")]
+  private static async Task CleanupLaunchedAsync(OllamaProcessOwnership.OwnedProcess owned)
   {
-    try
-    {
-      if (!process.HasExited)
-      {
-        process.Kill(entireProcessTree: true);
-        _ = process.WaitForExit(5_000);
-      }
-    }
-    catch (InvalidOperationException)
-    {
-      // The owned process already exited between checks.
-    }
-    catch (System.ComponentModel.Win32Exception)
-    {
-      // Preserve cancellation/timeout as the authoritative failure.
-    }
+    try { await owned.StopAsync().WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false); }
+    catch (Exception) { DictateAnywhere.Core.Services.DiagnosticBoundary.RecordFailure(); }
   }
 
-  // Ollama's own Windows setup script creates this marker so a first install starts hidden.
-  // That keeps the setup entirely within Koncus Nai instead of opening Ollama's onboarding window.
-  private static void CreateOllamaUpgradeMarker()
+  [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031", Justification = "Run independent owned temporary cleanup, preserving an existing acquisition or helper failure.")]
+  internal static void RemoveInstallerFiles(Action deleteFile, Action deleteDirectory, Exception? original)
   {
-    string markerDirectory = Path.Combine(
-      Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-      "Ollama");
-    Directory.CreateDirectory(markerDirectory);
-    File.WriteAllText(Path.Combine(markerDirectory, "upgraded"), string.Empty, Encoding.UTF8);
+    List<Exception> failures = [];
+    try { deleteFile(); } catch (Exception error) { failures.Add(error); }
+    try { deleteDirectory(); } catch (Exception error) { failures.Add(error); }
+    if (failures.Count == 0) return;
+    if (original is null) throw new AggregateException("Ollama installer temporary cleanup failed.", failures);
+    DictateAnywhere.Core.Services.DiagnosticBoundary.RecordFailure();
   }
 
-  private static void StartOllamaServer(string executablePath)
+  private static OllamaProcessOwnership.IProcess StartOllamaServer(string executablePath)
   {
     ProcessStartInfo startInfo = new()
     {
@@ -350,10 +355,7 @@ internal static class LocalOllamaRuntimeReadiness
       CreateNoWindow = true,
     };
     startInfo.ArgumentList.Add("serve");
-    Process process = Process.Start(startInfo)
-      ?? throw new InvalidOperationException("Could not start the Ollama local service.");
-    OllamaProcessOwnership.Track(process);
-    OllamaListenerTrust.ApproveManaged(process);
+    return OllamaProcessOwnership.Launch(startInfo);
   }
 
   private static async Task<bool> WaitForApiAsync(TimeSpan timeout, CancellationToken cancellationToken)

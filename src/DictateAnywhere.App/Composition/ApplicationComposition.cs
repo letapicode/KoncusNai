@@ -219,7 +219,7 @@ internal sealed class ApplicationComposition
       ChatRuntimeReadinessProbe,
       Diagnostics,
       identity => MessageBox.Show(
-          $"An Ollama service is running on this device. Private chat and attached document text will be sent to this process:\n\n{identity.ExecutablePath}\nProcess ID: {identity.ProcessId}\n\nTrust this process for this app session? If it changes, approval is required again.",
+          $"An Ollama service is running on this device. Private chat and attached document text will be sent to this process:\n\n{identity.ExecutablePath}\nProcess ID: {identity.ProcessId}\n\nTrust this process for this app session? If it changes, approval is required again. This permits use only; Koncus Nai will not manage or stop this external process.",
         "Trust external Ollama service?",
         MessageBoxButton.YesNo,
         MessageBoxImage.Warning,

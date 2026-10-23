@@ -59,7 +59,8 @@ internal sealed class LocalChatProviderRegistry
           "Gemma 4 E4B Q4_K_M through Ollama. Ollama manages the quantized model and keeps it local on this device.",
           [new LocalChatModelDefinition("gemma4:e4b", "Gemma 4 E4B (Ollama Q4_K_M)", "Quantized 8B Gemma 4 E4B model served by your local Ollama installation.")],
           ModelProviderOperationalMetadata.LocalOffline),
-        selection => new OllamaChatService(OllamaChatOptions.ForModel(selection.ModelId), OllamaListenerTrust.IsCurrentTrusted)),
+        selection => new OwnedOllamaChatService(new OllamaChatService(
+          OllamaChatOptions.ForModel(selection.ModelId), OllamaListenerTrust.IsCurrentTrusted), OllamaProcessOwnership.Default)),
       new LocalChatProviderRegistration(
         new LocalChatProviderDefinition(
           ChatProviderIds.LlamaCppLocal,
@@ -71,5 +72,14 @@ internal sealed class LocalChatProviderRegistry
           ModelProviderOperationalMetadata.LocalOffline),
         selection => new LlamaCppChatService(LlamaCppChatOptions.ForModel(selection.ModelId))),
     ]);
+  }
+
+  // A window borrows the application runtime. Closing one window releases its
+  // accepted requests; only application shutdown terminates direct launches.
+  internal sealed class OwnedOllamaChatService(IChatCompletionService inner, OllamaProcessOwnership owner) : IChatCompletionService
+  {
+    public System.Threading.Tasks.Task<ChatCompletionResult> CompleteAsync(ChatCompletionRequest request,
+      System.Threading.CancellationToken cancellationToken = default) => owner.RunAsync(
+        token => inner.CompleteAsync(request, token), cancellationToken);
   }
 }

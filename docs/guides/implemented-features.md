@@ -130,9 +130,9 @@ Update this document whenever a user-visible feature, supported model, workflow,
 - Provides local-chat model selection, readiness status, setup/download controls, request timing, history, and friendly failure messages.
 - Supports an Ollama-backed Gemma 4 E4B model and llama.cpp-backed local GGUF models, including the bundled Gemma 3 4B option.
 - Does **not** start Ollama when Koncus Nai opens or when Reading Studio is used.
-- Removes only a verified Ollama shortcut from the current user's Windows Startup folder so the installer cannot silently restore sign-in launch. Unrelated startup entries are never touched.
+- Preserves Ollama startup shortcuts and custom installations. A shortcut name or executable target is not proof that Koncus Nai owns user configuration.
 - The **Start / set up Ollama** action starts an installed Ollama service only after the user asks to use it. It downloads Gemma 4 only when the model is missing. Ollama loads the model for the first chat request, so that first response can take longer.
-- Choosing **Quit** from the tray closes Koncus Nai and stops an Ollama process only when that process was started and ownership-tracked by Koncus Nai. An Ollama instance that was already running is left alone.
+- Choosing **Quit** drains accepted Ollama users and stops only retained handles launched directly by Koncus Nai. Existing listeners, installer-created servers and processes newly observed during polling remain external; explicit consent permits use only. Legacy PID markers are left untouched and never authorize termination. See [batch 6 ownership and adoption](../release/process-ownership-adoption-audit-batch-6-2026-10-01.md).
 - Local Gemma chat and refinement can require Python runtime dependencies and installed model files; the UI provides readiness and repair/update guidance.
 
 ## Settings, privacy, diagnostics, and packaging
