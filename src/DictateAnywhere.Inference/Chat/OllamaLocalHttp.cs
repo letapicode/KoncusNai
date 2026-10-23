@@ -15,7 +15,15 @@ internal static class OllamaLocalHttp
   public static HttpClient CreateClient()
   {
 #pragma warning disable CA2000 // HttpClient takes ownership of the handler; the catch disposes it if construction fails.
-    HttpClientHandler handler = new() { AllowAutoRedirect = false, UseProxy = false };
+    SocketsHttpHandler handler = new()
+    {
+      AllowAutoRedirect = false,
+      UseProxy = false,
+      // Listener approval must not authorize a pooled connection to an older
+      // process. Every request connects anew; the check/connect race still exists.
+      PooledConnectionLifetime = TimeSpan.Zero,
+      PooledConnectionIdleTimeout = TimeSpan.Zero,
+    };
 #pragma warning restore CA2000
     try
     {

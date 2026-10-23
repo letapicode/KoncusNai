@@ -11,38 +11,51 @@ internal sealed record OllamaListenerIdentity(int ProcessId, DateTime StartTimeU
 /// <summary>Approval is scoped to one Windows listener process instance, never to a port or a claimed model digest.</summary>
 internal static class OllamaListenerTrust
 {
-  private static readonly object Sync = new();
-  private static OllamaListenerIdentity? approvedExternal;
-  private static (int ProcessId, DateTime StartTimeUtc)? managedProcess;
+  private static readonly Session Default = new(() => TryCapture(out OllamaListenerIdentity? identity) ? identity : null);
 
-  internal static bool IsCurrentTrusted()
+  internal static bool IsCurrentTrusted() => Default.IsCurrentTrusted();
+  internal static bool ApproveExternal(OllamaListenerIdentity identity) =>
+    !OllamaProcessOwnership.Default.IsStopping && Default.ApproveExternal(identity);
+  internal static void ApproveManaged(OllamaProcessOwnership.IProcess process)
   {
-    if (!TryCapture(out OllamaListenerIdentity? current) || current is null) return false;
-    lock (Sync)
+    OllamaListenerIdentity identity = new(process.Id, process.StartTimeUtc, Path.GetFullPath(process.ExecutablePath));
+    OllamaProcessOwnership.Default.ThrowIfStopping(System.Threading.CancellationToken.None);
+    Default.ApproveManaged(identity);
+  }
+
+  internal static bool IsApproved(OllamaListenerIdentity current, OllamaListenerIdentity? external,
+    OllamaListenerIdentity? managed) => current == external || current == managed;
+
+  // Tests own a session and inject capture; they never inspect the real listener
+  // or mutate the production session's consent.
+  internal sealed class Session(Func<OllamaListenerIdentity?> capture)
+  {
+    private readonly object sync = new();
+    private OllamaListenerIdentity? external;
+    private OllamaListenerIdentity? managed;
+    internal bool IsCurrentTrusted()
     {
-      return IsApproved(current, approvedExternal, managedProcess);
+      OllamaListenerIdentity? current = capture();
+      lock (sync)
+      {
+        if (current != external) external = null;
+        if (current != managed) managed = null;
+        return current is not null && IsApproved(current, external, managed);
+      }
     }
-  }
-
-  internal static bool IsApproved(
-    OllamaListenerIdentity current,
-    OllamaListenerIdentity? external,
-    (int ProcessId, DateTime StartTimeUtc)? managed)
-    => current == external
-      || (managed is { } owned
-          && current.ProcessId == owned.ProcessId
-          && current.StartTimeUtc == owned.StartTimeUtc);
-
-  internal static void ApproveManaged(Process process)
-  {
-    lock (Sync) managedProcess = (process.Id, process.StartTime.ToUniversalTime());
-  }
-
-  internal static bool ApproveExternal(OllamaListenerIdentity identity)
-  {
-    if (!TryCapture(out OllamaListenerIdentity? current) || current != identity) return false;
-    lock (Sync) approvedExternal = identity;
-    return true;
+    internal bool ApproveExternal(OllamaListenerIdentity identity)
+    {
+      OllamaListenerIdentity? current = capture();
+      lock (sync)
+      {
+        external = current == identity ? identity : null;
+        return external is not null;
+      }
+    }
+    internal void ApproveManaged(OllamaListenerIdentity identity)
+    {
+      lock (sync) managed = identity;
+    }
   }
 
   internal static bool TryCapture(out OllamaListenerIdentity? identity)
@@ -85,7 +98,7 @@ internal static class OllamaListenerTrust
         byte[] portBytes = BitConverter.GetBytes(row.LocalPort);
         int listenerPort = (portBytes[0] << 8) | portBytes[1];
         bool local = address[0] == 127 && address[1] == 0 && address[2] == 0 && address[3] == 1;
-        if (listenerPort != port || !local) continue;
+        if (listenerPort != port || !local || row.State != 2) continue;
         if (owner is not null && owner != (int)row.OwningProcessId) return null;
         owner = checked((int)row.OwningProcessId);
       }

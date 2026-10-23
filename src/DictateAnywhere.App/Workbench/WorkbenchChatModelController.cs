@@ -62,7 +62,8 @@ internal sealed class WorkbenchChatModelController
     {
       if (string.Equals(normalized.ProviderId, ChatProviderIds.OllamaLocal, StringComparison.OrdinalIgnoreCase))
       {
-        return await SetupOllamaAsync(normalized, progress, cancellationToken).ConfigureAwait(true);
+        return await OllamaProcessOwnership.Default.RunAsync(
+          token => SetupOllamaAsync(normalized, progress, token), cancellationToken).ConfigureAwait(true);
       }
 
       if (string.Equals(normalized.ProviderId, ChatProviderIds.LlamaCppLocal, StringComparison.OrdinalIgnoreCase))
@@ -178,7 +179,7 @@ internal sealed class WorkbenchChatModelController
     diagnostics.Info("Ollama chat model setup requested from the Workbench.");
     progress?.Report(new WorkbenchChatModelSetupProgress(
       "Starting Ollama locally. The model stays unloaded until the first message."));
-    Progress<double> transferProgress = CreateTransferProgress(progress, "Setting up Ollama...");
+    IProgress<double> transferProgress = new TransferProgress(progress, "Setting up Ollama...");
     LocalChatRuntimeReadiness readiness = await LocalOllamaRuntimeReadiness
       .StartAsync(selection.ModelId, transferProgress, cancellationToken)
       .ConfigureAwait(true);
@@ -190,6 +191,7 @@ internal sealed class WorkbenchChatModelController
       if (!approveExternalOllama(identity))
         return new WorkbenchChatModelSetupResult(
           "The external Ollama listener was not trusted. No private chat content was sent.", RefreshReadiness: false);
+      cancellationToken.ThrowIfCancellationRequested();
       if (!OllamaListenerTrust.ApproveExternal(identity))
         return new WorkbenchChatModelSetupResult(
           "The Ollama listener changed during review. Retry model setup.", RefreshReadiness: false);
@@ -271,9 +273,12 @@ internal sealed class WorkbenchChatModelController
 
   private static Progress<double> CreateTransferProgress(
     IProgress<WorkbenchChatModelSetupProgress>? progress,
-    string status) => new(value => progress?.Report(new WorkbenchChatModelSetupProgress(
-      status,
-      Math.Clamp(value, 0, 1))));
+    string status) => new(value => progress?.Report(new WorkbenchChatModelSetupProgress(status, Math.Clamp(value, 0, 1))));
+
+  private sealed class TransferProgress(IProgress<WorkbenchChatModelSetupProgress>? progress, string status) : IProgress<double>
+  {
+    public void Report(double value) => progress?.Report(new WorkbenchChatModelSetupProgress(status, Math.Clamp(value, 0, 1)));
+  }
 
   private static bool IsModelManagementException(Exception exception) =>
     string.Equals(exception.GetType().Name, "ModelManagementException", StringComparison.Ordinal);

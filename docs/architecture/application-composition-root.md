@@ -27,10 +27,10 @@ Startup failures/cancellation, duplicate-instance exit, and tray quit use the
 same path. A duplicate instance never creates production composition and never
 calls the real Ollama ownership boundary.
 
-Shutdown cancels startup and runtime lifecycle admission, stops activation and
+Shutdown first closes Ollama launch/request admission and publishes its retained stop, then cancels startup and runtime lifecycle admission, stops activation and
 watchdog timers, starts closing every registered window, drains startup/tray/
 watchdog commands and window cleanup, then disposes runtime/readiness and
-productivity hotkeys, stops only ownership-tracked Ollama, and releases process
+productivity hotkeys, awaits the independently retained Ollama drain/stop, and releases process
 resources. Global dictation and undo admission stop together at the beginning,
 so a slow undo unregister does not leave dictation accepting new recordings.
 Readiness remains available until dependent window operations have drained.
@@ -65,7 +65,7 @@ The physical OS behavior is not validated by the simulated dispatcher tests.
 Forced termination, an unresponsive dispatcher, and power loss cannot guarantee
 cleanup. See Microsoft's [SessionEnding contract](https://learn.microsoft.com/en-us/dotnet/api/system.windows.application.sessionending).
 
-Existing close/hide shell behavior and process-adoption policy are preserved.
+Existing close/hide shell behavior is preserved. Ollama adoption grants use consent separately from management: only directly launched handles confer termination authority. The runtime owner drains its own accepted setup, helper, readiness and chat users even when outer window/command cleanup times out; it never disposes process handles beneath those users. Conservative crash recovery performs no marker I/O or PID recovery. See the [batch 6 decision](../release/process-ownership-adoption-audit-batch-6-2026-10-01.md).
 Settings disposal now accelerates and drains the latest valid accepted autosave,
 including explicit flushes. Invalid/unscheduled edits and explicit canceled
 pending intent are not implicitly saved; storage conflicts/failures and deadline

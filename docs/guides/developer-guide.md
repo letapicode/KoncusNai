@@ -131,7 +131,7 @@ Stop source-run validation processes safely:
 .\scripts\stop-koncus-nai.ps1
 ```
 
-The stop helper closes Koncus Nai and only an ownership-tracked Ollama process started by Koncus Nai. `-AllOllama` is an explicit destructive override for controlled test machines and should not be used in ordinary development cleanup.
+The stop helper requests ordinary window close, then may force the named app process after its grace period. Ordinary window close can mean hide-to-tray, so prefer tray **Quit** for cooperative worker cleanup. The helper no longer follows descendant trees or reads PID markers in its ordinary path; Ollama remains untouched. `-AllOllama` remains an explicit destructive override for controlled test machines and should not be used in ordinary cleanup. Forced app exit cannot guarantee owned-worker cleanup; use the [cooperative lifecycle policy](../architecture/application-composition-root.md).
 
 Run the source app elevated:
 ```powershell

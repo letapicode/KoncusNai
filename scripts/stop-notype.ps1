@@ -22,22 +22,6 @@ function Stop-ProcessTree {
   }
 }
 
-function Test-OwnedOllamaMarker {
-  param(
-    [Parameter(Mandatory)]$Marker,
-    [Parameter(Mandatory)]$Process
-  )
-
-  $expectedName = [System.IO.Path]::GetFileName([string]$Marker.executablePath)
-  if ($expectedName -notin @("ollama", "ollama.exe") -or $Process.ProcessName -ne "ollama") {
-    return $false
-  }
-
-  $recordedStart = ([DateTime]$Marker.startTimeUtc).ToUniversalTime()
-  $actualStart = $Process.StartTime.ToUniversalTime()
-  return [Math]::Abs(($actualStart - $recordedStart).TotalSeconds) -lt 2
-}
-
 $notypeProcesses = @(Get-Process -Name "DictateAnywhere.App" -ErrorAction SilentlyContinue)
 foreach ($process in $notypeProcesses) {
   if ($process.MainWindowHandle -ne 0) {
@@ -51,24 +35,15 @@ if ($GracePeriodSeconds -gt 0 -and $notypeProcesses.Count -gt 0) {
 
 foreach ($process in $notypeProcesses) {
   if ($null -ne (Get-Process -Id $process.Id -ErrorAction SilentlyContinue)) {
-    Stop-ProcessTree -ProcessId $process.Id
+    Stop-Process -InputObject $process -Force -ErrorAction SilentlyContinue
   }
 }
 
-$markerPath = Join-Path $env:LOCALAPPDATA "DictateAnywhere\runtime\owned-ollama.pid"
+# A persisted PID cannot prove launch ownership. Ordinary cleanup leaves Ollama
+# and all legacy marker contents untouched. Only the running app owns its handles.
 if ($AllOllama) {
   foreach ($process in @(Get-Process -Name "ollama" -ErrorAction SilentlyContinue)) {
     Stop-ProcessTree -ProcessId $process.Id
-  }
-} elseif (Test-Path -LiteralPath $markerPath) {
-  try {
-    $marker = Get-Content -Raw -LiteralPath $markerPath | ConvertFrom-Json
-    $owned = Get-Process -Id ([int]$marker.processId) -ErrorAction SilentlyContinue
-    if ($null -ne $owned -and (Test-OwnedOllamaMarker -Marker $marker -Process $owned)) {
-      Stop-ProcessTree -ProcessId $owned.Id
-    }
-  } finally {
-    Remove-Item -LiteralPath $markerPath -Force -ErrorAction SilentlyContinue
   }
 }
 
@@ -76,5 +51,5 @@ Write-Host "Stopped $($notypeProcesses.Count) Koncus Nai process(es)." -Foregrou
 if ($AllOllama) {
   Write-Host "All local Ollama processes were explicitly stopped." -ForegroundColor Yellow
 } else {
-  Write-Host "Only a KoncusNai-owned Ollama process was eligible for shutdown." -ForegroundColor Cyan
+  Write-Host "Ollama was left untouched; forced app exit cannot guarantee owned-worker cleanup." -ForegroundColor Cyan
 }

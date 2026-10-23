@@ -8,12 +8,75 @@ using System.Threading;
 using System.Threading.Tasks;
 using DictateAnywhere.Core.Contracts;
 using DictateAnywhere.Inference;
+using Xunit;
 
 namespace DictateAnywhere.Inference.Tests;
 
 public sealed class OllamaRequestBoundaryTests
 {
   private const string Secret = "private prompt that must not be echoed";
+
+  [Xunit.Fact]
+  public async Task LocalTransportDoesNotReuseConnectionToPreviousListener()
+  {
+    using CancellationTokenSource lifetime = new();
+    using TcpListener first = new(IPAddress.Loopback, 0);
+    first.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+    first.Start();
+    int port = ((IPEndPoint)first.LocalEndpoint).Port;
+    using TcpListener replacement = new(IPAddress.Loopback, port);
+    replacement.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+    TaskCompletionSource<TcpClient> accepted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    Task oldServer = Task.Run(async () =>
+    {
+      try
+      {
+        using TcpClient socket = await first.AcceptTcpClientAsync(lifetime.Token);
+        accepted.TrySetResult(socket);
+        using NetworkStream stream = socket.GetStream();
+        using StreamReader reader = new(stream, Encoding.ASCII, leaveOpen: true);
+        while (await ReadRequestAsync(reader, lifetime.Token))
+          await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nold"), lifetime.Token);
+      }
+      catch (Exception error) when (error is OperationCanceledException or IOException or SocketException or ObjectDisposedException) { }
+    });
+    Task newServer = Task.CompletedTask;
+    try
+    {
+      using HttpClient client = OllamaLocalHttp.CreateClient();
+      Assert.Equal("old", await client.GetStringAsync($"http://127.0.0.1:{port}/api/tags"));
+      first.Stop();
+      replacement.Start();
+      newServer = Task.Run(async () =>
+      {
+        try
+        {
+          using TcpClient socket = await replacement.AcceptTcpClientAsync(lifetime.Token);
+          using NetworkStream stream = socket.GetStream();
+          using StreamReader reader = new(stream, Encoding.ASCII, leaveOpen: true);
+          if (await ReadRequestAsync(reader, lifetime.Token))
+            await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nnew"), lifetime.Token);
+        }
+        catch (Exception error) when (error is OperationCanceledException or IOException or SocketException or ObjectDisposedException) { }
+      });
+      Assert.Equal("new", await client.GetStringAsync($"http://127.0.0.1:{port}/api/chat"));
+    }
+    finally
+    {
+      lifetime.Cancel();
+      first.Stop();
+      replacement.Stop();
+      if (accepted.Task.IsCompletedSuccessfully) (await accepted.Task).Dispose();
+      await Task.WhenAll(oldServer, newServer).WaitAsync(TimeSpan.FromSeconds(30));
+    }
+  }
+
+  private static async Task<bool> ReadRequestAsync(StreamReader reader, CancellationToken token)
+  {
+    if (await reader.ReadLineAsync(token) is null) return false;
+    while (await reader.ReadLineAsync(token) is { Length: > 0 }) { }
+    return true;
+  }
 
   [Xunit.Theory]
   [Xunit.InlineData("http://example.com:11434/")]

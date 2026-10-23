@@ -1,292 +1,308 @@
 using DictateAnywhere.App.Runtime;
-using System.Text.Json;
+using DictateAnywhere.Core.Contracts;
+using Xunit;
 
 namespace DictateAnywhere.App.Tests;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000", Justification = "Tests explicitly drain shared StopAsync, including its expected failure; unverifiable fake handles remain retained by design.")]
 public sealed class OllamaProcessOwnershipTests
 {
-  [Xunit.Fact]
-  public void IsExpectedProcess_AcceptsTheExactRecordedOllamaIdentity()
+  [Fact]
+  public async Task EmptyOwnerAndIndependentOwnersStopOnlyTheirDirectHandles()
   {
-    DateTime started = DateTime.UtcNow;
-    OllamaProcessOwnership.OwnedProcessMarker marker = new(1234, started, @"C:\Program Files\Ollama\ollama.exe");
-
-    bool matches = OllamaProcessOwnership.IsExpectedProcess(marker, "ollama", started.AddMilliseconds(500));
-
-    Xunit.Assert.True(matches);
+    await using OllamaProcessOwnership empty = new();
+    await empty.StopAsync();
+    await using OllamaProcessOwnership first = new();
+    await using OllamaProcessOwnership second = new();
+    using Child a = new();
+    using Child b = new();
+    first.TrackProcess(a);
+    second.TrackProcess(b);
+    await second.StopAsync();
+    Assert.Equal(0, a.Stops);
+    Assert.Equal(0, a.Disposals);
+    Assert.Equal(1, b.Stops);
+    Assert.Equal(1, b.Disposals);
+    await first.StopAsync();
+    Assert.Equal(1, a.Stops);
   }
 
-  [Xunit.Theory]
-  [Xunit.InlineData("other", "ollama.exe", 0)]
-  [Xunit.InlineData("ollama", "other.exe", 0)]
-  [Xunit.InlineData("ollama", "ollama.exe", 10)]
-  public void IsExpectedProcess_RejectsPidReuseAndUnrelatedProcesses(
-    string processName,
-    string executableName,
-    int startOffsetSeconds)
+  [Fact]
+  public async Task StopClosesAdmissionDrainsAllUsersAndRejectsLateResults()
   {
-    DateTime started = DateTime.UtcNow;
-    OllamaProcessOwnership.OwnedProcessMarker marker = new(1234, started, executableName);
-
-    bool matches = OllamaProcessOwnership.IsExpectedProcess(
-      marker,
-      processName,
-      started.AddSeconds(startOffsetSeconds));
-
-    Xunit.Assert.False(matches);
-  }
-
-  [Xunit.Fact]
-  public async Task StopOwnedAsync_WhenNoProcessTrackedAndNoMarker_CompletesSafely()
-  {
-    using TestScope scope = new();
-    OllamaProcessOwnership owner = scope.CreateOwner();
-
-    await owner.StopAsync();
-
-    Xunit.Assert.False(File.Exists(scope.MarkerPath));
-    Xunit.Assert.Equal(0, scope.Processes.LookupCount);
-    Xunit.Assert.Equal(0, scope.Processes.EnumerationCount);
-  }
-
-  [Xunit.Fact]
-  public async Task StopOwnedAsync_WhenMarkerCorrupted_DeletesMarkerAndCompletesSafely()
-  {
-    using TestScope scope = new();
-    OllamaProcessOwnership owner = scope.CreateOwner();
-    await File.WriteAllTextAsync(scope.MarkerPath, "{ invalid json corrupt content }");
-
-    await owner.StopAsync();
-
-    Xunit.Assert.False(File.Exists(scope.MarkerPath));
-    Xunit.Assert.Equal(0, scope.Processes.LookupCount);
-  }
-
-  [Xunit.Fact]
-  public void TrackNewProcess_IgnoresExistingProcessesPresentBeforeStart()
-  {
-    using TestScope scope = new();
-    using FakeProcess external = new(1234);
-    scope.Processes.Candidates.Add(external);
-
-    scope.CreateOwner().TrackNewProcesses(new HashSet<int> { external.Id });
-
-    Xunit.Assert.False(File.Exists(scope.MarkerPath));
-    Xunit.Assert.Equal(1, scope.Processes.EnumerationCount);
-    Xunit.Assert.Equal(0, external.StopCount);
-    Xunit.Assert.Equal(1, external.DisposeCount);
-  }
-
-  [Xunit.Fact]
-  public async Task TrackProcess_WritesIdentityAndStopsOnlyTheTrackedProcess()
-  {
-    using TestScope scope = new();
-    using FakeProcess tracked = new(1234);
-    using FakeProcess external = new(5678);
-    scope.Processes.Candidates.Add(external);
-    OllamaProcessOwnership owner = scope.CreateOwner();
-
-    owner.TrackProcess(tracked);
-    OllamaProcessOwnership.OwnedProcessMarker marker = ReadMarker(scope.MarkerPath);
-    Xunit.Assert.Equal(tracked.Id, marker.ProcessId);
-    Xunit.Assert.Equal(tracked.StartTimeUtc, marker.StartTimeUtc);
-    Xunit.Assert.Equal(tracked.ExecutablePath, marker.ExecutablePath);
-
-    await owner.StopAsync();
-    await owner.StopAsync();
-
-    Xunit.Assert.Equal(1, tracked.StopCount);
-    Xunit.Assert.Equal(1, tracked.DisposeCount);
-    Xunit.Assert.Equal(0, external.StopCount);
-    Xunit.Assert.Equal(0, scope.Processes.LookupCount);
-    Xunit.Assert.Equal(0, scope.Processes.EnumerationCount);
-    Xunit.Assert.False(File.Exists(scope.MarkerPath));
-  }
-
-  [Xunit.Fact]
-  public async Task StopAsync_WithRecordedIdentity_UsesOnlyInjectedProcessLookup()
-  {
-    using TestScope scope = new();
-    using FakeProcess recorded = new(1234);
-    scope.Processes.Candidates.Add(recorded);
-    WriteMarker(scope.MarkerPath, recorded);
-
-    await scope.CreateOwner().StopAsync();
-
-    Xunit.Assert.Equal(1, scope.Processes.LookupCount);
-    Xunit.Assert.Equal(recorded.Id, scope.Processes.LastLookupId);
-    Xunit.Assert.Equal(1, recorded.StopCount);
-    Xunit.Assert.False(File.Exists(scope.MarkerPath));
-  }
-
-  [Xunit.Theory]
-  [Xunit.InlineData("other", 0)]
-  [Xunit.InlineData("ollama", 10)]
-  public async Task StopAsync_WithReusedOrUnrelatedRecordedProcess_DoesNotStopIt(string name, int startOffsetSeconds)
-  {
-    using TestScope scope = new();
-    using FakeProcess recorded = new(1234);
-    WriteMarker(scope.MarkerPath, recorded);
-    using FakeProcess external = new(recorded.Id)
-    {
-      Name = name,
-      StartTimeUtc = recorded.StartTimeUtc.AddSeconds(startOffsetSeconds),
-    };
-    scope.Processes.Candidates.Add(external);
-
-    await scope.CreateOwner().StopAsync();
-
-    Xunit.Assert.Equal(0, external.StopCount);
-    Xunit.Assert.Equal(1, external.DisposeCount);
-    Xunit.Assert.False(File.Exists(scope.MarkerPath));
-  }
-
-  [Xunit.Fact]
-  public async Task StopAsync_WhenRecordedProcessNoLongerExists_RemovesOnlyItsMarker()
-  {
-    using TestScope scope = new();
-    using FakeProcess recorded = new(1234);
-    WriteMarker(scope.MarkerPath, recorded);
-
-    await scope.CreateOwner().StopAsync();
-
-    Xunit.Assert.Equal(1, scope.Processes.LookupCount);
-    Xunit.Assert.False(File.Exists(scope.MarkerPath));
-  }
-
-  [Xunit.Fact]
-  public async Task IndependentOwners_DoNotChangeOtherMarkersOrProcesses()
-  {
-    using TestScope activeScope = new();
-    using TestScope isolatedScope = new();
-    using FakeProcess active = new(1234);
-    using FakeProcess isolated = new(5678);
-    OllamaProcessOwnership activeOwner = activeScope.CreateOwner();
-    OllamaProcessOwnership isolatedOwner = isolatedScope.CreateOwner();
-    activeOwner.TrackProcess(active);
-    byte[] activeMarker = await File.ReadAllBytesAsync(activeScope.MarkerPath);
-    isolatedOwner.TrackProcess(isolated);
-
-    await isolatedOwner.StopAsync();
-
-    Xunit.Assert.Equal(activeMarker, await File.ReadAllBytesAsync(activeScope.MarkerPath));
-    Xunit.Assert.Equal(0, active.StopCount);
-    Xunit.Assert.Equal(0, active.DisposeCount);
-    Xunit.Assert.Equal(1, isolated.StopCount);
-    Xunit.Assert.False(File.Exists(isolatedScope.MarkerPath));
-    await activeOwner.StopAsync();
-    Xunit.Assert.Equal(1, active.StopCount);
-  }
-
-  [Xunit.Fact]
-  public async Task StopAsync_AwaitsTheControlledStopBeforeRemovingItsMarker()
-  {
-    using TestScope scope = new();
-    TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    using FakeProcess tracked = new(1234) { StopCompletion = completion.Task };
-    OllamaProcessOwnership owner = scope.CreateOwner();
-    owner.TrackProcess(tracked);
+    OllamaProcessOwnership owner = new();
+    using Child child = new();
+    owner.TrackProcess(child);
+    TaskCompletionSource entered = Signal();
+    TaskCompletionSource release = Signal();
+    Task<int> user = owner.RunAsync(async _ => { entered.SetResult(); await release.Task; return 1; });
+    await entered.Task;
     Task stop = owner.StopAsync();
     try
     {
-      Xunit.Assert.False(stop.IsCompleted);
-      Xunit.Assert.True(File.Exists(scope.MarkerPath));
-      Xunit.Assert.Equal(1, tracked.StopCount);
+      Assert.True(owner.IsStopping);
+      Assert.False(stop.IsCompleted);
+      Assert.Equal(0, child.Stops);
+      await Assert.ThrowsAsync<ObjectDisposedException>(() => owner.RunAsync(_ => Task.FromResult(1)));
+      Assert.Same(stop, owner.StopAsync());
+      Assert.Same(stop, owner.DisposeAsync().AsTask());
     }
     finally
     {
-      completion.TrySetResult();
-      await stop.WaitAsync(TimeSpan.FromSeconds(5));
+      release.TrySetResult();
+      await Assert.ThrowsAnyAsync<OperationCanceledException>(() => user);
+      await stop;
     }
-
-    Xunit.Assert.False(File.Exists(scope.MarkerPath));
-    Xunit.Assert.Equal(1, tracked.DisposeCount);
+    Assert.Equal(1, child.Stops);
+    Assert.Equal(1, child.Disposals);
   }
 
-  [Xunit.Fact]
-  public async Task TrackNewProcesses_SelectsNewestInjectedCandidateAndLeavesExistingProcessUnstopped()
+  [Fact]
+  public async Task CallerCancelBoundsStopWaitWithoutAbandoningExitOrDisposingHandle()
   {
-    using TestScope scope = new();
-    using FakeProcess existing = new(1234);
-    using FakeProcess older = new(5678);
-    using FakeProcess newest = new(9012) { StartTimeUtc = older.StartTimeUtc.AddSeconds(5) };
-    scope.Processes.Candidates.AddRange([existing, older, newest]);
-    OllamaProcessOwnership owner = scope.CreateOwner();
-
-    owner.TrackNewProcesses(new HashSet<int> { existing.Id });
-    Xunit.Assert.Equal(newest.Id, ReadMarker(scope.MarkerPath).ProcessId);
-    await owner.StopAsync();
-
-    Xunit.Assert.Equal(0, existing.StopCount);
-    Xunit.Assert.Equal(0, older.StopCount);
-    Xunit.Assert.Equal(1, newest.StopCount);
-    Xunit.Assert.Equal(1, existing.DisposeCount);
-    Xunit.Assert.Equal(1, older.DisposeCount);
-    Xunit.Assert.Equal(1, newest.DisposeCount);
-  }
-
-  private static OllamaProcessOwnership.OwnedProcessMarker ReadMarker(string path) =>
-    JsonSerializer.Deserialize<OllamaProcessOwnership.OwnedProcessMarker>(File.ReadAllText(path))!;
-
-  private static void WriteMarker(string path, FakeProcess process) =>
-    File.WriteAllText(path, JsonSerializer.Serialize(new OllamaProcessOwnership.OwnedProcessMarker(
-      process.Id, process.StartTimeUtc, process.ExecutablePath)));
-
-  private sealed class TestScope : IDisposable
-  {
-    private readonly string directory = Path.Combine(Path.GetTempPath(), "DictateAnywhere.Tests", $"ollama-ownership-{Guid.NewGuid():N}");
-
-    public TestScope()
+    OllamaProcessOwnership owner = new();
+    TaskCompletionSource exit = Signal();
+    using Child child = new() { Exit = exit.Task };
+    owner.TrackProcess(child);
+    Task stop = owner.StopAsync();
+    using CancellationTokenSource caller = new();
+    caller.Cancel();
+    try
     {
-      Directory.CreateDirectory(directory);
-      MarkerPath = Path.Combine(directory, "owned-ollama.pid");
-      Xunit.Assert.NotEqual(OllamaProcessOwnership.MarkerPath, MarkerPath);
+      await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner.StopAsync(caller.Token));
+      Assert.False(stop.IsCompleted);
+      Assert.Equal(0, child.Disposals);
     }
-
-    public string MarkerPath { get; }
-    public FakeProcessSource Processes { get; } = new();
-    public OllamaProcessOwnership CreateOwner() => new(MarkerPath, Processes);
-    public void Dispose() => Directory.Delete(directory, recursive: true);
+    finally { exit.TrySetResult(); await stop; }
+    Assert.Equal(1, child.Disposals);
   }
 
-  private sealed class FakeProcessSource : OllamaProcessOwnership.IProcessSource
+  [Fact]
+  public async Task EveryStopIsInitiatedBeforeAwaitingBlockedExit()
   {
-    public List<FakeProcess> Candidates { get; } = [];
-    public int LookupCount { get; private set; }
-    public int EnumerationCount { get; private set; }
-    public int? LastLookupId { get; private set; }
-
-    public IEnumerable<OllamaProcessOwnership.IProcess> GetOllamaProcesses()
+    OllamaProcessOwnership owner = new();
+    TaskCompletionSource exit = Signal();
+    using Child blocked = new() { Exit = exit.Task };
+    using Child independent = new();
+    owner.TrackProcess(blocked);
+    owner.TrackProcess(independent);
+    Task stop = owner.StopAsync();
+    try
     {
-      EnumerationCount++;
-      return Candidates;
+      await independent.Stopping.Task;
+      Assert.False(stop.IsCompleted);
+      Assert.Equal(0, blocked.Disposals);
+      Assert.Equal(1, independent.Stops);
     }
+    finally { exit.TrySetResult(); await stop; }
+  }
 
-    public OllamaProcessOwnership.IProcess GetProcessById(int processId)
+  [Fact]
+  public async Task FailedKillRetainsHandleUntilExitAndIndependentDisposalContinues()
+  {
+    OllamaProcessOwnership owner = new();
+    TaskCompletionSource exit = Signal();
+    InvalidOperationException denied = new("termination denied");
+    using Child failed = new() { Exit = exit.Task, StopFailure = denied };
+    using Child independent = new() { DisposeFailure = new IOException("dispose failed") };
+    owner.TrackProcess(failed);
+    owner.TrackProcess(independent);
+    Task stop = owner.StopAsync();
+    try
     {
-      LookupCount++;
-      LastLookupId = processId;
-      return Candidates.Find(process => process.Id == processId)
-        ?? throw new ArgumentException("No such test process.", nameof(processId));
+      await independent.Stopping.Task;
+      Assert.False(stop.IsCompleted);
+      Assert.Equal(0, failed.Disposals);
+    }
+    finally { exit.TrySetResult(); }
+    AggregateException error = await Assert.ThrowsAsync<AggregateException>(() => stop);
+    Assert.Contains(denied, error.Flatten().InnerExceptions);
+    Assert.Equal(1, failed.Disposals);
+    Assert.Equal(1, independent.Disposals);
+    Assert.Same(stop, owner.StopAsync());
+  }
+
+  [Fact]
+  public async Task UnverifiableExitReportsIncompleteAndRetainsHandle()
+  {
+    OllamaProcessOwnership owner = new();
+    IOException unavailable = new("exit identity unavailable");
+    using Child child = new() { Exit = Task.FromException(unavailable) };
+    owner.TrackProcess(child);
+    AggregateException error = await Assert.ThrowsAsync<AggregateException>(() => owner.StopAsync());
+    Assert.Contains(unavailable, error.Flatten().InnerExceptions);
+    Assert.Equal(0, child.Disposals);
+  }
+
+  [Fact]
+  public async Task CancellationCallbacksAreRetainedAndFaultsDoNotPreventIndependentStops()
+  {
+    OllamaProcessOwnership owner = new();
+    using Child child = new();
+    owner.TrackProcess(child);
+    TaskCompletionSource entered = Signal();
+    TaskCompletionSource canceled = Signal();
+    TaskCompletionSource release = Signal();
+    Task<int> user = owner.RunAsync(async token =>
+    {
+      using CancellationTokenRegistration callback = token.Register(() => { canceled.TrySetResult(); throw new IOException("callback"); });
+      entered.SetResult();
+      await release.Task;
+      return 1;
+    });
+    await entered.Task;
+    Task stop = owner.StopAsync();
+    try
+    {
+      await canceled.Task;
+      Assert.False(stop.IsCompleted);
+      Assert.Equal(0, child.Disposals);
+    }
+    finally { release.TrySetResult(); }
+    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => user);
+    await Assert.ThrowsAsync<AggregateException>(() => stop);
+    Assert.Equal(1, child.Stops);
+  }
+
+  [Fact]
+  public async Task InitiatingCallbackCannotSelfAwaitButSharedStopStillDrains()
+  {
+    OllamaProcessOwnership owner = new();
+    using Child child = new();
+    owner.TrackProcess(child);
+    Task? stop = null;
+    Exception? mistakenAwait = null;
+    Task<int> user = owner.RunAsync(async _ =>
+    {
+      stop = owner.RequestStop();
+      mistakenAwait = await Record.ExceptionAsync(() => owner.StopAsync());
+      return 1;
+    });
+    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => user);
+    Assert.IsType<InvalidOperationException>(mistakenAwait);
+    await stop!;
+    Assert.Equal(1, child.Stops);
+  }
+
+  [Fact]
+  public async Task CopiedExecutionContextFromCompletedUseCanStopLater()
+  {
+    OllamaProcessOwnership owner = new();
+    TaskCompletionSource release = Signal();
+    Task? delayed = null;
+    await owner.RunAsync(_ =>
+    {
+      delayed = Task.Run(async () => { await release.Task; await owner.StopAsync(); });
+      return Task.FromResult(1);
+    });
+    release.TrySetResult();
+    await delayed!;
+  }
+
+  [Fact]
+  public async Task WindowBorrowedChatUsersShareRuntimeUntilApplicationStop()
+  {
+    OllamaProcessOwnership owner = new();
+    using Child child = new();
+    owner.TrackProcess(child);
+    TaskCompletionSource release = Signal();
+    Chat inner = new(release.Task);
+    LocalChatProviderRegistry.OwnedOllamaChatService a = new(inner, owner);
+    LocalChatProviderRegistry.OwnedOllamaChatService b = new(inner, owner);
+    Task<ChatCompletionResult> first = a.CompleteAsync(Request());
+    Task<ChatCompletionResult> second = b.CompleteAsync(Request());
+    await inner.BothEntered.Task;
+    Task stop = owner.StopAsync();
+    try { Assert.Equal(0, child.Stops); Assert.False(stop.IsCompleted); }
+    finally { release.TrySetResult(); }
+    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => second);
+    await stop;
+    Assert.Equal(1, child.Stops);
+  }
+
+  private static ChatCompletionRequest Request() => new([new(ChatMessageRoles.User, "fixture", DateTimeOffset.UtcNow)],
+    new(ChatProviderIds.OllamaLocal, "gemma4:e4b"));
+  internal static TaskCompletionSource Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+  [Fact]
+  public async Task BlockedCancellationCallbackKeepsUsersAndSourcesOwnedUntilCallbackReturns()
+  {
+    OllamaProcessOwnership owner = new();
+    using Child child = new();
+    owner.TrackProcess(child);
+    using ManualResetEventSlim releaseCallback = new();
+    TaskCompletionSource entered = Signal();
+    TaskCompletionSource callbackEntered = Signal();
+    TaskCompletionSource releaseUser = Signal();
+    Task<int> user = owner.RunAsync(async token =>
+    {
+      using CancellationTokenRegistration callback = token.Register(() =>
+      {
+        callbackEntered.TrySetResult();
+        releaseCallback.Wait();
+      });
+      entered.TrySetResult();
+      await releaseUser.Task;
+      return 1;
+    });
+    await entered.Task;
+    Task stop = owner.StopAsync();
+    try
+    {
+      await callbackEntered.Task;
+      releaseUser.TrySetResult();
+      Assert.False(user.IsCompleted);
+      Assert.False(stop.IsCompleted);
+      Assert.Equal(0, child.Disposals);
+    }
+    finally
+    {
+      releaseCallback.Set();
+      releaseUser.TrySetResult();
+      await Assert.ThrowsAnyAsync<OperationCanceledException>(() => user);
+      await stop;
     }
   }
 
-  private sealed class FakeProcess(int id) : OllamaProcessOwnership.IProcess
+  private sealed class Chat(Task release) : IChatCompletionService
   {
-    public int Id { get; } = id;
-    public DateTime StartTimeUtc { get; init; } = new(2026, 9, 30, 12, 0, 0, DateTimeKind.Utc);
-    public string Name { get; init; } = "ollama";
-    public string ExecutablePath => @"C:\Program Files\Ollama\ollama.exe";
-    public Task StopCompletion { get; init; } = Task.CompletedTask;
-    public int StopCount { get; private set; }
-    public int DisposeCount { get; private set; }
+    private int entered;
+    public TaskCompletionSource BothEntered { get; } = Signal();
+    public async Task<ChatCompletionResult> CompleteAsync(ChatCompletionRequest request, CancellationToken cancellationToken = default)
+    {
+      if (Interlocked.Increment(ref entered) == 2) BothEntered.SetResult();
+      await release;
+      return new("fixture", ChatProviderIds.OllamaLocal, "gemma4:e4b", TimeSpan.Zero);
+    }
+  }
 
+  internal sealed class Child : OllamaProcessOwnership.IProcess
+  {
+    public int Id => 42;
+    public DateTime StartTimeUtc => new(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc);
+    public string Name => "ollama";
+    public string ExecutablePath => @"C:\Owned\ollama.exe";
+    public bool HasExited { get; init; }
+    public int ExitCode { get; init; }
+    public Task Exit { get; init; } = Task.CompletedTask;
+    public Exception? StopFailure { get; init; }
+    public Exception? DisposeFailure { get; init; }
+    public TaskCompletionSource Stopping { get; } = Signal();
+    public int Stops { get; private set; }
+    public int Disposals { get; private set; }
     public Task StopAsync()
     {
-      StopCount++;
-      return StopCompletion;
+      Stops++;
+      Stopping.TrySetResult();
+      return StopFailure is null ? Task.CompletedTask : Task.FromException(StopFailure);
     }
-
-    public void Dispose() => DisposeCount++;
+    public Task WaitForExitAsync() => Exit;
+    public void Dispose()
+    {
+      Disposals++;
+      // Outer fixture disposal is safe and should not obscure the asserted owned-disposal fault.
+      if (Disposals == 1 && DisposeFailure is not null) throw DisposeFailure;
+    }
   }
 }
