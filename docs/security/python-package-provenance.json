@@ -94,9 +94,9 @@
     },
     {
       "name": "certifi",
-      "version": "2026.7.22",
+      "version": "2026.10.19",
       "license": "Mozilla Public License 2.0 (MPL 2.0)",
-      "source": "https://pypi.org/project/certifi/2026.7.22/"
+      "source": "https://pypi.org/project/certifi/2026.10.19/"
     },
     {
       "name": "cffi",
@@ -646,9 +646,9 @@
     },
     {
       "name": "pillow",
-      "version": "12.3.0",
+      "version": "13.0.0",
       "license": "MIT-CMU",
-      "source": "https://pypi.org/project/pillow/12.3.0/"
+      "source": "https://pypi.org/project/pillow/13.0.0/"
     },
     {
       "name": "pip",
@@ -1138,9 +1138,9 @@
     },
     {
       "name": "Werkzeug",
-      "version": "3.1.8",
+      "version": "3.1.9",
       "license": "BSD-3-Clause",
-      "source": "https://pypi.org/project/Werkzeug/3.1.8/"
+      "source": "https://pypi.org/project/Werkzeug/3.1.9/"
     },
     {
       "name": "win32-setctime",

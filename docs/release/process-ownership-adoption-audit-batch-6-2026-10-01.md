@@ -140,8 +140,36 @@ Prior batch reports recorded the roadmap as prose; this audit retains the follow
 | 19 | Documentation claims, links and measured size policy | Complete after this report and cap update are revalidated |
 | 20 | Reproducible CI/release evidence and physical compatibility artifacts | Partial; automated gates pass, five compatibility artifacts, manual matrix and dynamic elevated cases NOT_RUN |
 
+Item 16 was remediated after this audit; see the remediation addendum below. The table remains the point-in-time batch 6 status.
+
 ## Recommendation
 
 Recommended next batch: duplicate-instance and partial-startup admission plus the general hotkey startup path, revalidated against merged code. Prove that duplicate-instance exit occurs before settings/I/O, failed or partial startup cannot register late callbacks, and hotkey registration/unregistration is idempotent across startup failure and shutdown. Keep fake boundaries and owned temporary state; do not use real markers, installed runtimes or external processes. Treat the Python advisory findings as a separate release-blocking dependency decision, because fixing them here would change pinned environments outside this audit. Complete physical installation, consent-UI, clean-Windows, session-ending, model/GPU and long-recording evidence in the release track before any no-orphan or physical-reliability claim. No performance improvement is claimed from unmeasured timing.
 
 Acceptance for the supported ownership, consent, drain, failure and transport contract is met by the passing automated checks above, with the explicit exceptions of the failing advisory gate and the unverified physical scenarios. No directly blocking deferred implementation defect was identified within this batch's supported source boundary. The legacy-marker regression's isolated path and the non-atomic check/connect race are stated limitations, not hidden completion claims.
+
+## Remediation addendum — Python dependency advisories (2026-10-23)
+
+Status: roadmap item 16 is closed by a separate follow-up commit on `codex/process-ownership-adoption`. This addendum does not revise the batch 6 point-in-time results above; it records the later dependency remediation.
+
+The three findings in the validation record were external advisory drift against pinned runtime versions. The fixed releases were adopted with the complete PyPI artifact hash set for each release:
+
+| Package | Before | After | Artifacts hashed |
+|---|---|---|---:|
+| certifi | 2026.7.22 | 2026.10.19 | 2 |
+| pillow | 12.3.0 | 13.0.0 | 83 |
+| Werkzeug | 3.1.8 | 3.1.9 | 2 |
+
+Updated files: the three shipped runtime locks, the hashed experiments lock and `docs/security/python-package-provenance.json`. The inventory remains 192 entries and keeps exact normalized name/version equality with every shipped lock.
+
+Verification after the change:
+
+- `audit-python-advisories.ps1 -FailOnFindings`: 192 versions queried, 0 findings.
+- `validate-supply-chain.ps1` and its self-test: passed.
+- `security-compliance.ps1`: passed.
+- Documentation validation and self-test: passed.
+- Size gate: passed. The dependency-only candidate, before this addendum, measured 10,486,340 tracked bytes (tests 2,002,666; documentation and planning 1,783,353), 1,014 bytes below the batch 6 candidate; no cap change was needed.
+- Hash-locked install proof on CPython 3.11.9; repository image import tests 3/3; Pillow 13 shadowed against the installed torchvision 0.29.0 / transformers 5.17.0, RapidOCR 3.9.2 and TensorBoard 2.20.0 environments. No installed runtime was modified.
+- certifi 2026.10.19 removes the compromised `emSign ECC Root CA - G3` root and adds no roots.
+
+Limits: the OSV result is point-in-time; no full transcription, OCR or vision inference was run with Pillow 13; the Indic runtime's pre-existing transformers 4.46.1 drift remains; `docs/license-inventory.md` still states 221 Python name/version pairs while the inventory is 192. Evidence is local under ignored `artifacts/python-advisory-remediation/`.
